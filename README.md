@@ -1,0 +1,1 @@
+# plugins-mapsvg-lite-interactive-vector-maps
