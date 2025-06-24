@@ -56,6 +56,9 @@ class Schema extends Model
 	public $title;
 	public $fields = array();
 
+	/** @var string | null */
+	public $postType;
+
 	private $prevFields = array();
 
 	public function __construct($data)
@@ -217,6 +220,14 @@ class Schema extends Model
 	public function getName()
 	{
 		return $this->name;
+	}
+	public function setPostType($postType)
+	{
+		$this->postType = $postType;
+	}
+	public function getPostType()
+	{
+		return $this->postType;
 	}
 	public function setTitle($title)
 	{

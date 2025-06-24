@@ -338,10 +338,6 @@
       }
     }
 
-    if (schemaData.name && schemaData.type === "post") {
-      schemaData.postType = schemaData.name.split("_").slice(1).join("_")
-    }
-
     _this.formBuilder = new mapsvg.formBuilder({
       container: _this.formContainer,
       schema: schemaForModal,
@@ -369,7 +365,12 @@
             data.apiAuthorization = ""
           }
           if (data.type === "post") {
-            data.name = "posts_" + data.postType
+            data.name =
+              "posts_" +
+              data.postType
+                .toLowerCase()
+                .replace(/[-\s]+/g, "_") // Replace dashes and spaces with underscores
+                .replace(/[^a-z0-9_]/g, "")
           }
 
           if (data.type === "object") {

@@ -44,15 +44,14 @@ class SchemaController extends Controller
 			return new \WP_REST_Response(["data" => ["error" => "Data source with the name '" . $data["name"] . "' already exists"]], 400);
 		}
 
-		$schemaRepository = RepositoryFactory::get("schema");
 		$response = array();
-
 		$response['schema'] = $schemaRepository->create($data);
 
 
 		if ($data["type"] === "post") {
 			$post_types = Options::get("mappable_post_types") ?? [];
-			$post_type = str_replace('posts_', '', $originalName);
+
+			$post_type = $data["postType"];
 
 			if (!in_array($post_type, $post_types)) {
 				$post_types[] = $post_type;

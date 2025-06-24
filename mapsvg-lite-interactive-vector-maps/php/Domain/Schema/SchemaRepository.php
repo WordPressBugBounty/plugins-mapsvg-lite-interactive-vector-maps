@@ -52,6 +52,13 @@ class SchemaRepository extends Repository
 			if (empty($schema->fields)) {
 				$defSchema = RepositoryFactory::getDefaultSchema($schema->name, $schema->type);
 				$schema->fields = $defSchema->fields;
+				if ($schema->type === "post") {
+					foreach ($defSchema->fields as $field) {
+						if (isset($field->type) && $field->type === 'post') {
+							$field->post_type = $schema->postType;
+						}
+					}
+				}
 			}
 		}
 

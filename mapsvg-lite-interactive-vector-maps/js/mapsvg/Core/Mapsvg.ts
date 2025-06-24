@@ -68,6 +68,7 @@ export interface MapSVGProps {
   _nonce: string
   google_maps_api_key: string
   version: string
+  plan: string
   markerImages: { url: string; file: string; folder: string; relativeUrl?: string }[]
   defaultMarkerImage: string
   // formBuilder: FormBuilder
@@ -98,6 +99,7 @@ export class Mapsvg implements MapSVGProps {
   static initialized = false
   loaded: boolean = false
   version: string = "process.env.VERSION"
+  plan: string = "process.env.PLAN"
   markerImages: { url: string; file: string; folder: string; relativeUrl?: string }[]
   defaultMarkerImage: string
   // formBuilder: FormBuilder
@@ -133,6 +135,10 @@ export class Mapsvg implements MapSVGProps {
     }
 
     this.mouse = { x: 0, y: 0 }
+  }
+
+  get v(): string {
+    return this.plan + "-" + this.version
   }
 
   static createClient(frontEndOptions?: MapsvgFrontendParams) {

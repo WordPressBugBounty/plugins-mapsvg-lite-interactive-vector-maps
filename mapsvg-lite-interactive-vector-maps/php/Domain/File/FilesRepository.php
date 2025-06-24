@@ -201,6 +201,10 @@ class FilesRepository
 		$mapsvg_error = $this->checkUploadDir();
 
 		if (!$mapsvg_error) {
+			if (strpos($_file['name'], '../') !== false || strpos($_file['name'], '..\\') !== false) {
+				throw new \Exception('Invalid file name: path traversal detected', 400);
+			}
+
 			$fileClass = $this->getModelClass();
 			$file = new $fileClass(array('serverPath' => $this->writeToFolder . DIRECTORY_SEPARATOR . $_file['name']));
 

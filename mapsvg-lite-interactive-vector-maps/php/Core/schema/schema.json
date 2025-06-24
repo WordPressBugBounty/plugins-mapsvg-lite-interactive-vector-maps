@@ -1,5 +1,6 @@
 {
   "name": "schema",
+  "postType": "",
   "objectNameSingular": "schema",
   "objectNamePlural": "schemas",
   "apiEndpoints": [

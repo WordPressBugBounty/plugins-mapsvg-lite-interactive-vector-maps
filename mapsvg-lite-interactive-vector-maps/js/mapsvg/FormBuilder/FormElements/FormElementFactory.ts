@@ -128,7 +128,7 @@ export class FormElementFactory {
 
     const getFilterableFields = (schema: Schema) => {
       const databaseFields: string[] = []
-      const type = ucfirst(schema.type)
+      const type = schema.type === "post" || schema.type === "api" ? "Object" : ucfirst(schema.type)
 
       schema.getFields().forEach(async (obj) => {
         if (obj.type == "location" || obj.type == "image") {

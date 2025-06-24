@@ -17,7 +17,7 @@
 
                 <a href="https://mapsvg.com/docs" target="_blank">Docs</a>
 
-                | <a href="https://mapsvg.com/changelog" target="_blank">Changelog</a> <span class="badge badge-version">v<?php echo esc_html(MAPSVG_VERSION . ($data['gitBranch'] ? ' <i class="bi bi-git"></i> ' . $data['gitBranch'] : '')); ?></span>
+                | <a href="https://mapsvg.com/changelog" target="_blank">Changelog</a> <span class="badge badge-version"><?php echo esc_html(str_replace("mapsvg-", "", MAPSVG_PLAN) . "-" . MAPSVG_VERSION . ($data['gitBranch'] ? ' <i class="bi bi-git"></i> ' . $data['gitBranch'] : '')); ?></span>
                 <?php if (MAPSVG_DEBUG) { ?>
                     | <a href="#" id="mapsvg-btn-phpinfo" data-loading-text="Getting info...">PHPInfo</a>
                 <?php } ?>

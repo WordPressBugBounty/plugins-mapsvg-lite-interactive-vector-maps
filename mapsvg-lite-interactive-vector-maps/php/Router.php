@@ -142,15 +142,6 @@ class Router
 				}
 			)
 		));
-		register_rest_route('mapsvg/v1', $baseRoute . 'access', array(
-			array(
-				'methods' => 'POST',
-				'callback' => '\MapSVG\OptionsController::setAccess',
-				'permission_callback' => function () {
-					return current_user_can('edit_posts');
-				}
-			)
-		));
 	}
 
 	public function registerMapRoutes()

@@ -47,6 +47,7 @@ export interface SchemaOptions {
   objectNamePlural?: string
   strict?: boolean
   remote?: boolean
+  postType?: string
 }
 
 export enum SchemaEventType {
@@ -94,6 +95,7 @@ export class Schema {
   type: SchemaType
   name: string
   title?: string
+  postType?: string
   fields?: ArrayIndexed<SchemaField>
   lastChangeTime: number
   events: Events
@@ -172,6 +174,10 @@ export class Schema {
       this.setApiEndpoints(endpoints)
       this.setApiBaseUrl(mapsvgCore.routes.api.replace(/\/+$/, ""))
     }
+  }
+
+  setPostType(postType: string) {
+    this.postType = postType
   }
 
   update(options) {
@@ -270,6 +276,7 @@ export class Schema {
       objectNamePlural: this.objectNamePlural,
       objectNameSingular: this.objectNameSingular,
       remote: this.remote,
+      postType: this.postType,
     }
     return data
   }

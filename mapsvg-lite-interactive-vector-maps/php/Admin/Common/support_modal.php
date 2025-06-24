@@ -62,6 +62,9 @@
           </div>
           <div class="tab-pane fade" id="access-tokens" role="tabpanel" aria-labelledby="access-tokens-tab">
             <div class="alert alert-info mt-4 mapsvg-premium-feature"><i class="bi bi-star-fill"></i> Premium feature <a class="btn btn-xs mx-1 btn-outline-primary" target="_blank" href="https://mapsvg.com">Upgrade</a></div>
+
+
+
             <div id="mapsvg-support-access-section">
               <?php if (strpos(home_url(), 'demo.mapsvg.com') !== false) : ?>
                 <div class="alert alert-info mt-4" role="alert">
@@ -101,6 +104,9 @@
 
 
 
+                <div class="alert alert-danger mapsvg-admin-only-feature hidden" role=" alert">
+                  <i class="bi bi-lock"></i> This feature is for admins only.
+                </div>
                 <button type="submit" class="btn btn-primary" disabled="disabled">Create</button>
 
 
@@ -114,9 +120,7 @@
                 The magic link has been copied to the clipboard. Make sure to save it as it will be shown just once.
               </div>
             </div>
-            <h5 style="margin-top: 30px;">
-              Access tokens
-            </h5>
+
             <div id="mapsvg-tokens"></div>
           </div>
         </div>

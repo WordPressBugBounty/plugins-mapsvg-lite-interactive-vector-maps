@@ -66,17 +66,9 @@ class SVGFileController extends Controller
 				'error' => $e->getMessage()
 			), 400);
 		}
-		if (!current_user_can('unfiltered_html')) {
-			// Remove JS scripts from the SVG file
-			try {
-				$file->sanitize();
-			} catch (\Exception $e) {
-				return self::render(array(
-					'error' => 'You don\'t have permission to upload unfiltered SVG and MapSVG could not sanitize it properly. Please remove all dangerous code from the SVG file.'
-				), 400);
-			}
-		}
+		$file->maybeSanitize(current_user_can('unfiltered_html'));
 		$file = $filesRepo->create($file);
+
 		return self::render(array('file' => array(
 			'name' => $file->name,
 			'relativeUrl' => $file->relativeUrl,
@@ -97,11 +89,14 @@ class SVGFileController extends Controller
 		$files = $request->get_file_params();
 		$filesRepo = new SVGFileRepository();
 		$file = new SVGFile($files['file']);
+		$file->maybeSanitize(current_user_can('unfiltered_html'));
 		$filesRepo->save($file);
+
 		static::updateLastChanged($file);
 
 		return self::render(array('status' => 'OK'));
 	}
+
 
 	/**
 	 * Copies an SVG file
@@ -114,6 +109,7 @@ class SVGFileController extends Controller
 	{
 		$filesRepo = new SVGFileRepository();
 		$file = new SVGFile(["relativeUrl" => $request['file']['path']]);
+		$file->maybeSanitize(current_user_can('unfiltered_html'));
 		$newFile = $filesRepo->copy($file);
 		return self::render(array('file' => $newFile));
 	}

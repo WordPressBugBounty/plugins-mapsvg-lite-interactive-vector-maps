@@ -356,8 +356,11 @@ export const handleFailedRequest = (response) => {
     if (response && response.responseText) {
       try {
         const _response = JSON.parse(response.responseText)
-        if (_response && _response.data && _response.data.error) {
-          message = _response.data.error
+        if (
+          (_response && _response.data && _response.data.error) ||
+          (_response && _response.error)
+        ) {
+          message = _response.data?.error ? _response.data.error : _response.error
         }
       } catch (e) {
         // do nothing

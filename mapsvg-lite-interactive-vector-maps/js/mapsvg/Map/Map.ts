@@ -151,6 +151,7 @@ export class MapSVGMap {
   optionsDelta: { [key: string]: any }
 
   mapIsGeo: boolean
+  drawMode: boolean = false
   geoCoordinates: boolean = false
   inBackend: boolean
   highlightedRegions: Array<Region> = []
@@ -2069,6 +2070,16 @@ export class MapSVGMap {
   getRegionStylesByState(region: Region): null | RegionStylesByStatus {
     if (!region) {
       return null
+    }
+
+    if (this.drawMode) {
+      return {
+        default: {
+          selected: {},
+          hover: {},
+          default: {},
+        },
+      }
     }
 
     const statusStyles: RegionStylesByStatus = {}
@@ -6786,6 +6797,23 @@ export class MapSVGMap {
     this.editData.on = utils.numbers.parseBoolean(on)
     this.deselectAllRegions()
     this.setEventHandlers()
+  }
+
+  /**
+   * Enables "Edit objects" mode
+   * Used in the Map Editor.
+   * @param {bool} on
+   * @private
+   */
+  setDrawMode(on: boolean): void {
+    this.drawMode = utils.numbers.parseBoolean(on)
+    if (this.drawMode) {
+      this.regions.forEach((region) => {
+        region.setStyle(region.styleSvg)
+      })
+    } else {
+      this.reloadAllRegionStyles()
+    }
   }
 
   /**

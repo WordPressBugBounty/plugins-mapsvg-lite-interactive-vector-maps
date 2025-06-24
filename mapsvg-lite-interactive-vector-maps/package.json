@@ -1,10 +1,13 @@
 {
   "name": "mapsvg",
-  "version": "8.6.10",
+  "version": "8.6.12",
   "type": "module",
   "main": "dist/mapsvg-front.min.js",
   "module": "dist/mapsvg-front.esm.js",
   "browser": "dist/mapsvg-front.umd.js",
+  "mapsvgMeta": {
+    "plan": "lite"
+  },
   "ts-node": {
     "esm": true,
     "experimentalSpecifierResolution": "node"
@@ -49,7 +52,9 @@
     "cssnano": "^7.0.6",
     "eslint": "^8.56.0",
     "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-module-utils": "^2.12.1",
     "formdata-node": "^6.0.3",
     "gulp": "^5.0.0",
     "gulp-clean-css": "^4.3.0",

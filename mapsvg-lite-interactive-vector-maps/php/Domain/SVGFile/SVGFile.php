@@ -34,15 +34,24 @@ class SVGFile extends File
 	/**
 	 *  Remove all <script>...</script> tags (case-insensitive, multiline, greedy)
 	 **/
-	public function sanitize()
+	public function maybeSanitize($canHaveScripts = false)
 	{
-		if (isset($this->body)) {
+		if (!$canHaveScripts) {
+			$this->body = self::sanitize($this->body);
+		}
+
+		return $this;
+	}
+
+	public static function sanitize($body)
+	{
+		if (isset($body)) {
 			$sanitizer = new Sanitizer();
-			$this->body = $sanitizer->sanitize($this->body);
-			if (!$this->body) {
+			$body = $sanitizer->sanitize($body);
+			if (!$body) {
 				throw new \Exception('SVG file sanitization failed', 400);
 			}
 		}
-		return $this;
+		return $body;
 	}
 }

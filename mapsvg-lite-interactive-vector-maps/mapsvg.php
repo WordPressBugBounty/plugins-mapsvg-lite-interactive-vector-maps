@@ -3,7 +3,7 @@
 Plugin Name: MapSVG Lite
 Plugin URI: https://mapsvg.com
 Description: Any maps with database integration, filters and search. Use included maps or draw your own. Create vector maps, Google maps, image maps, floor plans, store locators.
-Version: 8.6.10
+Version: 8.6.12
 Requires at least: 5.0
 Requires PHP: 7.4
 Author: Northern Lights Production
@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) exit; // Exit if accessed directly
 define('MAPSVG_API_URL', 'https://mapsvg.com/dashboard/api');
 define('MAPSVG_PLAN', 'mapsvg-lite');
 /** MapSVG version number */
-define('MAPSVG_VERSION', '8.6.10');
+define('MAPSVG_VERSION', '8.6.12');
 /** Prefix for MapSVG tables in the database */
 define('MAPSVG_PREFIX',  'mapsvg6_');
 

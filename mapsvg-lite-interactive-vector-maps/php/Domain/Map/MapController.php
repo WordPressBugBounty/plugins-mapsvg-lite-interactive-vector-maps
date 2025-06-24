@@ -181,6 +181,23 @@ class MapController extends Controller
 		exit;
 	}
 
+	/**
+	 * Validates the map data to prevent file traversal and other issues.
+	 * @param array $map
+	 * @throws \Exception if validation fails
+	 */
+	private static function validate(array $map)
+	{
+		if (isset($map['options']['source']) || isset($map['options']['svgFilePath'])) {
+			$svgPaths = [$map['options']['source'], $map['options']['svgFilePath']];
+			foreach ($svgPaths as $svgPath) {
+				if (strpos($svgPath, '../') !== false || strpos($svgPath, '..\\') !== false) {
+					throw new \Exception("Invalid SVG file path: path traversal detected.", 400);
+				}
+			}
+		}
+		// Add more validation checks here as needed
+	}
 
 	/**
 	 * Creates a new map
@@ -192,15 +209,21 @@ class MapController extends Controller
 	 */
 	public static function create($request)
 	{
-
 		$map = $request['map'];
-
 		/**
 		 * @var MapsRepository
 		 */
 		$mapsRepository = RepositoryFactory::get("map");
 
 		$map["options"] = json_decode($map["options"], true);
+
+		// Validate map data
+		try {
+			self::validate($map);
+		} catch (\Exception $e) {
+			return self::render(["error" => $e->getMessage()], $e->getCode() ?: 400);
+		}
+
 		$map["options"]["filtersSchema"] =
 			[
 				 
@@ -545,7 +568,6 @@ class MapController extends Controller
 	 */
 	public static function update($request)
 	{
-
 		$mapData = (array)$request['map'];
 
 		// Prevent blockage by Apache's mod_sec
@@ -555,6 +577,13 @@ class MapController extends Controller
 			$mapData['options'] = str_replace("!mapsvg-encoded-db", "database", $mapData['options']);
 			$mapData['options'] = str_replace("!mapsvg-encoded-vc", "varchar", $mapData['options']);
 			$mapData['options'] = str_replace("!mapsvg-encoded-int", "int(11)", $mapData['options']);
+		}
+
+		// Validate map data
+		try {
+			self::validate($mapData);
+		} catch (\Exception $e) {
+			return self::render(["error" => $e->getMessage()], $e->getCode() ?: 400);
 		}
 
 		$mapsRepository = RepositoryFactory::get("map");

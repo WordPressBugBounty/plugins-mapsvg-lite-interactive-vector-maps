@@ -69,6 +69,31 @@ class PostTypesRepository
         ];
       }
     }
+    // Add ACF fields
+    if (function_exists('acf_get_field_groups')) {
+      $field_groups = acf_get_field_groups(['post_type' => $post_type]);
+      foreach ($field_groups as $group) {
+        $fields = acf_get_fields($group['key']);
+        if (is_array($fields)) {
+          foreach ($fields as $field) {
+            $exists = false;
+            foreach ($meta as $m) {
+              if ($m['name'] === $field['name']) {
+                $exists = true;
+                break;
+              }
+            }
+            if (!$exists) {
+              $meta[] = [
+                'name' => $field['name'],
+                'type' => isset($field['type']) ? $field['type'] : 'string',
+                'label' => isset($field['label']) ? $field['label'] : ucfirst($field['name']),
+              ];
+            }
+          }
+        }
+      }
+    }
 
     return [
       'postType'  => $post_type,

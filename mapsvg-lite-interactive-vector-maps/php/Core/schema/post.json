@@ -33,6 +33,7 @@
       "label": "Post",
       "type": "post",
       "db_type": "int(11)",
+      "post_type": "post",
       "visible": true,
       "readonly": true
     }

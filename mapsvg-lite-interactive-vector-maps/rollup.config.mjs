@@ -41,6 +41,7 @@ export default [
       replace({
         preventAssignment: true,
         "process.env.VERSION": packageJson.version,
+        "process.env.PLAN": packageJson.mapsvgMeta.plan,
       }),
       postcss({
         extensions: [".css", ".scss"],

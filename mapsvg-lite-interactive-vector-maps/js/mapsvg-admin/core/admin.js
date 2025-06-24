@@ -817,6 +817,7 @@ function loadDeps() {
       if (on) {
         _this.toggleContainers(false)
         editingMap.hideMarkersExceptOne()
+        editingMap.setDrawMode(true)
         if (!_data.controllers.draw) {
           await window.mapsvg.utils.files.loadFiles([
             { path: "js/mapsvg-admin/modules/draw/draw-controller.js" },
@@ -837,6 +838,7 @@ function loadDeps() {
         if (_data.previousMode !== "draw") {
           return
         }
+        editingMap.setDrawMode(false)
         _this.toggleContainers()
         editingMap.showMarkers()
         _data.controllers.draw && _data.controllers.draw.close()
@@ -1255,7 +1257,9 @@ function loadDeps() {
           events: {
             save: function (event) {
               const { data, formBuilder } = event.data
-              data.allowed_shortcodes = data.allowed_shortcodes.split(",")
+              if (data.allowed_shortcodes) {
+                data.allowed_shortcodes = data.allowed_shortcodes.split(",")
+              }
               jQuery.extend(_data.options.options, data)
               _this.updateOptions(data)
               settingsModal.hide()
@@ -1810,7 +1814,9 @@ function loadDeps() {
     },
     loadTokens: () => {
       _data.tokensRepo.find().done((data) => {
-        const tableHtml = `
+        $("#customizationModal #mapsvg-tokens").empty()
+        if (data && data.length > 0) {
+          const tableHtml = `
             <table class="table">
               <thead>
                 <tr>
@@ -1849,14 +1855,16 @@ function loadDeps() {
               </tbody>
             </table>
           `
-
-        $("#customizationModal #mapsvg-tokens").html(tableHtml)
-
-        // Add event listener for delete buttons
-        $("#customizationModal .delete-token").on("click", function () {
-          const tokenId = $(this).data("token-id")
-          _data.tokensRepo.delete(tokenId)
-        })
+          $("#customizationModal #mapsvg-tokens").append(
+            `<h5 class="mapsvg-title" style="margin-top: 30px;">Access tokens</h5>`,
+          )
+          $("#customizationModal #mapsvg-tokens").append(tableHtml)
+          // Add event listener for delete buttons
+          $("#customizationModal .delete-token").on("click", function () {
+            const tokenId = $(this).data("token-id")
+            _data.tokensRepo.delete(tokenId)
+          })
+        }
       })
     },
     // END
@@ -1909,6 +1917,12 @@ function loadDeps() {
       var onEditMapScreen = _data.options.map && _data.options.map.id ? true : false
 
       $("body").addClass("mapsvg-edit-screen")
+
+      $("body .mapsvg-admin-only-feature").hide()
+      if (!_data.options.user.isAdmin) {
+        $("body .mapsvg-admin-only-feature").show()
+        $("body .mapsvg-admin-only-button").attr("disabled", true)
+      }
 
       $(document).ready(function () {
         // Position control panel in WordPress

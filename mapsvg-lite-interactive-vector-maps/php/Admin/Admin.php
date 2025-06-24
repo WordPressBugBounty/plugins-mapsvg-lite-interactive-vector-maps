@@ -144,7 +144,7 @@ class Admin
             'svgFiles' => $svgRepo->find(),
             'options' => $options,
             'postTypes' => $post_types,
-            'userIsAdmin' => current_user_can("create_users") ? true : false,
+            'userIsAdmin' => current_user_can("manage_options"),
             'pagination' => array(
                 "page" => $currentPage,
                 "hasMore" => $mapsData["hasMore"],
@@ -164,14 +164,14 @@ class Admin
             'user' => array(
                 "name" => $user_name,
                 "email" => $user_email,
-                "isAdmin" => current_user_can("create_users")
+                "isAdmin" => current_user_can("manage_options")
             ),
             'maps' => $mapsRepo->find($query),
             'gitBranch' => "",
             'svgFiles' => $svgRepo->find(),
             'options' => $options,
             'postTypes' => $post_types,
-            'userIsAdmin' => current_user_can("create_users") ? true : false
+            'userIsAdmin' => current_user_can("manage_options")
         ));
 
         $this->renderOutput('index', $templateData);
@@ -236,7 +236,7 @@ class Admin
             'user' => array(
                 "name" => $user_name,
                 "email" => $user_email,
-                "isAdmin" => current_user_can("create_users")
+                "isAdmin" => current_user_can("manage_options")
             ),
             'phpIni' => array(
                 'post_max_size'       => ini_get('post_max_size'),
@@ -248,7 +248,7 @@ class Admin
             'fullTextMinWord' => $fullTextMinWord,
             'options' => $options,
             'postTypes' => $post_types,
-            'userIsAdmin' => current_user_can("create_users") ? true : false
+            'userIsAdmin' => current_user_can("manage_options")
         ));
 
 

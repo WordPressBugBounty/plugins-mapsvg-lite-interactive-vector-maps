@@ -1627,3 +1627,6 @@ body.mapsvg-modal-fullscreen {
 .mapsvg-details-category {
   color: #aaa;
 }
+.tt-menu.tt-open {
+  z-index: 999999999;
+}
