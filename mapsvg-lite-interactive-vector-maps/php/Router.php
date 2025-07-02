@@ -26,6 +26,7 @@ class Router
 
 		// This should be called before "rest_api_init"
 		add_action('init', array($this, 'setupGutenberg'));
+		add_action('init', array($this, 'addShortcodePostType'));
 
 		
 
@@ -126,6 +127,16 @@ class Router
 	{
 		$postEditorMapLoader = new PostEditorMapLoader();
 		$postEditorMapLoader->init();
+	}
+	function addShortcodePostType()
+	{
+		register_post_type('mapsvg_shortcode', [
+			'label' => 'MapSVG Embeddable Shortcode Blank Page',
+			'public' => false,
+			'show_ui' => false,
+			'exclude_from_search' => true,
+			'supports' => ['title', 'editor'],
+		]);
 	}
 
 

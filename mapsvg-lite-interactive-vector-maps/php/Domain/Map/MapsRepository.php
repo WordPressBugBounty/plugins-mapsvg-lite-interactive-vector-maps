@@ -103,7 +103,7 @@ class MapsRepository extends Repository
 	 */
 	public function update($map)
 	{
-		parent::update($map);
+		return parent::update($map);
 	}
 
 	/**
@@ -171,11 +171,13 @@ class MapsRepository extends Repository
 
 		$newMap = $this->create($newMapData, true);
 
+
+
 		if (isset($newMapData['options']['css'])) {
 			$mapUpdate = array('id' => $newMap->id, 'options' => $newMapData['options']);
 			$mapUpdate['options']['css'] = str_replace('#mapsvg-map-' . $map->id, '#mapsvg-map-' . $newMap->id, $newMapData['options']['css']);
 			//			$mapUpdate['options']['css'] = str_replace('#mapsvg-map-'. $map->id, '{{mapsvg_gallery '.$newMap->id, $newMapData['options']['css']);
-			$this->update($mapUpdate);
+			$newMap = $this->update($mapUpdate);
 		}
 
 		$this->copyTables($map, $newMap);

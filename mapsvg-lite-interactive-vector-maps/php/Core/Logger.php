@@ -56,9 +56,7 @@ class Logger
 
 	public static function sendHeaders()
 	{
-		error_log("headers sent");
 		if (static::clockworkEnabled()) {
-			error_log("headers sent");
 			return self::$clockwork->sendHeaders();
 		}
 	}

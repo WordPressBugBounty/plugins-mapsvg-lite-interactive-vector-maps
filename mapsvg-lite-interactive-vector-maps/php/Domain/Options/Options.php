@@ -146,7 +146,12 @@ class Options
     }
     public static function encodeValue($field, $value)
     {
-        if ($field === 'mappable_post_types' || $field === 'allowed_shortcodes') {
+        if (is_array($value) && ($field === 'mappable_post_types' || $field === 'allowed_shortcodes')) {
+            // Trim each value and remove duplicates
+            foreach ($value as &$v) {
+                $v = trim($v);
+            }
+            unset($v); // break reference
             $value = array_unique($value);
             return wp_json_encode($value, JSON_UNESCAPED_UNICODE);
         } else {

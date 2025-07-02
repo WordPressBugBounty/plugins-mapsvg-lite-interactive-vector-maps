@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 8.6.12
+Stable tag: 8.6.13
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -202,55 +202,58 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 * Fix clicking on links in SVG 
 * Fix broken options in 8.5.37
 
-= 8.5.39 ==
+= 8.5.39 =
 * Fix filter tags (show clickable filter tags when filters are hidden)
 * Fix search by regions
 
-= 8.5.40 ==
+= 8.5.40 =
 * Fix "select" field editing
 * Fix shortcode rending function (for mapsvg templates)
 
-= 8.5.41 ==
+= 8.5.41 =
 * Fix Handlebars WP shortcode rendering
 
-= 8.5.42 ==
+= 8.5.42 =
 * Fix clustering
 
-= 8.6.0 ==
+= 8.6.0 =
 * (Pro only) Filters for WP CPT
 * (Pro only) Dynamic markers by WP CPT field values
 
-= 8.6.3 ==
+= 8.6.3 =
 * Fix map.destroy() method
 
-= 8.6.4 ==
+= 8.6.4 =
 * Fix loading of different kinds of data sources
 
-= 8.6.5 ==
+= 8.6.5 =
 * Fixed XSS vulnerability
 * Fixed SVG file copy vulnerability
 
-= 8.6.6 ==
+= 8.6.6 =
 * Fixed post title being rendered as plain text (in popovers / details)
 
-= 8.6.7 ==
+= 8.6.7 =
 * Added SVG file sanitization for non-admins
 
-= 8.6.8 ==
+= 8.6.8 =
 * Minor bugfix
 
-= 8.6.9 ==
+= 8.6.9 =
 * Minor bugfix for migrations
 
-= 8.6.10 ==
+= 8.6.10 =
 * Fixed security vulnerabilities related to unauthorized shortcode rendering in templates
 
-= 8.6.11 ==
+= 8.6.11 =
 * Fixed unavailable filtering by ACF fields
 * Fixed handling of post type names containing dashes
 
-= 8.6.12 ==
+= 8.6.12 =
 * Fixed a few vulnerabilities
+
+= 8.6.13 =
+* Fixed: Duplicating a map now correctly updates the map ID in the "CSS" tab, preventing conflicts with the original map.
 
 == Upgrade Notice ==
 

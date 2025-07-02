@@ -330,7 +330,7 @@ Handlebars.registerHelper("shortcode", function (...args) {
     })
   }
 
-  const url = mapsvg.routes.home + "/mapsvg_sc?mapsvg_shortcode=" + encodeURI(shortcode)
+  const url = mapsvg.routes.home + "/mapsvg_sc/?mapsvg_shortcode=" + encodeURI(shortcode)
 
   return new Handlebars.SafeString(
     '<iframe width="100%" class="mapsvg-iframe-shortcode" src="' + url + '"></iframe>',
