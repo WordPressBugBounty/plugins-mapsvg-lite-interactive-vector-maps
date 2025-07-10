@@ -1257,8 +1257,11 @@ function loadDeps() {
           events: {
             save: function (event) {
               const { data, formBuilder } = event.data
-              if (data.allowed_shortcodes) {
-                data.allowed_shortcodes = data.allowed_shortcodes.split(",")
+              if (typeof data.allowed_shortcodes === "string") {
+                data.allowed_shortcodes = data.allowed_shortcodes
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter((item) => item.length > 0)
               }
               jQuery.extend(_data.options.options, data)
               _this.updateOptions(data)

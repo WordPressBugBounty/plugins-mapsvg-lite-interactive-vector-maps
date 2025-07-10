@@ -694,7 +694,11 @@ export class MapSVGMap {
           ? "objects,regions"
           : "regions"
       // If map options are not specified then fetch them from the server
-      this.mapDataPromise = fetch(mapsvgCore.routes.api + `maps/${this.id}?withData=${withData}`)
+      // Build the base URL for the map data endpoint
+      const baseUrl = mapsvgCore.routes.api + `maps/${this.id}`
+      const separator = baseUrl.includes("?") ? "&" : "?"
+      const url = `${baseUrl}${separator}withData=${withData}`
+      this.mapDataPromise = fetch(url)
         .then(async (response) => {
           if (!response.ok) {
             // Handle HTTP error

@@ -139,7 +139,7 @@ class Options
             $value = (bool)$value;
             return $value;
         } elseif (in_array($field, ['mappable_post_types', 'allowed_shortcodes'])) {
-            return json_decode($value ? $value : '', true);
+            return json_decode($value ? $value : '[]', true);
         } else {
             return $value;
         }
