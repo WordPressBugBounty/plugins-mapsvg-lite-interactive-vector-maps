@@ -231,6 +231,7 @@ export class Region extends MapObject {
       objects: this.objects.map((o) => o.getData()),
       data: this.data?.getData(),
       fill: this.style.fill ?? "",
+      status: this.status,
     }
 
     return data
@@ -415,9 +416,9 @@ export class Region extends MapObject {
     }
 
     this.status = status
-    if (regionModel) {
-      regionModel.update({ status })
-    }
+    // if (regionModel) {
+    //   regionModel.update({ status })
+    // }
     this.setDisabled(statusOptions.disabled, true)
     this.setStyleByType()
     this.events.trigger(MapObjectEvent.UPDATE, { region: this, data: { status } })

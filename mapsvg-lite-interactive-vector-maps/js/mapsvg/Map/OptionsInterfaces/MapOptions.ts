@@ -26,6 +26,10 @@ export interface MapOptions {
   source?: string
   // Contents of an SVG file if it was preloaded
   svgData?: string
+  regionsDynamicStatus?: {
+    filtered?: string | number | undefined
+    noObjects?: string | number | undefined
+  }
   regionPrefix?: string
   groups?: ArrayIndexed<GroupOptionsInterface>
   galleries?: ArrayIndexed<GalleryOptionsInterface>

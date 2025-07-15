@@ -7,10 +7,7 @@
   MapSVG.extend(MapSVGAdminFiltersSettingsController, window.MapSVGAdminController)
 
   MapSVGAdminFiltersSettingsController.prototype.viewLoaded = function () {
-    var _this = this
-    _this.mapsvg.regionsRepository.events.on("schemaChange", function () {
-      _this.render()
-    })
+    this.mapsvg.regionsRepository.getSchema().events.on("update", () => this.render())
   }
 
   MapSVGAdminFiltersSettingsController.prototype.setEventHandlers = function () {

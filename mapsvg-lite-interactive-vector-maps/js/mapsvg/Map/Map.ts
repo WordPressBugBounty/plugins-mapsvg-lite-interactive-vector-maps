@@ -7209,6 +7209,16 @@ export class MapSVGMap {
     if (this.options.choropleth?.on) {
       this.setChoropleth()
     }
+
+    const filteredStatus = this.options.regionsDynamicStatus?.noObjects
+    if (typeof filteredStatus !== "undefined") {
+      this.regions
+        .filter((region) => region.objects.length === 0)
+        .forEach((region) => {
+          region.setStatus(filteredStatus)
+        })
+    }
+
     this.events.trigger("afterLoadObjects", {
       objects: this.objectsRepository.getLoaded(),
     })
@@ -7239,9 +7249,15 @@ export class MapSVGMap {
         this.deleteMarkers()
         this.deleteClusters()
 
-        repository.objects
-          .filter((object) => object.getData().regions && object.getData().regions.length > 0)
-          .forEach((object) => this.linkObjectToRegions(object))
+        this.regions.forEach((region) => {
+          region.objects.clear()
+        })
+
+        repository.objects.forEach((object) => {
+          if (object.getData().regions && object.getData().regions.length > 0) {
+            this.linkObjectToRegions(object)
+          }
+        })
 
         repository.objects
           .filter((object) => object.getData().location)
@@ -7250,6 +7266,7 @@ export class MapSVGMap {
         if (this.options.clustering.on) {
           this.startClusterizer()
         }
+        this.reloadRegionsFull()
         this.objectsLoadedToMapHandler()
       },
     )
@@ -7773,9 +7790,10 @@ export class MapSVGMap {
           region.setStatus(_region.getData().status)
         }
       } else {
+        const filteredStatus = this.options.regionsDynamicStatus?.filtered
         if (
-          this.options.filters.filteredRegionsStatus ||
-          this.options.filters.filteredRegionsStatus === 0 ||
+          filteredStatus ||
+          filteredStatus === 0 ||
           (this.options.menu.source === "regions" &&
             this.options.menu.filterout &&
             this.options.menu.filterout.field === "status" &&
@@ -7783,9 +7801,8 @@ export class MapSVGMap {
           this.options.menu.filterout.val === 0
         ) {
           const status =
-            this.options.filters.filteredRegionsStatus ||
-            this.options.filters.filteredRegionsStatus === 0
-              ? this.options.filters.filteredRegionsStatus
+            filteredStatus || filteredStatus === 0
+              ? filteredStatus
               : this.options.menu.filterout.val
           region.setStatus(status)
         }
@@ -8302,6 +8319,11 @@ export class MapSVGMap {
         _this.options.choropleth.colors.high +
         '",GradientType=1 )',
     })
+  }
+  setRegionsDynamicStatus(value: { filtered?: string; noObjects?: string }) {
+    deepMerge(this.options.regionsDynamicStatus, value)
+    this.reloadRegionsFull()
+    this.objectsLoadedToMapHandler()
   }
   setSvgFileLastChanged(val: number) {
     this.svgFileLastChanged = val

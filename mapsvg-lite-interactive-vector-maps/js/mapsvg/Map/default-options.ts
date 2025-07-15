@@ -96,6 +96,10 @@ const DefaultOptions = {
     },
   },
   regions: {},
+  regionsDynamicStatus: {
+    filtered: undefined,
+    noObjects: undefined,
+  },
   clustering: { on: false },
   viewBox: [],
   cursor: "default",

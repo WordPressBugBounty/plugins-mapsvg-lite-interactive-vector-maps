@@ -39,18 +39,22 @@ if (!class_exists('WP_EX_PAGE_ON_THE_FLY')) {
 			// Only run for the main query and only for our intended slug
 			if (
 				$query && $query->is_main_query() &&
-				count($posts) == 0 &&
 				(strtolower($wp->request) == $this->slug || (isset($wp->query_vars['page_id']) && ($wp->query_vars['page_id'] == $this->slug)))
 			) {
 
-				// Try to find an existing post of type mapsvg_shortcode with this slug
-				$existing = get_posts([
-					'name' => $this->slug,
-					'post_type' => 'mapsvg_shortcode',
-					'post_status' => 'publish',
-					'numberposts' => 1,
-				]);
+				// If a post already exists and it's mapsvg_shortcode, just update its content
 
+				if (!empty($posts) && $posts[0]->post_type === 'mapsvg_shortcode') {
+					$existing = $posts;
+				} else {
+					// Try to find an existing post of type mapsvg_shortcode with this slug
+					$existing = get_posts([
+						'name' => $this->slug,
+						'post_type' => 'mapsvg_shortcode',
+						'post_status' => 'publish',
+						'numberposts' => 1,
+					]);
+				}
 
 				if ($existing) {
 					$post = $existing[0];
@@ -64,7 +68,6 @@ if (!class_exists('WP_EX_PAGE_ON_THE_FLY')) {
 						'number'  => 1,
 					]);
 					$admin_id = !empty($admin_users) ? $admin_users[0]->ID : 1;
-
 
 					// Create a new post in the DB
 					$post_id = wp_insert_post([

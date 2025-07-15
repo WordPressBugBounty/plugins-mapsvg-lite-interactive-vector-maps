@@ -97,7 +97,8 @@ export class FiltersController extends DetailsController {
       events: {
         "change.formElement": (event) => {
           const { formElement, field } = event.data
-          let { value } = event.data
+          let value = JSON.parse(JSON.stringify(event.data.value))
+
           if (formElement.type === "search") {
             this.query.setSearch(value)
           } else {
@@ -108,11 +109,13 @@ export class FiltersController extends DetailsController {
             }
 
             if (field === "regions") {
-              if (!value[0]) {
+              if (!value || !value[0]) {
                 value = null
-                delete filters.regionsTableName
               } else {
-                filters.regionsTableName = this.map.regionsRepository.getSchema().name
+                value = {
+                  table_name: this.map.regionsRepository.getSchema().name,
+                  region_ids: Array.isArray(value) ? value.map((v) => v.value) : [value],
+                }
               }
             } else if (
               field === "distance" &&
@@ -145,6 +148,12 @@ export class FiltersController extends DetailsController {
   update(query: Query): void {
     const _query = Object.assign({}, query.filters)
     _query.search = query.search
+    if (_query.regions && _query.regions.region_ids) {
+      // @ts-expect-error type
+      _query.regions = _query.regions.region_ids.map((region) => {
+        return { value: region }
+      })
+    }
     this.formBuilder && this.formBuilder.update(_query)
   }
 

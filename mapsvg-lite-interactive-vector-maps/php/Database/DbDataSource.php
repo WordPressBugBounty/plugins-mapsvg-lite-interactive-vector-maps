@@ -142,20 +142,14 @@ class DbDataSource implements DataSourceInterface
 
         if ($fieldValue != '') {
 
-          // There are 3 special parameters in the search query which are not real DB fields.
-          // Handle them separately.
-          // 1. regionTableName - for filtering objects by region.
-          if ($fieldName === "regionsTableName") {
-            $region_table_name = $fieldValue;
-            continue;
-          }
-          // 2. prefix - for filtering objects by prefix in the ID
+          // There are 2 special parameters in the search query which are not real DB fields.
+          // 1. prefix - for filtering objects by prefix in the ID
           if ($fieldName === 'prefix') {
             $filters_sql[] = '`id` LIKE %s';
             $filters_sql_fields[] = $fieldValue . '%';
             continue;
           }
-          // 3. distance - for filtering objects by lat/lng coordinates
+          // 2. distance - for filtering objects by lat/lng coordinates
           if ($fieldName === 'distance') {
             $fieldName = 'location';
           }
@@ -172,21 +166,18 @@ class DbDataSource implements DataSourceInterface
           }
 
           if ($field->type === 'region') {
-            $regions_table = $region_table_name;
-            $regions_array = array();
-            $regions_array_fields = array();
-            if (!is_array($fieldValue)) {
-              $fieldValue = [["value" => $fieldValue]];
-            }
-            foreach ($fieldValue as $region) {
-              $regionId = $region['value'];
-              $regions_array[] = ' r2o.region_id = %s ';
-              $regions_array_fields[] = $regionId;
+            $regions_table = $fieldValue["table_name"];
+            $regions_array = $fieldValue["region_ids"];
+
+            foreach ($regions_array as $region_id) {
+              $regions_placeholders[] = "%s";
             }
 
-            $regions_sql = implode(' OR ', $regions_array);
-            $filter_regions = "INNER JOIN {$this->db->mapsvg_prefix}r2o r2o ON r2o.objects_table=%s AND r2o.regions_table=%s AND r2o.object_id=id AND ({$regions_sql})";
-            $filter_regions_fields = array_merge([$this->source, $regions_table], $regions_array_fields);
+            $regions_sql = "r2o.region_id IN (" . implode(',', $regions_placeholders) . ")";
+
+            $filter_regions = "INNER JOIN {$this->db->mapsvg_prefix}r2o r2o ON r2o.objects_table=%s AND r2o.regions_table=%s AND r2o.object_id=id AND {$regions_sql}";
+
+            $filter_regions_fields = array_merge([$this->source, $regions_table], $regions_array);
           } else if ($field->type === 'location') {
             if (isset($fieldValue['geoPoint']) && !empty($fieldValue['geoPoint']["lat"]) && !empty($fieldValue['geoPoint']["lng"])) {
               $having = ' HAVING distance < %d ';

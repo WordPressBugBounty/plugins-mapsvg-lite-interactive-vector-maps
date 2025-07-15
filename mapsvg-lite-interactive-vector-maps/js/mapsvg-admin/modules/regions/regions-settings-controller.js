@@ -8,6 +8,11 @@
   window.MapSVGAdminRegionsSettingsController = MapSVGAdminRegionsSettingsController
   MapSVG.extend(MapSVGAdminRegionsSettingsController, window.MapSVGAdminController)
 
+  MapSVGAdminRegionsSettingsController.prototype.viewLoaded = function () {
+    var _this = this
+    this.mapsvg.regionsRepository.getSchema().events.on("update", () => this.render())
+  }
+
   MapSVGAdminRegionsSettingsController.prototype.setEventHandlers = function () {
     var _this = this
     this.view.on("click", "#mapsvg-clear-regions-btn", function () {
@@ -35,5 +40,15 @@
         window.location.reload()
       })
     })
+  }
+
+  MapSVGAdminRegionsSettingsController.prototype.getTemplateData = function () {
+    var _this = this
+    var statusField = _this.mapsvg.regionsRepository.getSchema().getFieldByType("status")
+    var options = statusField ? statusField.options : []
+    return {
+      ..._this.mapsvg.options,
+      statuses: options,
+    }
   }
 })(jQuery, window, window.MapSVG)
