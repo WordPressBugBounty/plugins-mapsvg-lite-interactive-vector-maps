@@ -2,6 +2,7 @@
   var MapSVGAdminCssController = function (container, admin, mapsvg) {
     this.name = "css"
     this.disableHorizontalScroll = true
+    this.scrollable = false
     MapSVGAdminController.call(this, container, admin, mapsvg)
   }
   window.MapSVGAdminCssController = MapSVGAdminCssController

@@ -33,7 +33,7 @@ class PostEditorMapLoader
             if (!empty($this->mappablePostTypes)) {
                 foreach ($this->mappablePostTypes as $postType) {
                     add_action('untrash_' . $postType, [$this, 'updatePostData']);
-                    add_action('wp_trash_' . $postType, [$this, 'deletePostData']);
+                    add_action('trash_' . $postType, [$this, 'deletePostData']);
                 }
             }
         }
@@ -102,6 +102,7 @@ class PostEditorMapLoader
         $post = get_post($postID);
         $table = static::getTableName($post->post_type);
         $postsRepo = RepositoryFactory::get($table);
+        Logger::info("TEST");
         if ($postsRepo) {
             $postInMapsvgTable = $postsRepo->findOne(["post" =>  $postID]);
             if ($postInMapsvgTable) {

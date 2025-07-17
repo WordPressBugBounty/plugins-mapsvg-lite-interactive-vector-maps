@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 8.7.0
+Stable tag: 8.7.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -265,6 +265,12 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 = 8.7.0 = 
 * Feature: dynamic Region statuses
 * Fixed: incorrect container height issues in the map editor
+
+= 8.7.1 = 
+* Fixed: deleting a post did not delete marker from the map
+* Fixed: added min0
+* Fixed: scrolling of css/js/templates code editors on Firefox
+* Fixed: map sizing issues with some WP themes
 
 
 == Upgrade Notice ==

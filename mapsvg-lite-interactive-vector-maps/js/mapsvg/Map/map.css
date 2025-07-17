@@ -42,6 +42,7 @@
   /*overflow: visible !important;*/
   max-width: none !important;
   max-height: none !important;
+
   width: 100%;
   height: auto;
   /*height: 100vh;*/
@@ -54,6 +55,13 @@
   transform-origin: 0% 0%;
   -webkit-transform-origin: 0% 0%;
 }
+.mapsvg svg:not([width]) {
+  min-width: min-content;
+}
+.mapsvg svg:not([height]) {
+  min-height: min-content;
+}
+
 .mapsvg-relative {
   position: relative !important;
 }

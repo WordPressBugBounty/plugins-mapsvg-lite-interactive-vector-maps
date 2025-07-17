@@ -994,7 +994,7 @@ export class MapSVGMap {
       g.objects &&
         g.objects.length &&
         g.objects.forEach((obj) => {
-          const elems = this.containers.svg.querySelector("#" + obj.value)
+          const elems = this.containers.svg.querySelector(`[id="${obj.value}"]`)
           if (elems) {
             elems.classList.toggle("mapsvg-hidden", !g.visible)
           }
