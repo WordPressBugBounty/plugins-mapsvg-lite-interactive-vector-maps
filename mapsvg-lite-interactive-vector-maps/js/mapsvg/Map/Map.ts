@@ -122,7 +122,7 @@ export type ZoomLevel = {
 export class MapSVGMap {
   id: number
   version: string
-  containerId: string
+  container: HTMLElement
   markerOptions: Record<string, unknown> = { src: mapsvgCore.routes.root + "markers/pin1_red.png" }
   middlewares: MiddlewareList
   controllerMiddleWare: MiddlewareHandler
@@ -533,12 +533,12 @@ export class MapSVGMap {
   /**
    * Initializes a new instance of the Map class.
    *
-   * @param containerId The ID of the HTML element that will contain the map.
+   * @param container The ID or HTML element that will contain the map.
    * @param mapParams An object containing map parameters such as ID, options, SVG file last changed timestamp, and version.
    * @param params Additional parameters for the map, including options for prefetching and backend mode.
    */
   constructor(
-    containerId: string,
+    container: string | HTMLElement,
     mapParams: {
       id?: number
       options?: MapOptions
@@ -567,7 +567,7 @@ export class MapSVGMap {
       )
     }
 
-    this.containerId = containerId
+    this.container = typeof container === "string" ? document.getElementById(container) : container
     this.id = mapParams.id
     this.svgFileLastChanged =
       typeof mapParams.svgFileLastChanged === "number"
@@ -1837,15 +1837,31 @@ export class MapSVGMap {
       if (name !== undefined) {
         this.options.templates[name] = templates[name]
         if (name == "directoryItem" || name == "directoryCategoryItem") {
+          Handlebars.unregisterPartial(name + "-" + this.id)
           Handlebars.unregisterPartial(name)
           try {
-            Handlebars.registerPartial(name, templates[name])
+            if (name == "directoryCategoryItem") {
+              templates[name] = templates[name].replace(
+                /\{\{\s*>?\s*directoryItem\s*\}\}/g,
+                "{{>directoryItem-" + this.id + "}}",
+              )
+            }
+
+            Handlebars.registerPartial(name + "-" + this.id, templates[name])
           } catch (error) {
-            Handlebars.registerPartial(name, "")
+            Handlebars.registerPartial(name + "-" + this.id, "")
             console.error(error)
           }
         } else {
           try {
+            if (name == "directory" || name == "directoryCategoryItem") {
+              templates[name] = templates[name]
+                .replace(/\{\{\s*>?\s*directoryItem\s*\}\}/g, "{{>directoryItem-" + this.id + "}}")
+                .replace(
+                  /\{\{\s*>?\s*directoryCategoryItem\s*\}\}/g,
+                  "{{>directoryCategoryItem-" + this.id + "}}",
+                )
+            }
             this.options.templates[name] = templates[name]
             this.templates[name] = Handlebars.compile(templates[name], { strict: false })
           } catch (err) {
@@ -3691,7 +3707,7 @@ export class MapSVGMap {
   createContainers() {
     this.containers = {
       ...this.containers,
-      map: document.getElementById(this.containerId),
+      map: this.container,
       scrollpane: $('<div class="mapsvg-scrollpane"></div>')[0],
       scrollpaneWrap: $('<div class="mapsvg-scrollpane-wrap"></div>')[0],
       layers: $('<div class="mapsvg-layers-wrap"></div>')[0],
@@ -4682,6 +4698,7 @@ export class MapSVGMap {
     this.controllers.popover && this.controllers.popover.close()
 
     if (this.controllers.detailsView) this.controllers.detailsView.destroy()
+    if (this.controllers.directory) this.controllers.directory.destroy()
 
     $(this.containers.detailsView).remove()
     $(this.containers.popover).remove()
@@ -4690,6 +4707,10 @@ export class MapSVGMap {
     $(this.containers.tooltipMarker).remove()
 
     $(this.containers.wrapAll).remove()
+    $(this.containers.filtersModal).remove()
+    $(this.containers.filters).remove()
+    $(this.containers.map).empty().remove()
+
     const indexToRemove = mapsvgCore.instances.findIndex((item) => item.id === this.id)
     if (indexToRemove !== -1) {
       mapsvgCore.instances.splice(indexToRemove, 1) // Remove 1 element at the found index
@@ -8042,7 +8063,7 @@ export class MapSVGMap {
     this.containers.loading.appendChild(spinner)
     this.containers.loading.appendChild(loadingTextBlock)
 
-    document.getElementById(this.containerId).appendChild(this.containers.loading)
+    this.container.appendChild(this.containers.loading)
   }
   private hideLoadingMessage() {
     $(this.containers.loading).hide()

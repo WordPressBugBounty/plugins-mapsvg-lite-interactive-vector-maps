@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 8.7.1
+Stable tag: 8.7.3
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -268,9 +268,16 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 
 = 8.7.1 = 
 * Fixed: deleting a post did not delete marker from the map
-* Fixed: added min0
 * Fixed: scrolling of css/js/templates code editors on Firefox
 * Fixed: map sizing issues with some WP themes
+
+= 8.7.2 = 
+* Fixed: "Show another map" feature functionality
+* Fixed: WP Rocket and LiteSpeed cache plugins were breaking MapSVG code. Added JavaScript files to exclusions in those plugins' settings.
+* Fixed: premature jQuery call that was breaking the map when jQuery wasn't immediately available
+
+= 8.7.3 = 
+* Fixed: directory rendering issues with enabled categories
 
 
 == Upgrade Notice ==

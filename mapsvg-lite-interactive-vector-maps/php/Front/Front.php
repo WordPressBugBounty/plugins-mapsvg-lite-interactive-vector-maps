@@ -75,7 +75,29 @@ class Front
 		add_filter("script_loader_tag", "\MapSVG\Front::add_module_to_mapsvg_script", 10, 3);
 		// wp_add_inline_script('mapsvg', "window.addEventListener('MapSVGDefined', () => mapsvgCore.init(JSON.parse(mapsvgFrontendParams))); mapsvgFrontendParams = null; delete window.mapsvgFrontendParams;");
 		wp_enqueue_script('mapsvg');
+
+
+		add_filter('litespeed_optimize_js_excludes', '\MapSVG\Front::jsExclude');
+		add_filter('litespeed_optm_js_defer_exc', '\MapSVG\Front::jsExclude');
+		add_filter('litespeed_optm_gm_js_exc', '\MapSVG\Front::jsExclude');
 	}
+
+	static function jsExclude($excludes = array())
+	{
+		$my_custom_excludes = array(
+			'mapsvg.js',
+			'handlebars-helpers.js',
+			'handlebars.min.js',
+			'bloodhound.js',
+			'typeahead.jquery.js',
+			'select2.full.min.js',
+			'jquery.nanoscroller.min.js'
+		);
+		return array_merge($excludes, $my_custom_excludes);
+	}
+
+
+
 
 	static function add_module_to_mapsvg_script($tag, $handle, $src)
 	{
@@ -83,8 +105,9 @@ class Front
 		if (in_array($handle, $defer_scripts)) {
 			// phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- This script needs to be loaded as a module			
 			$tag = '<script ';
+			$tag .= ' data-no-minify="1" ';
 			if ($handle === "mapsvg") {
-				$tag .= 'type="module"';
+				$tag .= ' type="module" ';
 			}
 			$tag .= 'src="' . esc_url($src) . '" id="' . $handle . '-js" defer></script>';
 		}

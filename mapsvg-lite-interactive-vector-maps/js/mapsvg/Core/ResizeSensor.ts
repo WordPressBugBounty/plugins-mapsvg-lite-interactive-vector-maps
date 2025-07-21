@@ -6,8 +6,6 @@
  * @constructor
  */
 
-const $ = jQuery
-
 export class ResizeSensor {
   element: HTMLElement
   callback: () => void
