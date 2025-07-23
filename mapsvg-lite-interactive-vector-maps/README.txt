@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 8.7.3
+Stable tag: 8.7.4
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -278,6 +278,9 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 
 = 8.7.3 = 
 * Fixed: directory rendering issues with enabled categories
+
+= 8.7.4 = 
+* Fixed: security issue, checking uploaded file type
 
 
 == Upgrade Notice ==
