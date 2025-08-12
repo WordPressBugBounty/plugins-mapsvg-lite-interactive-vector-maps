@@ -1033,6 +1033,9 @@
       // Delete editing points
       newSVG.find(".mapsvg-path-point").remove()
 
+      // Remove unwanted title="null" attributes that get added during cloning
+      newSVG.find("[title='null']").removeAttr("title")
+
       // Restore stroke-width, remove classes
       newSVG.find("path, polygon, circle, ellipse, rect").each(function (index) {
         if ($(this).attr("data-stroke-width")) {

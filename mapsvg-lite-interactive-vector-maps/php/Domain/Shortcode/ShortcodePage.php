@@ -8,6 +8,7 @@ if (!class_exists('WP_EX_PAGE_ON_THE_FLY')) {
 	{
 
 		public $slug = '';
+		public $post_id = null;
 		public $args = array();
 		public $post_content = '';
 		/**
@@ -19,8 +20,15 @@ if (!class_exists('WP_EX_PAGE_ON_THE_FLY')) {
 		function __construct($args)
 		{
 			$this->args = $args;
-			$this->slug = $args['slug'];
-			$this->post_content = $args['post_content'];
+			if (isset($args['slug'])) {
+				$this->slug = $args['slug'];
+			}
+			if (isset($args['ID'])) {
+				$this->post_id = $args['ID'];
+			}
+			if (isset($args['post_content'])) {
+				$this->post_content = $args['post_content'];
+			}
 
 			// Add the filter only for the next query
 			add_filter('the_posts', array($this, 'fly_page'), 10, 2);
@@ -36,10 +44,12 @@ if (!class_exists('WP_EX_PAGE_ON_THE_FLY')) {
 		{
 			global $wp;
 
+			\MapSVG\Logger::info($this->slug);
+
 			// Only run for the main query and only for our intended slug
 			if (
 				$query && $query->is_main_query() &&
-				(strtolower($wp->request) == $this->slug || (isset($wp->query_vars['page_id']) && ($wp->query_vars['page_id'] == $this->slug)))
+				(strtolower($wp->request) == $this->slug)
 			) {
 
 				// If a post already exists and it's mapsvg_shortcode, just update its content
@@ -48,42 +58,55 @@ if (!class_exists('WP_EX_PAGE_ON_THE_FLY')) {
 					$existing = $posts;
 				} else {
 					// Try to find an existing post of type mapsvg_shortcode with this slug
-					$existing = get_posts([
-						'name' => $this->slug,
-						'post_type' => 'mapsvg_shortcode',
-						'post_status' => 'publish',
-						'numberposts' => 1,
-					]);
+					if ($this->post_id) {
+						$existing = [get_post($this->post_id)];
+					} else {
+						$existing = get_posts([
+							'name' => $this->slug,
+							'post_type' => 'mapsvg_shortcode',
+							'post_status' => 'publish',
+							'numberposts' => 1,
+						]);
+					}
+
+					if ($existing) {
+
+						$post = $existing[0];
+
+						if ($this->post_content) {
+							// Optionally, update content dynamically							
+							$post->post_content = $this->post_content;
+						}
+					} else {
+						$admin_users = get_users([
+							'role'    => 'administrator',
+							'orderby' => 'ID',
+							'order'   => 'ASC',
+							'number'  => 1,
+						]);
+						$admin_id = !empty($admin_users) ? $admin_users[0]->ID : 1;
+
+						if ($this->post_id) {
+							$post_id = $this->post_id;
+						} else {
+							// Create a new post in the DB
+							$post_id = wp_insert_post([
+								'post_title'   => '',
+								'post_name'    => $this->slug,
+								'post_type'    => 'mapsvg_shortcode',
+								'post_status'  => 'publish',
+								'post_content' => '',
+								'post_author'  => $admin_id,
+							]);
+							$post = get_post($post_id);
+						}
+					}
+
+					\MapSVG\Logger::info($post);
+					// Remove the filter so it doesn't affect other queries
+					remove_filter('the_posts', array($this, 'fly_page'), 10);
+					return [$post];
 				}
-
-				if ($existing) {
-					$post = $existing[0];
-					// Optionally, update content dynamically
-					$post->post_content = $this->post_content;
-				} else {
-					$admin_users = get_users([
-						'role'    => 'administrator',
-						'orderby' => 'ID',
-						'order'   => 'ASC',
-						'number'  => 1,
-					]);
-					$admin_id = !empty($admin_users) ? $admin_users[0]->ID : 1;
-
-					// Create a new post in the DB
-					$post_id = wp_insert_post([
-						'post_title'   => 'MapSVG Shortcode: ' . $this->slug,
-						'post_name'    => $this->slug,
-						'post_type'    => 'mapsvg_shortcode',
-						'post_status'  => 'publish',
-						'post_content' => '',
-						'post_author'  => $admin_id,
-					]);
-					$post = get_post($post_id);
-				}
-
-				// Remove the filter so it doesn't affect other queries
-				remove_filter('the_posts', array($this, 'fly_page'), 10);
-				return [$post];
 			}
 
 			// Remove the filter for all other queries as well
@@ -259,12 +282,14 @@ if (isset($_GET['mapsvg_shortcode'])) {  // phpcs:ignore WordPress.Security.Nonc
 
 
 if (isset($_GET['mapsvg_embed_post'])) {  // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
-	add_action('wp_enqueue_scripts', 'mapsvg_add_jquery');
 	add_action('template_redirect', 'mapsvg_blank_template');
 
-	$post_id = (int)$_GET['mapsvg_embed_post'];  // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
-	$post = get_post($post_id, ARRAY_A);
-	$post['slug'] = 'mapsvg_sc';
+	$post_id = (int)$_GET['mapsvg_embed_post'];  // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing	
 
-	new WP_EX_PAGE_ON_THE_FLY($post);
+	$args = array(
+		'ID' => $post_id,
+		'slug' => 'mapsvg_sc',
+	);
+
+	new WP_EX_PAGE_ON_THE_FLY($args);
 }

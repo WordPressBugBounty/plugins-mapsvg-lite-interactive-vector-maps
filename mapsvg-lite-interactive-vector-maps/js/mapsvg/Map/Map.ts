@@ -530,6 +530,10 @@ export class MapSVGMap {
 
   private debouncedShowTooltip: (object: Marker | Region | MarkerCluster) => void
 
+  // Touch event handlers for mobile scrolling
+  private touchMoveHandler: (e: TouchEvent) => void
+  private touchEndHandler: (e: TouchEvent) => void
+
   /**
    * Initializes a new instance of the Map class.
    *
@@ -5859,9 +5863,11 @@ export class MapSVGMap {
     $(this.containers.map).addClass("no-transitions")
 
     const ce =
-      e.originalEvent && e.originalEvent.touches && e.originalEvent.touches[0]
-        ? e.originalEvent.touches[0]
-        : e
+      e.touches && e.touches[0]
+        ? e.touches[0]
+        : e.originalEvent && e.originalEvent.touches && e.originalEvent.touches[0]
+          ? e.originalEvent.touches[0]
+          : e
 
     this.scrollStarted = true
 
@@ -5918,9 +5924,11 @@ export class MapSVGMap {
     }
 
     const ce =
-      e.originalEvent && e.originalEvent.touches && e.originalEvent.touches[0]
-        ? e.originalEvent.touches[0]
-        : e
+      e.touches && e.touches[0]
+        ? e.touches[0]
+        : e.originalEvent && e.originalEvent.touches && e.originalEvent.touches[0]
+          ? e.originalEvent.touches[0]
+          : e
 
     this.panBy(this.scroll.gx - ce.clientX, this.scroll.gy - ce.clientY)
 
@@ -6091,7 +6099,7 @@ export class MapSVGMap {
     if (this.scrollStarted) {
       this.scrollEnd(_e, mapsvg, true)
     }
-    const e = _e.originalEvent
+    const e = _e.originalEvent || _e
 
     if (this.options.zoom.fingers && e.touches && e.touches.length == 2) {
       // this.touchZoomStartViewBox = this.viewBox;
@@ -6105,15 +6113,19 @@ export class MapSVGMap {
       this.scrollStart(_e, mapsvg)
     }
 
-    $(document)
-      .on("touchmove.scroll.mapsvg", (e: JQuery.TouchEventBase) => {
-        e.preventDefault()
-        this.touchMove(e, this)
-      })
-      .on("touchend.scroll.mapsvg", (e: JQuery.TouchEventBase) => {
-        e.preventDefault()
-        this.touchEnd(e, this)
-      })
+    // Use addEventListener with passive: false to allow preventDefault on touch events
+    this.touchMoveHandler = (e: TouchEvent) => {
+      e.preventDefault()
+      this.touchMove(e as any, this)
+    }
+
+    this.touchEndHandler = (e: TouchEvent) => {
+      e.preventDefault()
+      this.touchEnd(e as any, this)
+    }
+
+    document.addEventListener("touchmove", this.touchMoveHandler, { passive: false })
+    document.addEventListener("touchend", this.touchEndHandler, { passive: false })
   }
   /**
    * Event hanlder
@@ -6123,7 +6135,7 @@ export class MapSVGMap {
    */
   touchMove(_e: JQuery.TouchEventBase, mapsvg: MapSVGMap): void {
     _e.preventDefault()
-    const e = _e.originalEvent
+    const e = _e.originalEvent || _e
 
     if (this.options.zoom.fingers && e.touches && e.touches.length == 2) {
       if (!env.getDevice().ios) {
@@ -6176,15 +6188,15 @@ export class MapSVGMap {
    */
   touchEnd(_e: JQuery.TouchEventBase, mapsvg: MapSVGMap): void {
     _e.preventDefault()
-    const e = _e.originalEvent
     if (this.touchZoomStart) {
       this.touchZoomStart = false
     } else if (this.scrollStarted) {
       this.scrollEnd(_e, mapsvg)
     }
 
-    $(document).off("touchmove.scroll.mapsvg")
-    $(document).off("touchend.scroll.mapsvg")
+    // Remove the touch event listeners
+    document.removeEventListener("touchmove", this.touchMoveHandler)
+    document.removeEventListener("touchend", this.touchEndHandler)
   }
   /**
    * Returns array of IDs of selected Regions
@@ -6847,6 +6859,35 @@ export class MapSVGMap {
    */
   download() {
     window.location.href = window.location.origin + this.options.source
+  }
+
+  svg() {
+    return {
+      download: () => {
+        // Get the source URL
+        const sourceUrl =
+          window.location.protocol + "//" + window.location.host + this.options.source
+
+        // Create a temporary anchor element
+        const link = document.createElement("a")
+        link.href = sourceUrl
+
+        // Extract filename from the source path
+        const filename = sourceUrl.split("/").pop() || "download"
+        link.download = filename
+
+        // Set target to blank to avoid navigation
+        link.target = "_blank"
+
+        // Append to DOM, click, and remove
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      },
+      open: () => {
+        window.location.href = window.location.origin + this.options.source
+      },
+    }
   }
 
   /**
@@ -7799,16 +7840,13 @@ export class MapSVGMap {
     const statuses = this.regionsRepository.getSchema().getFieldByType("status")
 
     this.regions.forEach((region) => {
-      const _region = <Model>this.regionsRepository.getLoaded().findById(region.id)
+      const _region = this.regionsRepository.getLoaded().findById(region.id)
 
       if (_region) {
+        const data = _region?.getData()
         region.setData(_region)
-        if (
-          statuses &&
-          _region.getData().status !== undefined &&
-          _region.getData().status !== null
-        ) {
-          region.setStatus(_region.getData().status)
+        if (statuses && typeof data.status !== "undefined" && data.status !== null) {
+          region.setStatus(data.status)
         }
       } else {
         const filteredStatus = this.options.regionsDynamicStatus?.filtered

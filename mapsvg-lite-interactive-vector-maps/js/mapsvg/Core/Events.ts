@@ -163,7 +163,11 @@ export class Events {
             toRemove.push(event)
           }
         } catch (err) {
-          console.error(err)
+          console.error(
+            `MapSVG: event handler error for "${this.contextName}.${eventName}" on map  ID=${this.map?.id || "unknown"} with data:`,
+            { handler: event.handler, data },
+            err,
+          )
         }
       })
 

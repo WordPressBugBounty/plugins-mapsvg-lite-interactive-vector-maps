@@ -271,10 +271,9 @@ export class Region extends MapObject {
   setTitle(title?: string): void {
     if (title) {
       this.title = title
+      this.element.setAttribute("title", this.title)
+      this.events.trigger(MapObjectEvent.UPDATE, { region: this, data: { title } })
     }
-
-    this.element.setAttribute("title", this.title)
-    this.events.trigger(MapObjectEvent.UPDATE, { region: this, data: { title } })
   }
 
   /**
@@ -517,11 +516,12 @@ export class Region extends MapObject {
   setData(data: Model) {
     this.data = data
     if (
-      data &&
-      typeof data.getData === "function" &&
-      typeof data.getData()?.title !== "undefined"
+      this.data &&
+      typeof this.data.getData === "function" &&
+      typeof this.data.getData()?.title !== "undefined" &&
+      this.data.getData()?.title !== null
     ) {
-      this.setTitle(data.getData().title)
+      this.setTitle(this.data.getData().title)
     }
     this.events.trigger(MapObjectEvent.UPDATE, { region: this, data: { data } })
   }
