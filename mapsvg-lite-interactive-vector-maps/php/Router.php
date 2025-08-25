@@ -28,7 +28,32 @@ class Router
 		add_action('init', array($this, 'setupGutenberg'));
 		add_action('init', array($this, 'addShortcodePostType'));
 
-		
+		// Add query vars for custom endpoints
+		add_filter('query_vars', array($this, 'addCustomQueryVars'));
+
+		// Legacy shortcode support
+		add_action('parse_request', function ($wp) {
+			if ($wp->request === 'mapsvg_sc') { // phpcs:ignore
+				if (isset($_GET['mapsvg_shortcode'])) {
+					$legacy = wp_unslash($_GET['mapsvg_shortcode']); // phpcs:ignore
+					wp_redirect(home_url('/_mapsvg/shortcode/' . rawurlencode($legacy)), 301);
+					exit;
+				}
+				if (isset($_GET['mapsvg_embed_post'])) {
+					$legacy = wp_unslash($_GET['mapsvg_embed_post']); // phpcs:ignore
+					wp_redirect(home_url('/_mapsvg/post/' . rawurlencode($legacy)), 301);
+					exit;
+				}
+			}
+		});
+
+		// Register _mapsvg endpoint on both frontend and admin
+		add_action('init', function () {
+			if (!get_option('mapsvg_rewrite_flushed')) {
+				static::addMapsvgEndpoint();
+			}
+		});
+		add_action('parse_request', array($this, 'handleMapsvgRequest'));
 
 		add_action('rest_api_init', function () {
 
@@ -115,7 +140,114 @@ class Router
 		));
 	}
 
-	
+	private function requireAdmin(): void
+	{
+		if (!is_user_logged_in() || !current_user_can('manage_options')) {
+			wp_redirect(admin_url()); // or home_url()
+			exit;
+		}
+	}
+
+
+	public function handleMapsvgRequest($wp)
+	{
+
+		if (strpos($wp->request, '_mapsvg/') === 0) {
+			$path = trim($wp->request, '/');
+			$parts = explode('/', $path);
+
+			if (count($parts) > 1) {
+				$action = $parts[1];
+
+				switch ($action) {
+											
+					case 'shortcode':
+						$this->handleShortcodeRequest($wp, $parts);
+						break;
+					case 'post':
+						$this->handlePostRequest($wp, $parts);
+						break;
+					default:
+						wp_redirect(home_url());
+						break;
+				}
+			} else {
+				wp_redirect(home_url());
+			}
+
+			return;
+		}
+	}
+
+	/**
+	 * Add custom query variables for our endpoints
+	 */
+	public function addCustomQueryVars($vars)
+	{
+		$vars[] = '_mapsvg';
+		return $vars;
+	}
+
+	/**
+	 * Handle shortcode requests for /_mapsvg/shortcode/...
+	 */
+	private function handleShortcodeRequest($wp, $parts)
+	{
+		if (count($parts) > 1) {
+			// Get the full shortcode from the URL parts and decode it
+			// Check for shortcode in query parameter
+			if (isset($_GET['s'])) {
+				$shortcode = sanitize_text_field(wp_unslash($_GET['s']));
+			} else {
+				// Fallback to URL parts for backward compatibility
+				$shortcode = implode('/', array_slice($parts, 2));
+				$shortcode = urldecode($shortcode);
+			}
+
+			// Ensure the shortcode has proper brackets
+			if (!str_starts_with($shortcode, '[')) {
+				$shortcode = '[' . $shortcode;
+			}
+			if (!str_ends_with($shortcode, ']')) {
+				$shortcode = $shortcode . ']';
+			}
+
+			// Include the necessary files
+			\MapSVG\ShortcodeHandler::renderShortcode($shortcode);
+
+			// Don't exit - let WordPress continue to process the template_redirect action
+			return;
+		} else {
+			wp_redirect(home_url());
+		}
+		return;
+	}
+
+	/**
+	 * Handle post embed requests for /_mapsvg/post/...
+	 */
+	private function handlePostRequest($wp, $parts)
+	{
+		if (count($parts) > 2) {
+			$post_id = (int)$parts[2];
+
+			// Include the post embed renderer
+			$post_file = MAPSVG_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'php' . DIRECTORY_SEPARATOR . 'Domain' . DIRECTORY_SEPARATOR . 'Shortcode' . DIRECTORY_SEPARATOR . 'ShortcodePage.php';
+			if (file_exists($post_file)) {
+				include($post_file);
+				// Use the new OOP approach
+				\MapSVG\ShortcodeHandler::renderPostEmbed($post_id);
+			} else {
+				// Fallback if file doesn't exist
+				echo 'Post embed renderer not found';
+			}
+		} else {
+			wp_redirect(home_url());
+		}
+		return;
+	}
+
+
 
 	
 

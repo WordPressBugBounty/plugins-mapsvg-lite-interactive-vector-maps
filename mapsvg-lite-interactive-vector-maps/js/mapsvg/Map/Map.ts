@@ -1010,24 +1010,22 @@ export class MapSVGMap {
    * Returns the list of options for visibility settings in admin.js
    */
   getGroupSelectOptions(): any[] {
-    const _this = this
-    let id
     const optionGroups = []
     const options = []
     const options2 = []
 
-    $(_this.containers.svg)
+    $(this.containers.svg)
       .find("g")
       .each(function (index) {
         const id = $(this)[0].getAttribute("id")
         if (id) {
-          const title = $(this)[0].getAttribute("title")
+          const title = $(this)[0].getAttribute("title") || ""
           options.push({ label: title || id, value: id })
         }
       })
     optionGroups.push({ title: "SVG Layers / Groups", options: options })
 
-    $(_this.containers.svg)
+    $(this.containers.svg)
       .find("path,ellipse,circle,polyline,polygon,rectangle,img,text")
       .each(function (index) {
         const id = $(this)[0].getAttribute("id")

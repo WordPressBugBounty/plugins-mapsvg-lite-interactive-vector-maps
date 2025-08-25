@@ -330,7 +330,7 @@ Handlebars.registerHelper("shortcode", function (...args) {
     })
   }
 
-  const url = mapsvg.routes.home + "/mapsvg_sc/?mapsvg_shortcode=" + encodeURI(shortcode)
+  const url = mapsvg.routes.home + "/_mapsvg/shortcode/" + encodeURI(shortcode)
 
   return new Handlebars.SafeString(
     '<iframe width="100%" class="mapsvg-iframe-shortcode" src="' + url + '"></iframe>',
@@ -393,7 +393,7 @@ Handlebars.registerHelper("shortcode_inline", function (...args) {
 Handlebars.registerHelper("post", function (value) {
   if (this.post) {
     return new Handlebars.SafeString(
-      '<iframe width="100%" class="mapsvg-iframe-post"  src="/mapsvg_sc?mapsvg_embed_post=' +
+      '<iframe width="100%" class="mapsvg-iframe-post"  src="/_mapsvg/post/' +
         encodeURI(this.post.id) +
         '"></iframe>',
     )

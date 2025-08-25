@@ -67,6 +67,7 @@
 
 <body <?php body_class('blank-slate mapsvg-embedded-post'); ?>>
 
+
     <?php while (have_posts()) : ?>
 
         <?php the_post(); ?>

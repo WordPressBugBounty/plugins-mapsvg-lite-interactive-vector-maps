@@ -1,6 +1,6 @@
 <?php
 
-namespace Mapsvg;
+namespace MapSVG;
 
 class Shortcode
 {
@@ -12,7 +12,7 @@ class Shortcode
    * @param string $shortcode
    * @return string|null
    */
-  public static function getName($shortcode)
+  public static function getName(string $shortcode): ?string
   {
     if (preg_match('/\\[\\s*([a-zA-Z0-9_\\-]+)\\b/', $shortcode, $matches)) {
       return $matches[1];

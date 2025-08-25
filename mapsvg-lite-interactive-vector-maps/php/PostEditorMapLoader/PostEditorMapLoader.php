@@ -102,7 +102,6 @@ class PostEditorMapLoader
         $post = get_post($postID);
         $table = static::getTableName($post->post_type);
         $postsRepo = RepositoryFactory::get($table);
-        Logger::info("TEST");
         if ($postsRepo) {
             $postInMapsvgTable = $postsRepo->findOne(["post" =>  $postID]);
             if ($postInMapsvgTable) {

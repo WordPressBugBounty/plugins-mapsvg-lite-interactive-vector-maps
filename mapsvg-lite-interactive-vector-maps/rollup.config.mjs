@@ -105,7 +105,10 @@ export default [
       nodeResolve({
         browser: true,
       }),
-      process.env.NODE_ENV === "production" && terser(),
+      process.env.NODE_ENV === "production" &&
+        terser({
+          compress: { unused: false },
+        }),
     ],
   },
 ]
