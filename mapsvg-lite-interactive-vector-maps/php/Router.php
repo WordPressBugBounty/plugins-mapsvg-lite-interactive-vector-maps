@@ -94,7 +94,23 @@ class Router
 		// add_action('send_headers', array($this, 'finish_loggeer'), 10);
 	}
 
-		
+
+	public static function addMapsvgEndpoint()
+	{
+		if (!get_option('mapsvg_rewrite_flushed')) {
+			add_rewrite_rule('^_mapsvg/([^/]+)/?$', 'index.php?_mapsvg=$matches[1]', 'top');
+			add_rewrite_tag('%_mapsvg%', '([^&]+)');
+			flush_rewrite_rules();
+			update_option('mapsvg_rewrite_flushed', true);
+		}
+	}
+
+	public static function removeMapsvgEndpoint()
+	{
+		flush_rewrite_rules();
+		update_option('mapsvg_rewrite_flushed', false);
+	}
+
 
 	// function finish_loggeer($served)
 	// {
@@ -160,13 +176,8 @@ class Router
 				$action = $parts[1];
 
 				switch ($action) {
-											
-					case 'shortcode':
-						$this->handleShortcodeRequest($wp, $parts);
-						break;
-					case 'post':
-						$this->handlePostRequest($wp, $parts);
-						break;
+										
+							
 					default:
 						wp_redirect(home_url());
 						break;
