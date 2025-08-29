@@ -533,7 +533,7 @@ export class MapSVGMap {
   // Touch event handlers for mobile scrolling
   private touchMoveHandler: (e: TouchEvent) => void
   private touchEndHandler: (e: TouchEvent) => void
-
+  private touchActive = false
   /**
    * Initializes a new instance of the Map class.
    *
@@ -593,6 +593,10 @@ export class MapSVGMap {
     this.showLoadingMessage()
 
     this.middlewares = new MiddlewareList()
+
+    // in constructor (or init):
+    this.touchMoveHandler = this.touchMove.bind(this)
+    this.touchEndHandler = this.touchEnd.bind(this)
 
     this.init()
   }
@@ -6084,6 +6088,7 @@ export class MapSVGMap {
   setObjectClickedBeforeScroll(object: Region | Marker | MarkerCluster): void {
     this.objectClickedBeforeScroll = object
   }
+
   /**
    * Event hanlder
    * @param _e
@@ -6112,15 +6117,6 @@ export class MapSVGMap {
     }
 
     // Use addEventListener with passive: false to allow preventDefault on touch events
-    this.touchMoveHandler = (e: TouchEvent) => {
-      e.preventDefault()
-      this.touchMove(e as any, this)
-    }
-
-    this.touchEndHandler = (e: TouchEvent) => {
-      e.preventDefault()
-      this.touchEnd(e as any, this)
-    }
 
     document.addEventListener("touchmove", this.touchMoveHandler, { passive: false })
     document.addEventListener("touchend", this.touchEndHandler, { passive: false })
@@ -6193,8 +6189,8 @@ export class MapSVGMap {
     }
 
     // Remove the touch event listeners
-    document.removeEventListener("touchmove", this.touchMoveHandler)
-    document.removeEventListener("touchend", this.touchEndHandler)
+    document.removeEventListener("touchmove", this.touchMoveHandler, false)
+    document.removeEventListener("touchend", this.touchEndHandler, false)
   }
   /**
    * Returns array of IDs of selected Regions

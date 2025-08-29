@@ -20,27 +20,63 @@ class PostEditorMapLoader
         $this->mappablePostTypes = \MapSVG\Options::get('mappable_post_types') ?? [];
     }
 
+    private function isClassicEditor($hook_suffix)
+    {
+        global $post;
+
+        $post_types = Options::get('mappable_post_types') ?? [];
+        $screen = get_current_screen();
+        if (empty($post_types)) {
+            return false;
+        }
+
+        $onMappablePostTypeEditorScreen = is_object($screen) && in_array($screen->post_type, $post_types) && in_array($hook_suffix, array('post.php', 'post-new.php'));
+
+        if ($onMappablePostTypeEditorScreen) {
+
+            $itsGutenbergEnabledForThePost = use_block_editor_for_post($post);
+
+            if ($itsGutenbergEnabledForThePost) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function init()
     {
 
         $this->addLocationFieldToPosts();
 
         if (is_admin()) {
-            add_action('admin_init', array($this, 'setupTinymce'));
-            add_action('add_meta_boxes', array($this, 'addLocationMetaBox'));
-            add_action('save_post', array($this, 'saveLocationMeta'));
-            add_action('admin_enqueue_scripts', array($this, 'addScriptsForPostEditor'));
-            if (!empty($this->mappablePostTypes)) {
-                foreach ($this->mappablePostTypes as $postType) {
-                    add_action('untrash_' . $postType, [$this, 'updatePostData']);
-                    add_action('trash_' . $postType, [$this, 'deletePostData']);
-                }
-            }
-        }
 
+            add_action('current_screen', function (\WP_Screen $screen) {
+                if ($screen->base !== 'post' && $screen->base !== 'post-new') return;
+                $current_screen = get_current_screen();
+                if (
+                    method_exists($current_screen, 'is_block_editor')
+                    && $current_screen->is_block_editor()
+                ) {
+                    // Gutenberg is being loaded
+                    add_action('admin_enqueue_scripts', array($this, 'addJsCssGutenberg'));
+                } else {
+                    // Classic editor is being loaded
+                    add_action('admin_enqueue_scripts', array($this, 'addJsCssClassicEditor'));
+                    add_action('add_meta_boxes', array($this, 'addLocationMetaBox'));
+                    add_action('save_post', array($this, 'saveLocationMeta'));
+                }
+            });
+        }
         if (!empty($this->mappablePostTypes)) {
             foreach ($this->mappablePostTypes as $postType) {
-                add_action('rest_after_insert_' . $postType, [$this, 'updatePostData'], 10, 2);
+                if ($postType) {
+                    add_action('untrash_' . $postType, [$this, 'updatePostData']);
+                    add_action('trash_' . $postType, [$this, 'deletePostData']);
+                    add_action('rest_after_insert_' . $postType, [$this, 'updatePostData'], 10, 2);
+                    add_action('rest_after_update_' . $postType, [$this, 'updatePostData'], 10, 2);
+                }
             }
         }
     }
@@ -85,7 +121,6 @@ class PostEditorMapLoader
         } else {
             $post = $postsRepo->findOne(["post" => $id]);
 
-
             if ($post) {
                 $post->update($params);
                 $postsRepo->update($post);
@@ -126,8 +161,9 @@ class PostEditorMapLoader
     }
 
     // Register meta box
-    public function addLocationMetaBox()
+    public function addLocationMetaBox($hook_suffix)
     {
+
         if (!empty($this->mappablePostTypes)) {
             foreach ($this->mappablePostTypes as $postType) {
                 if (!use_block_editor_for_post_type($postType)) {
@@ -151,18 +187,6 @@ class PostEditorMapLoader
      */
     public function setupTinymce()
     {
-        // Check if the logged in WordPress User can edit Posts or Pages
-        // If not, don't register our TinyMCE plugin
-        if (!current_user_can('edit_posts') && !current_user_can('edit_pages')) {
-            return;
-        }
-
-        // Check if the logged in WordPress User has the Visual Editor enabled
-        // If not, don't register our TinyMCE plugin
-        if (get_user_option('rich_editing') !== 'true') {
-            return;
-        }
-
         wp_register_style('mapsvg-tinymce', MAPSVG_PLUGIN_URL . "css/mapsvg-tinymce.css", null, MAPSVG_ASSET_VERSION);
         wp_enqueue_style('mapsvg-tinymce');
 
@@ -214,6 +238,9 @@ class PostEditorMapLoader
                 static::addJsCssGutenberg();
             } else {
                 static::addJsCssClassicEditor();
+                static::setupTinymce();
+                add_action('add_meta_boxes', array($this, 'addLocationMetaBox'));
+                add_action('save_post', array($this, 'saveLocationMeta'));
             }
         }
     }
@@ -265,6 +292,9 @@ class PostEditorMapLoader
     function addJsCssClassicEditor()
     {
         global $post;
+
+        static::setupTinymce();
+
         \MapSVG\Front::addJsCss();
 
         $this->addJsCssCommon();

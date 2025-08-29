@@ -68,9 +68,12 @@
                   data-array="true"
                   class="btn-check region_disable mapsvg-region-disabled"
                   name="options[{{@index}}][disabled]"
+                  id="options[{{@index}}][disabled]"
                   {{#if disabled}}checked{{/if}}
                 />
-                <label class="btn btn-outline-secondary form-check-label toggle-tooltip" title="Disable">
+                <label
+                  for="options[{{@index}}][disabled]"
+                class="btn btn-outline-secondary form-check-label toggle-tooltip" title="Disable">
                   <i class="bi bi-ban"></i>
                 </label>
               </div>

@@ -57,7 +57,7 @@ export class Region extends MapObject {
   constructor(params: RegionParams) {
     super(params.element, params.mapsvg)
     this.options = params.options || {}
-    this.statusOptions = params.statusOptions || {
+    this.statusOptions = this.mapsvg.options.regionStatuses || {
       1: { disabled: false, label: "Enabled", color: "", value: "1" },
     }
     this.status = "undefined"
@@ -408,7 +408,7 @@ export class Region extends MapObject {
    * @param {number} status
    */
   setStatus(status: string | number) {
-    const statusOptions = this.statusOptions[status]
+    const statusOptions = this.mapsvg.options.regionStatuses[status]
     const regionModel = this.data
     if (!statusOptions) {
       return false

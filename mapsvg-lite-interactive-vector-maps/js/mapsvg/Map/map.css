@@ -600,6 +600,7 @@
   padding: 10px;
   height: 100%;
   pointer-events: none;
+  z-index: 2;
 }
 .mapsvg-layers-control.closed {
   pointer-events: none;
