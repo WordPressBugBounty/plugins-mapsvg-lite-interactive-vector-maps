@@ -189,6 +189,7 @@ export class Location {
    */
   setSvgPoint(svgPoint: SVGPoint | { x: number; y: number }): void {
     this.svgPoint = svgPoint instanceof SVGPoint ? svgPoint : new SVGPoint(svgPoint)
+
     if (this.marker) {
       this.marker.setSvgPointFromLocation()
     }

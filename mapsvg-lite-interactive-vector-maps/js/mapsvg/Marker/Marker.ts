@@ -109,10 +109,13 @@ export class Marker extends MapObject {
   }
 
   setSvgPointFromLocation(): void {
-    const svgPoint =
-      this.location.geoPoint && this.location.geoPoint.lat !== 0 && this.location.geoPoint.lng !== 0
+    const svgPoint = this.location.svgPoint
+      ? this.location.svgPoint
+      : this.location.geoPoint &&
+          this.location.geoPoint.lat !== 0 &&
+          this.location.geoPoint.lng !== 0
         ? this.mapsvg.converter.convertGeoToSVG(this.location.geoPoint)
-        : this.location.svgPoint
+        : null
     if (svgPoint) {
       this.setSvgPoint(svgPoint)
     }
@@ -223,11 +226,11 @@ export class Marker extends MapObject {
     this.svgPoint = svgPoint
 
     // if (this.location) {
-    //     this.location.setSvgPoint(this.svgPoint);
+    //   this.location.setSvgPoint(this.svgPoint)
     // }
     // if (this.mapsvg.mapIsGeo) {
-    //     this.geoPoint = this.mapsvg.converter.convertSVGToGeo(this.svgPoint);
-    //     this.location.setGeoPoint(this.geoPoint);
+    //   this.geoPoint = this.mapsvg.converter.convertSVGToGeo(this.svgPoint)
+    //   this.location.setGeoPoint(this.geoPoint)
     // }
 
     this.adjustScreenPosition()
@@ -395,7 +398,7 @@ export class Marker extends MapObject {
         _this.svgPointBeforeDrag.x + dx / scale,
         _this.svgPointBeforeDrag.y + dy / scale,
       )
-      _this.setSvgPoint(newSvgPoint)
+      _this.location.setSvgPoint(newSvgPoint)
     })
     $("body").on("mouseup.drag.mapsvg", function (e) {
       e.preventDefault()
@@ -408,11 +411,10 @@ export class Marker extends MapObject {
         _this.svgPointBeforeDrag.y + dy / scale,
       )
 
-      _this.setSvgPoint(newSvgPoint)
-
+      _this.location.setSvgPoint(newSvgPoint)
       if (_this.mapsvg.isGeo()) {
-        // var svgPoint = new SVGPoint(_this.x + _this.width / 2, this.y + (this.height-1));
-        _this.geoPoint = _this.mapsvg.converter.convertSVGToGeo(newSvgPoint)
+        const geoPoint = _this.mapsvg.converter.convertSVGToGeo(newSvgPoint)
+        _this.location.setGeoPoint(geoPoint)
       }
 
       endCallback && endCallback.call(_this)
@@ -431,6 +433,7 @@ export class Marker extends MapObject {
     //$(this.element).closest('svg').css('pointer-events','auto');
     //$('body').css('cursor','default');
     this.setMoving(false)
+
     $("body").off(".drag.mapsvg")
     $(this.mapsvg.containers.map).removeClass("no-transitions")
   }

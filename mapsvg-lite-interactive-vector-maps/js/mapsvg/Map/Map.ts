@@ -6689,7 +6689,8 @@ export class MapSVGMap {
     if (this.editingMarker) {
       if (geoPoint) {
         this.editingMarker.location.setGeoPoint(geoPoint)
-      } else {
+      }
+      if (svgPoint) {
         this.editingMarker.location.setSvgPoint(svgPoint)
       }
       return
@@ -7403,7 +7404,7 @@ export class MapSVGMap {
         ".mapsvg-marker",
         (e) => {
           e.originalEvent.preventDefault()
-          const id = $(e.target.id).attr("id")
+          const id = $(e.target).attr("id")
           const marker = this.markers.get(id)
           const startCoords = getMouseCoords(e)
           marker.drag(startCoords, _this.scale)

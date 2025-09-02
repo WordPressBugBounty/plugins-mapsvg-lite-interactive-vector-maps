@@ -570,8 +570,11 @@ export class FormBuilder {
       $(_this.container).append(nano)
 
       // @ts-ignore
-      nano.jScrollPane({ contentWidth: "0px", mouseWheelSpeed: 30 })
-      _this.scrollApi = nano.data("jsp")
+      if (typeof nano.jScrollPane === "function") {
+        // @ts-ignore
+        nano.jScrollPane({ contentWidth: "0px", mouseWheelSpeed: 30 })
+        _this.scrollApi = nano.data("jsp")
+      }
     } else {
       // $(_this.container).html(this.view);
       $(_this.container).append(this.view)
