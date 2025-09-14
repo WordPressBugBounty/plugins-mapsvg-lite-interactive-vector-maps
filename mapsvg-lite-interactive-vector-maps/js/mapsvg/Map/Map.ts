@@ -8376,8 +8376,10 @@ export class MapSVGMap {
   }
   setRegionsDynamicStatus(value: { filtered?: string; noObjects?: string }) {
     deepMerge(this.options.regionsDynamicStatus, value)
-    this.reloadRegionsFull()
-    this.objectsLoadedToMapHandler()
+    if (this.regionsRepository.getLoaded().length > 0) {
+      this.reloadRegionsFull()
+      this.objectsLoadedToMapHandler()
+    }
   }
   setSvgFileLastChanged(val: number) {
     this.svgFileLastChanged = val
