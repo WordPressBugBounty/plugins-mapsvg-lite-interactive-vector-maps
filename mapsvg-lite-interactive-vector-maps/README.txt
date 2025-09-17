@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 8.7.13
+Stable tag: 8.7.14
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -306,6 +306,9 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 
 = 8.7.13 = 
 * Fixed: prevent setting region statuses before the data has loaded from the server
+
+= 8.7.14 = 
+* Fixed: SVG file reload failed when regions had no Title field.
 
 
 == Upgrade Notice ==

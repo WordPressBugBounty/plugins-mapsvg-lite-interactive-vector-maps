@@ -30,7 +30,7 @@ class RegionsRepository extends Repository
 	//  * @param Query $query Query for the database
 	//  * @return array<Schema>
 	//  */
-	public function find(Query $query = null)
+	public function find(Query | null $query = null)
 	{
 		if ($query === null) {
 			$query = new Query(array('perpage' => 0, 'filters' => array()));
@@ -58,6 +58,15 @@ class RegionsRepository extends Repository
 				$fields = $keys;
 			}
 		}
+
+		// Filter out non-existing fields using schema validation
+		$validFields = array();
+		foreach ($fields as $k => $v) {
+			if ($this->schema->getField($v)) {
+				$validFields[] = $v;
+			}
+		}
+		$fields = $validFields;
 
 		$_fields = array();
 		foreach ($fields as $k => $v) {
