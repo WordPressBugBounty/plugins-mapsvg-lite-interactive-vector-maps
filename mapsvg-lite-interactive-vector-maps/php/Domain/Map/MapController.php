@@ -228,7 +228,7 @@ class MapController extends Controller
 			[
 				 
 				// START distance_search
-				["type" => "distance", "db_type" => "varchar(255)", "label" => "Search by address", "name" => "distance", "value" => "", "searchable" => "", "options" => [["value" => "10", "default" => true, "selected" => true], ["value" => "30", "default" => false], ["value" => "50", "default" => false], ["value" => "100", "default" => false]], "optionsDict" => [], "distanceControl" => "select", "distanceUnits" => "km", "distanceUnitsLabel" => "km", "fromLabel" => "from", "addressField" => true, "addressFieldPlaceholder" => "Address", "userLocationButton" => "", "placeholder" => "", "language" => "", "country" => "", "searchByZip" => "", "zipLength" => 5, "parameterName" => "Object.distance", "parameterNameShort" => "distance", "visible" => true]
+				["type" => "distance", "db_type" => "varchar(255)", "label" => "Search by address", "name" => "distance", "value" => "", "searchable" => "", "options" => [["value" => "10", "default" => true, "selected" => true], ["value" => "30", "default" => false], ["value" => "50", "default" => false], ["value" => "100", "default" => false]], "optionsDict" => [], "distanceControl" => "select", "distanceUnits" => "km", "distanceUnitsLabel" => "km", "fromLabel" => "from", "addressField" => true, "addressFieldPlaceholder" => "Address", "userLocationButton" => "", "placeholder" => "Address", "language" => "", "country" => "", "searchByZip" => "", "zipLength" => 5, "parameterName" => "Object.distance", "parameterNameShort" => "distance", "visible" => true]
 				// END				
 			];
 

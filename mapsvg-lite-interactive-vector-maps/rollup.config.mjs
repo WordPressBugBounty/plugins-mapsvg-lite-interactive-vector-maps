@@ -13,13 +13,18 @@ import rootImport from "rollup-plugin-root-import"
 import sourcemaps from "rollup-plugin-sourcemaps2"
 import { fileURLToPath } from "url"
 import packageJson from "./package.json" assert { type: "json" }
+import postcssImport from "postcss-import"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export default [
+  // Main build - includes ALL CSS (mapsvg-bundle.css)
   {
     external: ["formidable", "jQuery", "Handlebars"],
-    input: { mapsvg: "js/mapsvg/Core/Mapsvg.ts" },
+    input: {
+      mapsvg: "js/mapsvg/Core/Mapsvg.ts",
+      // "formbuilder-1": "js/mapsvg/FormBuilder/form.css",
+    },
     output: {
       globals: {
         jQuery: "jQuery",
@@ -45,10 +50,10 @@ export default [
       }),
       postcss({
         extensions: [".css", ".scss"],
-        plugins: [autoprefixer(), cssnano()],
+        plugins: [postcssImport(), autoprefixer(), cssnano()],
         use: [["sass"]],
-        extract: "mapsvg-bundle.css", // Specify the output file
-        minimize: true, // Minify the CSS
+        extract: "mapsvg-bundle.css", // All CSS goes here
+        minimize: true,
       }),
       rootImport({
         root: `${__dirname}`,
@@ -111,4 +116,30 @@ export default [
         }),
     ],
   },
+  // FormBuilder build - includes ONLY FormBuilder CSS (formbuilder-bundle.css)
+  // {
+  //   // external: ["formidable", "jQuery", "Handlebars"],
+  //   input: { formbuilder: "js/mapsvg/FormBuilder/form.css" },
+  //   output: {
+  //     dir: "./dist",
+  //     format: "esm",
+  //     sourcemap: true,
+  //   },
+  //   plugins: [
+  //     postcss({
+  //       extensions: [".css", ".scss"],
+  //       plugins: [postcssImport(), autoprefixer(), cssnano()],
+  //       use: [["sass"]],
+  //       extract: "formbuilder-bundle.css", // Only FormBuilder CSS goes here
+  //       minimize: true,
+  //     }),
+  //     // typescript({ tsconfig: "./tsconfig.json" }),
+  //     sourcemaps(),
+  //     // commonjs(),
+  //     // json(),
+  //     nodeResolve({
+  //       browser: true,
+  //     }),
+  //   ],
+  // },
 ]

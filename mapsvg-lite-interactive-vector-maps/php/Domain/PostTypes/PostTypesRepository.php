@@ -148,6 +148,29 @@ class PostTypesRepository
                 INNER JOIN {$db->posts()} p ON pm.post_id = p.ID
                 WHERE pm.meta_key = '$meta_key' AND p.post_status = 'publish' AND pm.meta_value IS NOT NULL AND pm.meta_value != ''";
     $results = $db->get_col($sql, 0);
-    return $results ? $results : [];
+
+    // Unserialize meta values if needed and flatten arrays to scalars
+    $flat = array();
+    if (is_array($results)) {
+      foreach ($results as $value) {
+        $unserialized = maybe_unserialize($value);
+        if (is_array($unserialized)) {
+          foreach ($unserialized as $u) {
+            if (is_scalar($u) || (is_object($u) && method_exists($u, '__toString'))) {
+              $flat[] = (string)$u;
+            }
+          }
+        } elseif (is_scalar($unserialized) || (is_object($unserialized) && method_exists($unserialized, '__toString'))) {
+          $flat[] = (string)$unserialized;
+        }
+      }
+    }
+
+    if (empty($flat)) {
+      return $results ? $results : [];
+    }
+
+    $flat = array_values(array_unique($flat));
+    return $flat;
   }
 }

@@ -11,6 +11,7 @@ import { ResizeSensor } from "./ResizeSensor"
 import { deepMerge, isPhone, isTablet, parseBoolean, useId } from "./Utils"
 import "./controller.css"
 const $ = jQuery
+import { mapsvgCore } from "@/Core/Mapsvg"
 
 export enum ControllerEvent {
   RESIZE = "resize",
@@ -28,6 +29,7 @@ export enum ControllerEvent {
 export interface ControllerOptions {
   middleware?: Middleware[]
   classList?: string[]
+  useShadowRoot?: boolean
   container: HTMLElement
   map: MapSVGMap
   parent?: ObjectWithEvents
@@ -37,11 +39,7 @@ export interface ControllerOptions {
   state?: Record<string, unknown>
   options?: unknown
   styles?: Partial<CSSStyleDeclaration>
-  fullscreen?: {
-    sm?: boolean
-    md?: boolean
-    lg?: boolean
-  }
+  fullscreen?: boolean
   autoresize?: boolean
   scrollable?: boolean
   withToolbar?: boolean
@@ -67,11 +65,7 @@ export interface BaseController {
   loaded: boolean
   closable: boolean
   _canClose: boolean
-  fullscreen: {
-    sm: boolean
-    md: boolean
-    lg: boolean
-  }
+  fullscreen: boolean
   mobileCloseBtn: HTMLElement
   styles: Partial<CSSStyleDeclaration>
   containers: {
@@ -89,6 +83,7 @@ export interface BaseController {
   name: string
   template?: string
   scrollable: boolean
+  useShadowRoot?: boolean
   withToolbar: boolean
   autoresize: boolean
   templates: {
@@ -113,15 +108,13 @@ export class Controller implements BaseController {
   opened: boolean
   loaded: boolean
   closable: boolean
+  useShadowRoot: boolean = false
   _canClose: boolean
-  fullscreen: {
-    sm: boolean
-    md: boolean
-    lg: boolean
-  }
+  fullscreen: boolean = false
   mobileCloseBtn: HTMLElement
   styles: Partial<CSSStyleDeclaration>
   containers: {
+    shadowRoot?: HTMLElement
     parent: HTMLElement
     main?: HTMLElement
     view?: HTMLElement
@@ -168,14 +161,15 @@ export class Controller implements BaseController {
     this.opened = true
     this.loaded = false
     this.closable = options.closable ?? false
+    this.useShadowRoot = options.useShadowRoot ?? false
     this.canClose = true
 
-    this.fullscreen = deepMerge({ sm: false, md: false, lg: false }, options.fullscreen)
+    this.fullscreen = options.fullscreen ?? false
 
     this.map = options.map
     this.template = options.template || ""
     this.scrollable = options.scrollable === undefined ? true : options.scrollable
-    this.withToolbar = options.withToolbar === undefined ? true : options.withToolbar
+    // this.withToolbar = options.withToolbar === undefined ? true : options.withToolbar
     this.noPadding = options.noPadding ?? false
     this.autoresize = parseBoolean(options.autoresize)
 
@@ -279,8 +273,7 @@ export class Controller implements BaseController {
    * This method must be overriden by a child class and return an HTML code for the toolbar.
    */
   getToolbarTemplate(): string {
-    if (this.closable && this.withToolbar)
-      return '<div class="mapsvg-popover-close mapsvg-details-close"></div>'
+    if (this.closable) return '<div class="mapsvg-popover-close mapsvg-details-close"></div>'
     return ""
   }
 
@@ -316,17 +309,8 @@ export class Controller implements BaseController {
     if (this.destroyed) {
       return
     }
-    for (const [key, value] of Object.entries(this.fullscreen)) {
-      if (value) {
-        this.classList.push(`mapsvg-fullscreen-${key}`)
-      }
-    }
-    // Move modal to
-    if (
-      (isPhone() && this.fullscreen.sm) ||
-      (isTablet() && this.fullscreen.md) ||
-      this.fullscreen.lg
-    ) {
+    if (this.fullscreen) {
+      this.classList.push(`mapsvg-fullscreen`)
       this.containers.parent = document.body
       this.openedFullscreen = true
       document.body.classList.add("mapsvg-modal-fullscreen")
@@ -363,7 +347,7 @@ export class Controller implements BaseController {
     this.containers.contentWrap2.appendChild(this.containers.sizer)
 
     // Add toolbar if it exists in template file
-    if (this.withToolbar && this.templates.toolbar) {
+    if (this.templates.toolbar) {
       this.containers.toolbar = $("<div />").addClass("mapsvg-controller-view-toolbar")[0]
       this.containers.view.appendChild(this.containers.toolbar)
     }
@@ -372,7 +356,47 @@ export class Controller implements BaseController {
     this.containers.main.append(this.containers.view)
 
     // Add view into container
-    this.containers.parent.appendChild(this.containers.main)
+    if (this.useShadowRoot) {
+      // Добавляем ID карты, чтобы WP видел карту как раньше
+      this.containers.shadowRoot = $('<div class="mapsvg-shadow-root"></div>').attr(
+        "id",
+        `mapsvg-map-${this.name}-${this.map.id}`,
+      )[0]
+
+      // 2. Создаём Shadow Root
+      // open — чтобы можно было получить root из JS снаружи:
+      // document.querySelector('#mapsvg-map-123').shadowRoot
+      const shadowRoot = this.containers.shadowRoot.attachShadow({ mode: "open" })
+      // Insert this.containers.wrapAll before this.containers.map
+      shadowRoot.appendChild(this.containers.main)
+
+      // 6. Добавляем стили внутрь Shadow
+      for (const style of mapsvgCore.styles) {
+        const link = document.createElement("link")
+        link.rel = "stylesheet"
+
+        link.href = style.url + "?ver=" + style.version
+        shadowRoot.appendChild(link)
+      }
+
+      // Add theme
+      const link = document.createElement("link")
+      link.rel = "stylesheet"
+      link.href =
+        mapsvgCore.routes.root + "themes/" + this.map.options.theme.name + "/assets/css/styles.css"
+      shadowRoot.appendChild(link)
+
+      // Add custom CSS
+      const style = document.createElement("style")
+      shadowRoot.appendChild(style)
+      const liveCss = style
+      liveCss.textContent = this.map.options.css
+      this.containers.parent.appendChild(this.containers.shadowRoot)
+    } else {
+      this.containers.parent.appendChild(this.containers.main)
+    }
+
+    this.containers.main.setAttribute("data-mapsvg-theme", this.map.options.theme.name)
 
     if (this.autoresize) {
       this.resizeSensor = new ResizeSensor(this.containers.sizer, () => {
@@ -436,7 +460,7 @@ export class Controller implements BaseController {
       $(this.containers.contentView).html("")
     }
 
-    if (this.withToolbar && this.templates.toolbar)
+    if (this.templates.toolbar)
       $(this.containers.toolbar).html(this.templates.toolbar(formattedData))
 
     this.resize()
@@ -460,7 +484,7 @@ export class Controller implements BaseController {
    */
   updateTopShift() {
     const _this = this
-    if (!this.withToolbar) return
+    // if (!this.withToolbar) return
     // bad, i know.
     $(_this.containers.contentWrap).css({
       top: $(_this.containers.toolbar).outerHeight(true) + "px",
@@ -593,12 +617,18 @@ export class Controller implements BaseController {
     if (this.destroyed) {
       return
     }
+    if (this.containers.shadowRoot) {
+      this.containers.shadowRoot.remove()
+    }
     this.close()
     this.viewWillGetDestroyed()
     this.resizeSensor && this.resizeSensor.destroy()
     delete this.resizeSensor
     $(this.containers.view).empty().remove()
     $(this.containers.main).empty().remove()
+    if (this.containers.shadowRoot) {
+      this.containers.shadowRoot.remove()
+    }
     $(window).off("keydown.details.mapsvg-" + this.map.id)
     $("body").off("mouseup.popover.mapsvg touchend.popover.mapsvg")
     this.events.trigger(ControllerEvent.AFTER_UNLOAD, { controller: this })

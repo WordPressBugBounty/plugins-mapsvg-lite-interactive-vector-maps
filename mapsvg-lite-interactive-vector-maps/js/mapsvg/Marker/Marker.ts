@@ -133,22 +133,25 @@ export class Marker extends MapObject {
    * Get SVG bounding box of the Marker
    * @returns {ViewBox}
    */
-  getBBox(): ViewBox {
-    if (this.centered) {
-      return new ViewBox(
-        this.svgPoint.x - this.width / 2 / this.mapsvg.scale,
-        this.svgPoint.y - this.height / 2 / this.mapsvg.scale,
-        this.width / this.mapsvg.scale,
-        this.height / this.mapsvg.scale,
-      )
-    } else {
-      return new ViewBox(
-        this.svgPoint.x - this.width / 2 / this.mapsvg.scale,
-        this.svgPoint.y - this.height / this.mapsvg.scale,
-        this.width / this.mapsvg.scale,
-        this.height / this.mapsvg.scale,
-      )
-    }
+  getBBox(scale?: number): ViewBox {
+    scale = scale || this.mapsvg.getScale()
+
+    return new ViewBox(
+      this.svgPoint.x - this.width / 2 / scale,
+      this.svgPoint.y - this.height / (this.centered ? 1 : 2) / scale,
+      this.width / scale,
+      this.height / scale,
+    )
+  }
+  /**
+   * Returns geo-bounds of an object - South-West & North-East points.
+   * @returns {sw: GeoPoint, ne: GeoPoint}
+   */
+  getGeoBounds(): { sw: GeoPoint; ne: GeoPoint } {
+    const sw = this.location.geoPoint
+    const ne = this.location.geoPoint
+
+    return { sw: sw, ne: ne }
   }
   /**
    * Get Marker options

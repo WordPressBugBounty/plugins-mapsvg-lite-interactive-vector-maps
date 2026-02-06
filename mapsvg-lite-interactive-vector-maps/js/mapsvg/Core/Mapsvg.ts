@@ -54,6 +54,7 @@ export interface MapsvgFrontendParams {
   routes: MapsvgRoutes
   nonce: string
   google_maps_api_key: string
+  styles: Array<{ name: string; url: string; version: string }>
 }
 
 interface MapsvgEnv {
@@ -64,6 +65,8 @@ interface MapsvgEnv {
 
 export interface MapSVGProps {
   initialized: boolean
+  stylesAddedToBody: boolean
+  templatesLoaded: Promise<boolean>
   routes: MapsvgRoutes
   _nonce: string
   google_maps_api_key: string
@@ -73,7 +76,6 @@ export interface MapSVGProps {
   defaultMarkerImage: string
   // formBuilder: FormBuilder
   mediaUploader: any
-  templatesLoaded: Record<string, boolean>
   instances: MapSVGMap[]
   mouse: { x: number; y: number }
   googleMapsApiLoaded: boolean
@@ -93,6 +95,7 @@ export class Map {
 
 export class Mapsvg implements MapSVGProps {
   initialized: boolean
+  stylesAddedToBody: boolean
   routes: MapsvgRoutes
   _nonce: string
   google_maps_api_key: string
@@ -104,7 +107,7 @@ export class Mapsvg implements MapSVGProps {
   defaultMarkerImage: string
   // formBuilder: FormBuilder
   mediaUploader: any
-  templatesLoaded: Record<string, boolean> = {}
+  templatesLoaded: Promise<boolean>
   instances: MapSVGMap[]
 
   mouse: { x: number; y: number } = { x: 0, y: 0 }
@@ -118,8 +121,10 @@ export class Mapsvg implements MapSVGProps {
     apiIsLoading: boolean
     loaded: boolean
   }
+  styles: Array<{ name: string; url: string; version: string }>
 
   constructor() {
+    this.stylesAddedToBody = false
     this.instances = []
 
     const { wp, mapsvg_paths, ajaxurl, mapsvg_runtime_vars, google } = window
@@ -164,6 +169,7 @@ export class Mapsvg implements MapSVGProps {
       apiIsLoading: false,
       loaded: false,
     }
+    this.styles = options.styles ?? []
     if (typeof window.ajaxurl !== "undefined") {
       this.routes.ajaxurl = window.ajaxurl
     }

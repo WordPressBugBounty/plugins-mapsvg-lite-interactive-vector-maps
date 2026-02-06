@@ -68,14 +68,21 @@ class MapClassicEditor {
             formData["location"] = location.getData()
 
             if (this.mapsvg.options.googleMaps.on) {
-              this.mapsvg.events.on("googleMapsLoaded", () => {
-                var coords = {
-                  lat: location.geoPoint.lat,
-                  lng: location.geoPoint.lng,
-                }
+              var coords = {
+                lat: location.geoPoint.lat,
+                lng: location.geoPoint.lng,
+              }
+              const zoomToMarker = () => {
                 this.mapsvg.googleMaps.map.setCenter(coords)
                 this.mapsvg.googleMaps.map.setZoom(10)
-              })
+              }
+              if (this.mapsvg.googleMaps && this.mapsvg.googleMaps.initialized) {
+                zoomToMarker()
+              } else {
+                this.mapsvg.events.on("afterLoad.googleMaps", () => {
+                  zoomToMarker()
+                })
+              }
             }
           }
 

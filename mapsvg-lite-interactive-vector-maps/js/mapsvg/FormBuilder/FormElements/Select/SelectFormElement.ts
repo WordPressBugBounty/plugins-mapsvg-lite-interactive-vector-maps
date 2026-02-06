@@ -2,7 +2,7 @@ import { deepMerge, parseBoolean } from "@/Core/Utils"
 import { SchemaField } from "../../../Infrastructure/Server/SchemaField"
 import { FormBuilder } from "../../FormBuilder.js"
 import { FormElement } from "../FormElement.js"
-
+// import "./styles.css"
 const $ = jQuery
 
 // TODO extract "multiselect" class and make it inherited from SelectFormElement
@@ -13,6 +13,7 @@ const $ = jQuery
 export class SelectFormElement extends FormElement {
   multiselect: boolean
   optionsGrouped: any
+  select2: any | null
   declare inputs: { select: HTMLSelectElement }
 
   constructor(options: SchemaField, formBuilder: FormBuilder, external: { [key: string]: any }) {
@@ -29,6 +30,9 @@ export class SelectFormElement extends FormElement {
   setDomElements() {
     super.setDomElements()
     this.inputs.select = $(this.domElements.main).find("select")[0]
+    if (this.multiselect) {
+      $(this.domElements.main).addClass("mapsvg-form-field-select-multiple")
+    }
   }
 
   getSchema(): { [p: string]: any } {
@@ -80,19 +84,32 @@ export class SelectFormElement extends FormElement {
     })
   }
 
+  setPlaceholder(placeholder: string) {
+    $(this.inputs.select).find('option[value=""]').text(placeholder)
+    $(this.domElements.main).find(".select2-selection__placeholder").first().text(placeholder)
+    // $(this.inputs.select).trigger("change.select2")
+  }
+
   addSelect2() {
     if ($().mselect2) {
-      const select2Options: { placeholder?: string; allowClear?: boolean } = {}
+      const select2Options: {
+        placeholder?: string
+        allowClear?: boolean
+        dropdownParent?: any
+      } = {}
       if (this.formBuilder.filtersMode && this.type == "select") {
         select2Options.placeholder = this.placeholder
         if (!this.multiselect) {
           select2Options.allowClear = true
         }
+        select2Options.dropdownParent = $(this.formBuilder.form)
       }
-      $(this.domElements.main)
+      this.select2 = $(this.domElements.main)
         .find("select")
         .css({ width: "100%", display: "block" })
         .mselect2(select2Options)
+
+      this.select2
         .on("select2:focus", function () {
           $(this).mselect2("open")
         })

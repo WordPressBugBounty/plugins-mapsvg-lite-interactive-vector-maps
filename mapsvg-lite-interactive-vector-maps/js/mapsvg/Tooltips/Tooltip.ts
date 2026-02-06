@@ -164,13 +164,15 @@ export class Tooltip extends Controller {
         }
       }
 
+      const needMirrorLeft = tbbox.left > mbbox.right - tbbox.width
+
       if (this.mirror.right || this.mirror.left) {
         // may be cancel mirroring
 
-        if (this.mirror.left && m.x > this.mirror.left) {
+        if (this.mirror.left && m.x - mbbox.left > tbbox.width) {
           this.mirror.left = 0
           delete this.posShifted.leftright
-        } else if (this.mirror.right && m.x < this.mirror.right) {
+        } else if (this.mirror.right && mbbox.right - m.x > tbbox.width) {
           this.mirror.right = 0
           delete this.posShifted.leftright
         }

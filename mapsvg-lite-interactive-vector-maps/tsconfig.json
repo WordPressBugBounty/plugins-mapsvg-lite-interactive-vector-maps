@@ -23,6 +23,7 @@
     //    "outDir": "./dist",
     "removeComments": true,
     "sourceMap": true
+    // "strictNullChecks": true
   },
   "esModuleInterop": true,
   "allowSyntheticDefaultImports": true

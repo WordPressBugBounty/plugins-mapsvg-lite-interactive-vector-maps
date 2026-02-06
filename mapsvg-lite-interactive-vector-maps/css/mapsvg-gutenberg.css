@@ -183,7 +183,7 @@ input.typeahead.form-control.tt-input {
   display: flex;
   flex-direction: row;
 }
-#mapsvg-classic-editor-container #mapsvg {
+#mapsvg-classic-editor-container .mapsvg-shadow-root {
   flex-grow: 1;
 }
 #mapsvg-classic-editor-container #mapsvg-filters {

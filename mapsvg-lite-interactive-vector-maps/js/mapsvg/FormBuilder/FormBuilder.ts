@@ -16,6 +16,7 @@ import { FormElementFactory } from "./FormElements/FormElementFactory"
 import * as FormElementTypes from "./FormElements/index"
 import { FormElementInterface } from "./FormElements/index"
 const $ = jQuery
+import "./form.css"
 
 export enum FormBuilderEvents {
   AFTER_LOAD = "afterLoad",
@@ -155,12 +156,15 @@ export class FormBuilder {
     this.formElements = new ArrayIndexed("name")
   }
 
-  private loadTemplates(callback: () => void): void {
+  private loadTemplates(callback: (value: unknown) => void): void {
+    if (mapsvgCore.templatesLoaded) {
+      return callback(true)
+    }
+
     $.get(
       mapsvgCore.routes.root + "dist/" + this.template + ".html?v=" + mapsvgCore.version,
       (data) => {
         $(data).appendTo("body")
-        mapsvgCore.templatesLoaded[this.template] = true
         Handlebars.registerPartial("dataMarkerPartial", $("#mapsvg-data-tmpl-marker").html())
         if (this.editMode) {
           Handlebars.registerPartial(
@@ -168,7 +172,7 @@ export class FormBuilder {
             $("#mapsvg-markers-by-field-tmpl-partial").html(),
           )
         }
-        callback()
+        callback(true)
       },
     )
   }
@@ -176,10 +180,13 @@ export class FormBuilder {
   async init() {
     await this.formElementFactory.init()
 
-    if (!mapsvgCore.templatesLoaded[this.template]) {
-      this.loadTemplates(() => this.init())
-      return
+    if (!mapsvgCore.templatesLoaded) {
+      mapsvgCore.templatesLoaded = new Promise<boolean>((resolve) => {
+        this.loadTemplates(resolve)
+      })
     }
+
+    await mapsvgCore.templatesLoaded
 
     const _this = this
 
@@ -205,7 +212,23 @@ export class FormBuilder {
       this.view.classList.add("edit")
       this.form.classList.add("mapsvg-data-flex-full")
       this.form.classList.add("mapsvg-data-container")
-      $(this.view).find(".mapsvg-data-preview").prepend(this.form)
+
+      // const shadowContainer = $("<div />")[0]
+      const shadowRoot = $(this.view).find(".mapsvg-data-preview")[0]
+
+      // const shadowRoot = shadowContainer.attachShadow({ mode: "open" })
+      // Insert this.containers.wrapAll before this.containers.map
+      shadowRoot.prepend(this.form)
+
+      // 6. Добавляем стили внутрь Shadow
+      // for (const style of mapsvgCore.styles) {
+      //   const link = document.createElement("link")
+      //   link.rel = "stylesheet"
+      //   link.href = style.url + "?ver=" + style.version
+      //   shadowRoot.appendChild(link)
+      // }
+
+      // $(this.view).find(".mapsvg-data-preview").prepend(this.form)
       this.formEditor = <HTMLFormElement>$(this.view).find("#mapsvg-data-form-edit")[0]
     } else {
       this.view.appendChild(this.form)

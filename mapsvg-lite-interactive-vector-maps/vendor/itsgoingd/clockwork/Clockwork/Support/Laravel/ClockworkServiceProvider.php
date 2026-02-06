@@ -1,11 +1,22 @@
-<?php namespace Clockwork\Support\Laravel;
+<?php
+
+namespace Clockwork\Support\Laravel;
 
 use Clockwork\Clockwork;
 use Clockwork\Authentication\AuthenticatorInterface;
 use Clockwork\DataSource\{
-	EloquentDataSource, LaravelCacheDataSource, LaravelDataSource, LaravelEventsDataSource, LaravelHttpClientDataSource,
-	LaravelNotificationsDataSource, LaravelQueueDataSource, LaravelRedisDataSource, LaravelViewsDataSource, SwiftDataSource,
-	TwigDataSource, XdebugDataSource
+	EloquentDataSource,
+	LaravelCacheDataSource,
+	LaravelDataSource,
+	LaravelEventsDataSource,
+	LaravelHttpClientDataSource,
+	LaravelNotificationsDataSource,
+	LaravelQueueDataSource,
+	LaravelRedisDataSource,
+	LaravelViewsDataSource,
+	SwiftDataSource,
+	TwigDataSource,
+	XdebugDataSource
 };
 use Clockwork\Helpers\StackFilter;
 use Clockwork\Request\Request;
@@ -59,7 +70,7 @@ class ClockworkServiceProvider extends ServiceProvider
 	// Register the configuration file
 	protected function registerConfiguration()
 	{
-		$this->publishes([ __DIR__ . '/config/clockwork.php' => config_path('clockwork.php') ], 'clockwork');
+		$this->publishes([__DIR__ . '/config/clockwork.php' => config_path('clockwork.php')], 'clockwork');
 		$this->mergeConfigFrom(__DIR__ . '/config/clockwork.php', 'clockwork');
 	}
 
@@ -191,7 +202,21 @@ class ClockworkServiceProvider extends ServiceProvider
 		});
 
 		$this->app->singleton('clockwork.swift', function ($app) {
-			return new SwiftDataSource($app['mailer']->getSwiftMailer());
+			try {
+				if (method_exists($app, 'bound') && $app->bound('mailer')) {
+					$mailer = $app['mailer'] ?? null;
+					if ($mailer && method_exists($mailer, 'getSwiftMailer')) {
+						return new SwiftDataSource($mailer->getSwiftMailer());
+					}
+				}
+			} catch (\Throwable $e) {
+			}
+
+			return new class extends \Clockwork\DataSource\DataSource {
+				public function listenToEvents()
+				{ /* noop */
+				}
+			};
 		});
 
 		$this->app->singleton('clockwork.twig', function ($app) {
@@ -270,6 +295,6 @@ class ClockworkServiceProvider extends ServiceProvider
 
 	public function provides()
 	{
-		return [ 'clockwork' ];
+		return ['clockwork'];
 	}
 }

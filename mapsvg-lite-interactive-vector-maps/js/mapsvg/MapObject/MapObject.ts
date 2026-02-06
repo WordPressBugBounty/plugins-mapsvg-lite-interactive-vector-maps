@@ -73,8 +73,8 @@ export class MapObject {
    * @abstract
    * @private
    */
-  getBBox(): ViewBox {
-    return new ViewBox(1, 2, 3, 4)
+  getBBox(scale?: number): ViewBox {
+    return new ViewBox(0, 0, 0, 0)
   }
   /**
    * Returns geo-bounds of an object - South-West & North-East points.

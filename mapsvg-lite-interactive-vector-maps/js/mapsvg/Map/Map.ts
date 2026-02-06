@@ -5,6 +5,7 @@ import { ArrayIndexed } from "../Core/ArrayIndexed"
 import { EventWithData, Events } from "../Core/Events"
 
 import { mapsvgCore } from "@/Core/Mapsvg"
+
 import {
   MiddlewareHandler,
   MiddlewareHandlers,
@@ -127,8 +128,8 @@ export class MapSVGMap {
   middlewares: MiddlewareList
   controllerMiddleWare: MiddlewareHandler
   private previousPaddingBottom: number = 0
-
   converter: Converter
+  private _counter: number = 0
 
   dirtyFields: string[] = []
 
@@ -211,9 +212,9 @@ export class MapSVGMap {
     current: number
   }
   /**
-   * Geo ViewBiox, containing to geo-points: SW(lat,lng) and NE(lat,lng)
+   * Geo ViewBiox, containing two geo-points: SW(lat,lng) and NE(lat,lng)
    */
-  geoViewBox: GeoViewBox = new GeoViewBox(new GeoPoint(0, 0), new GeoPoint(0, 0))
+  geoViewBox: GeoViewBox | null
 
   mapLonDelta: number
   mapLatBottomDegree: number
@@ -239,6 +240,11 @@ export class MapSVGMap {
    */
   scale: number = 1
   superScale: number
+
+  private _prevTx: number
+  private _prevTy: number
+  private _prevScale: number
+
   /**
    * Scroll coordinates
    */
@@ -275,16 +281,22 @@ export class MapSVGMap {
   /**
    * Flag defining whether map needs to be downscaled or upscaled to prevent blurring on iOS devices
    */
-  iosDownscaleFactor: number
+  iosDownscaleFactor: number = 1
 
   /**
    * Map containers
    */
   containers: {
+    root?: HTMLElement
+    shadowRoot?: ShadowRoot
     /**
      * SVG image container
      */
     svg?: SVGSVGElement
+    /**
+     * SVG sizer
+     */
+    svgWrapper?: HTMLElement
     /**
      * Map container
      */
@@ -461,7 +473,7 @@ export class MapSVGMap {
   /**
    * Schema for the map filters (set of fields and their parameters)
    */
-  filtersSchema: Schema
+  filtersSchema?: Schema | undefined
 
   layers: {
     [key: string]: HTMLElement
@@ -589,6 +601,39 @@ export class MapSVGMap {
     })
 
     this.setLoadingText(mapParams.options ? mapParams.options.loadingText || "" : "")
+    if (this.inBackend) {
+      const style = document.createElement("style")
+      style.textContent = `
+        .mapsvg-loading {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          z-index: 100;
+          padding: 7px 10px;
+          border-radius: 5px;
+          border: 1px solid #ccc;
+          background: #f5f5f2;
+          transform: translate(-50%, -50%);
+          text-align: center;
+          box-shadow: 0px 0px 20px rgba(0,0,0,0.2);
+          line-height: 11px;
+        }
+        .mapsvg-loading-text {
+          display: inline-block;
+          font-size: 12px !important;
+          color: #999;
+          font-family: "Helvetica", sans-serif;
+        }
+        .mapsvg-loading .spinner-border {
+          display: inline-block;
+          margin: 0 auto;
+          color: #888;
+          margin-right: 5px;
+        }
+      `
+
+      document.head.appendChild(style)
+    }
     this.addLoadingMessage()
     this.showLoadingMessage()
 
@@ -912,7 +957,7 @@ export class MapSVGMap {
     this.update(restNewOptions)
 
     // 4. Google maps API blocker?
-    if (this.options.googleMaps.on) {
+    if (this.isGeo() && this.options.googleMaps.on) {
       this.afterLoadBlockers++
     }
 
@@ -924,6 +969,7 @@ export class MapSVGMap {
     
 
     if (
+      this.isGeo() &&
       mapsvgCore.googleMaps.apiKey &&
       (this.inBackend ||
         this.options.googleMaps.on ||
@@ -1582,13 +1628,16 @@ export class MapSVGMap {
     if (this.clustersFromWorker && this.clustersFromWorker.length > 0) {
       this.clustersFromWorker.forEach((cluster) => {
         // Don't clusterize on google maps with zoom level >= 17
-        if (this.googleMaps.map && this.googleMaps.map.getZoom() >= 17) {
+        if (
+          this.googleMaps.map &&
+          this.googleMaps.map.getZoom() >= this.options.clustering.maxZoom
+        ) {
           this.markerAdd(cluster.markers[0])
         } else {
-          if (cluster.markers.length > 1) {
-            this.markersClusterAdd(cluster)
-          } else {
+          if (this.zoomLevel >= this.options.clustering.maxZoom || cluster.markers.length === 1) {
             this.markerAdd(cluster.markers[0])
+          } else {
+            this.markersClusterAdd(cluster)
           }
         }
       })
@@ -2038,6 +2087,14 @@ export class MapSVGMap {
   }
 
   /**
+   * Disables all Regions if "true" is passed.
+   * @param {object} options
+   */
+  setClustering(options) {
+    deepMerge(this.options.clustering, options)
+  }
+
+  /**
    * Returns color of the Region for choropleth map
    * @returns {string} color
    */
@@ -2461,16 +2518,20 @@ export class MapSVGMap {
   setSvgTagViewBox(viewBox: ViewBox) {
     this.containers.svg.setAttribute("viewBox", viewBox.toString())
 
-    // if ((env.getDevice().ios || env.getDevice().android) && this.svgDefault.viewBox.width > 1500) {
-    //   this.iosDownscaleFactor = this.svgDefault.viewBox.width > 9999 ? 100 : 10
-    //   this.containers.svg.style.width =
-    //     (this.svgDefault.viewBox.width / this.iosDownscaleFactor).toString() + "px"
-    // } else {
-    //   this.containers.svg.style.width = this.svgDefault.viewBox.width + "px"
-    // }
+    if (env.getBrowser().safari) {
+      // const maxSize = 4096 // текущий WebKit порог около 4k
+      // const maxDim = Math.max(this.svgDefault.viewBox.width, this.svgDefault.viewBox.height)
+      // const factor = Math.ceil(maxDim / maxSize)
+      this.containers.svg.style.width = "1000%"
+      this.iosDownscaleFactor = 0.1
+      //this.containers.svg.style.transform = "scale(.01)"
+    } else {
+      this.containers.svg.style.width = "auto"
+    }
 
     this.vbStart = true
   }
+
   /**
    * Sets map viewbox
    * @param {ViewBox} viewBox
@@ -2533,7 +2594,28 @@ export class MapSVGMap {
     } else {
       const scale = this.getRelativeScale()
 
-      this.containers.scrollpane.style.transform = `translate(${this.scroll.tx}px, ${this.scroll.ty}px) scale(${scale})`
+      // if (isPhone()) {
+      //   this.animateTransform(
+      //     {
+      //       tx: this._prevTx ?? this.scroll.tx,
+      //       ty: this._prevTy ?? this.scroll.ty,
+      //       scale: this._prevScale ?? this.scale,
+      //     },
+      //     {
+      //       tx: this.scroll.tx,
+      //       ty: this.scroll.ty,
+      //       scale: scale,
+      //     },
+      //   )
+
+      //   this._prevTx = this.scroll.tx
+      //   this._prevTy = this.scroll.ty
+      //   this._prevScale = scale
+      // } else {
+      this.containers.svg.style.transform = `translate(${this.scroll.tx}px, ${this.scroll.ty}px) scale(${scale * this.iosDownscaleFactor})`
+      // }
+
+      // this.containers.svgWrapper.style.transform = `scale(${this.scale})`
 
       this.events.trigger(MapEventType.AFTER_CHANGE_BOUNDS, {
         center: {
@@ -2912,23 +2994,43 @@ export class MapSVGMap {
 
       const zoomGroup = $("<div />").addClass("mapsvg-btn-group").appendTo(buttons)
       const zoomIn = $("<div />").addClass("mapsvg-btn-map mapsvg-in")
+      const zoomInIcon =
+        '<svg viewBox="0 0 20 20" width="20" height="20" fill-rule="evenodd" version="1.1" id="svg134" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M 9,0 V 9 H 0 v 2 h 9 v 9 h 2 v -9 h 9 V 9 H 11 V 0 Z" /></svg>'
+      zoomIn.html(zoomInIcon)
 
-      zoomIn.on("touchend click", (e) => {
-        if (e.cancelable) {
-          e.preventDefault()
-        }
-        e.stopPropagation()
-        this.zoomIn()
-      })
+      zoomIn
+        .on("touchstart", (e) => {
+          if (e.cancelable) {
+            e.preventDefault()
+          }
+          e.stopPropagation()
+        })
+        .on("touchend click", (e) => {
+          if (e.cancelable) {
+            e.preventDefault()
+          }
+          e.stopPropagation()
+          this.zoomIn()
+        })
 
       const zoomOut = $("<div />").addClass("mapsvg-btn-map mapsvg-out")
-      zoomOut.on("touchend click", (e) => {
-        if (e.cancelable) {
-          e.preventDefault()
-        }
-        e.stopPropagation()
-        this.zoomOut()
-      })
+      const zoomOutIcon =
+        '<svg viewBox="0 0 20 20" width="20" height="20" fill-rule="evenodd" version="1.1" id="svg134" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="m 0,9 v 2 H 20 V 9 Z" /></svg>'
+      zoomOut.html(zoomOutIcon)
+      zoomOut
+        .on("touchstart", (e) => {
+          if (e.cancelable) {
+            e.preventDefault()
+          }
+          e.stopPropagation()
+        })
+        .on("touchend click", (e) => {
+          if (e.cancelable) {
+            e.preventDefault()
+          }
+          e.stopPropagation()
+          this.zoomOut()
+        })
       zoomGroup.append(zoomIn).append(zoomOut)
 
       const location = $("<div />").addClass("mapsvg-btn-map mapsvg-btn-location")
@@ -3415,6 +3517,10 @@ export class MapSVGMap {
       })
     }
   }
+
+  get useShadowRoot(): boolean {
+    return this.options.useShadowRoot || this.inBackend
+  }
   /**
    * Sets custom map CSS.
    * CSS is added as <style>...</style> tag in the page <header>
@@ -3426,8 +3532,18 @@ export class MapSVGMap {
       css = css.replace(/%id%/g, "" + this.id)
     }
     this.options.css = css || this.options.css
-    this.liveCss = this.liveCss || <HTMLStyleElement>$("<style></style>").appendTo("head")[0]
-    $(this.liveCss).html(this.options.css)
+
+    if (!this.liveCss) {
+      const style = document.createElement("style")
+      if (this.useShadowRoot) {
+        this.containers.shadowRoot.appendChild(style)
+      } else {
+        document.head.appendChild(style)
+      }
+      this.liveCss = style
+    }
+
+    this.liveCss.textContent = this.options.css
   }
   /**
    * Sets the filters schema for the map.
@@ -3586,10 +3702,13 @@ export class MapSVGMap {
       this.objectsRepository.query.filters &&
       this.objectsRepository.query.filters.distance
     ) {
-      const dist = this.objectsRepository.query.filters.distance
-      mapsvgCore.distanceSearch = this.objectsRepository.query.filters.distance
+      if (window && window.mapsvg) {
+        window.mapsvg.distanceSearch = this.objectsRepository.query.filters.distance
+      }
     } else {
-      mapsvgCore.distanceSearch = null
+      if (window && window.mapsvg) {
+        window.mapsvg.distanceSearch = null
+      }
     }
   }
 
@@ -3676,7 +3795,7 @@ export class MapSVGMap {
 
     for (const field_name in filters) {
       const field_value = filters[field_name]
-      const filterField = this.filtersSchema.getField(field_name)
+      const filterField = this.filtersSchema?.getField(field_name)
       const repoFieldName = filterField ? filterField.parameterNameShort : field_name
       const repoField = repo.getSchema().getField(repoFieldName)
       if (!repoField) {
@@ -3725,13 +3844,13 @@ export class MapSVGMap {
 
     this.containers.map.classList.add("mapsvg")
 
-    this.containers.wrapAll = document.createElement("div")
-    this.containers.wrapAll.classList.add("mapsvg-wrap-all")
-    this.containers.wrapAll.id = "mapsvg-map-" + this.id
-    this.containers.wrapAll.setAttribute("data-map-id", this.id ? this.id.toString() : "")
+    // this.containers.wrapAll = document.createElement("div")
+    // this.containers.wrapAll.classList.add("mapsvg-wrap-all")
+    // this.containers.wrapAll.id = "mapsvg-map-" + this.id
+    // this.containers.wrapAll.setAttribute("data-map-id", this.id ? this.id.toString() : "")
 
-    this.containers.wrap = document.createElement("div")
-    this.containers.wrap.classList.add("mapsvg-wrap")
+    // this.containers.wrap = document.createElement("div")
+    // this.containers.wrap.classList.add("mapsvg-wrap")
 
     this.containers.mapContainer = document.createElement("div")
     this.containers.mapContainer.classList.add("mapsvg-map-container")
@@ -3779,6 +3898,59 @@ export class MapSVGMap {
     this.containers.wrap.appendChild(this.containers.leftSidebar)
     this.containers.wrap.appendChild(this.containers.mapContainer)
     this.containers.wrap.appendChild(this.containers.rightSidebar)
+
+    if (this.useShadowRoot) {
+      // Добавляем ID карты, чтобы WP видел карту как раньше
+      this.containers.root = $('<div class="mapsvg-shadow-root"></div>')
+        .attr("id", "mapsvg-map-" + this.id)
+        .attr("data-map-id", this.id)[0]
+
+      // 2. Создаём Shadow Root
+      // open — чтобы можно было получить root из JS снаружи:
+      // document.querySelector('#mapsvg-map-123').shadowRoot
+      this.containers.shadowRoot = this.containers.root.attachShadow({ mode: "open" })
+      // Insert this.containers.wrapAll before this.containers.map
+      this.containers.wrapAll.parentNode.insertBefore(this.containers.root, this.containers.wrapAll)
+      this.containers.shadowRoot.appendChild(this.containers.wrapAll)
+
+      // 6. Добавляем стили внутрь Shadow
+      for (const style of mapsvgCore.styles) {
+        const link = document.createElement("link")
+        link.rel = "stylesheet"
+        link.href = style.url + "?ver=" + style.version
+        this.containers.shadowRoot.appendChild(link)
+      }
+
+      // Add theme
+      const link = document.createElement("link")
+      link.rel = "stylesheet"
+      link.href =
+        mapsvgCore.routes.root + "themes/" + this.options.theme.name + "/assets/css/styles.css"
+      this.containers.shadowRoot.appendChild(link)
+    } else {
+      // 6. Добавляем стили внутрь Shadow
+      if (!mapsvgCore.stylesAddedToBody) {
+        for (const style of mapsvgCore.styles) {
+          const link = document.createElement("link")
+          link.rel = "stylesheet"
+          link.href = style.url + "?ver=" + style.version
+          document.head.appendChild(link)
+        }
+        mapsvgCore.stylesAddedToBody = true
+      }
+      // Add theme
+      const link = document.createElement("link")
+      link.rel = "stylesheet"
+      link.href =
+        mapsvgCore.routes.root + "themes/" + this.options.theme.name + "/assets/css/styles.css"
+      document.head.appendChild(link)
+
+      // Insert this.containers.wrapAll before this.containers.map
+      // this.containers.map.parentNode.insertBefore(this.containers.wrapAll, this.containers.map)
+      // this.containers.wrapAll.parentNode.insertBefore(this.containers.root, this.containers.wrapAll)
+    }
+
+    this.containers.wrapAll.setAttribute("data-mapsvg-theme", this.options.theme.name)
 
     this.containersCreated = true
 
@@ -4081,6 +4253,11 @@ export class MapSVGMap {
 
     deepMerge(this.options, { googleMaps: options })
 
+    // Exit, if map is uncalibrated (incompatible with Google Maps)
+    if (this.isGeo() === false) {
+      return
+    }
+
     if (this.options.googleMaps.on) {
       if (!mapsvgCore.googleMaps.apiKey) {
         console.error("Google Maps API key is required no enable Google Maps")
@@ -4302,6 +4479,10 @@ export class MapSVGMap {
    * @private
    */
   loadGoogleMapsAPI(callback: () => void, fail: () => void): void {
+    // Exit early if the map is incompatible with Google Maps
+    if (!this.isGeo()) {
+      return
+    }
     if (!mapsvgCore.googleMaps.apiKey) {
       console.error("MapSVG: can't load Google API because no API key has been provided")
       return
@@ -4403,6 +4584,8 @@ export class MapSVGMap {
     let detContainer
     if (this.options.detailsView.location === "custom") {
       detContainer = $("#" + this.options.detailsView.containerId)[0]
+    } else if (this.options.detailsView.location === "fullscreen") {
+      detContainer = this.containers.map
     } else {
       detContainer = this.containers[this.options.detailsView.location]
     }
@@ -4427,16 +4610,13 @@ export class MapSVGMap {
       template,
       state: obj.getData(),
       scrollable: cancelAutoresize || this.shouldBeScrollable(this.options.detailsView.location), //['custom','header','footer'].indexOf(this.options.detailsView.location) === -1,
-      withToolbar: !((isPhone() || isTablet()) && this.options.detailsView.mobileFullscreen),
-      fullscreen: {
-        sm:
-          this.options.detailsView.mobileFullscreen ||
-          this.options.detailsView.location === "fullscreen",
-        md:
-          this.options.detailsView.mobileFullscreen ||
-          this.options.detailsView.location === "fullscreen",
-        lg: this.options.detailsView.location === "fullscreen",
-      },
+      fullscreen:
+        this.options.detailsView.location === "fullscreen" ||
+        (isPhone() && this.options.detailsView.mobileFullscreen),
+      useShadowRoot:
+        this.useShadowRoot &&
+        ((isPhone() && this.options.detailsView.mobileFullscreen) ||
+          ["custom", "fullscreen"].includes(this.options.detailsView.location)),
       position: ["custom", "header", "footer"].includes(this.options.detailsView.location)
         ? "relative"
         : "absolute",
@@ -4540,6 +4720,7 @@ export class MapSVGMap {
         width: $(container).hasClass("mapsvg-map-container") ? this.options.filters.width : "100%",
         padding: this.options.filters.padding,
       },
+      useShadowRoot: this.useShadowRoot && this.options.filters.location === "custom",
       query: this.filtersRepository?.query,
       schema: this.filtersSchema,
       template: '<div class="mapsvg-filters-container"></div>',
@@ -4548,7 +4729,6 @@ export class MapSVGMap {
         (!filtersInDirectory &&
           ["leftSidebar", "rightSidebar"].indexOf(this.options.filters.location) !== -1),
       modal,
-      withToolbar: isPhone() ? false : modal,
       modalLocation: this.options.filters.modalLocation,
       hideFilters: this.options.filters.hide,
       hideOnMobile: this.options.filters.hideOnMobile,
@@ -4885,10 +5065,11 @@ export class MapSVGMap {
    * Returns current SVG scale related to screen - map screen pixels to SVG points ratio.
    * Example: if SVG current viewBox width is 600 and the map is shown in a 300px container,
    * the map scale is 0.5 (300/600 = 0.5)
+   * @param viewBox - Optional viewBox to calculate scale for
    * @returns {number} Map scale related to screen
    */
-  getScale(): number {
-    const scale2 = this.containers.map.clientWidth / this.viewBox.width
+  getScale(viewBox?: ViewBox): number {
+    const scale2 = this.containers.map.clientWidth / (viewBox?.width || this.viewBox.width)
     return scale2 || 1
   }
 
@@ -5129,7 +5310,10 @@ export class MapSVGMap {
    * Returns geo-bounds of the map.
    * @returns {number[]} - [leftLon, topLat, rightLon, bottomLat]
    */
-  getGeoViewBox(): number[] {
+  getGeoViewBox(): number[] | null {
+    if (!this.isGeo()) {
+      return null
+    }
     const v = this.viewBox
     const p1 = new SVGPoint(v.x, v.y)
     const p2 = new SVGPoint(v.x + v.width, v.y)
@@ -5294,37 +5478,57 @@ export class MapSVGMap {
     }
   }
 
-  getGroupBBox(mapObjects: (Marker | Region | MarkerCluster)[]): ViewBox {
+  getGroupBBox(
+    mapObjects: (Marker | Region | MarkerCluster)[],
+    refineByViewbox?: ViewBox,
+  ): ViewBox {
     let _bbox, bbox
     const xmax: number[] = []
     const ymax: number[] = []
-    const xmin: number[] = []
-    const ymin: number[] = []
+    const allX: number[] = []
+    const allY: number[] = []
+
+    const skipWidth = mapObjects[0] instanceof Marker || mapObjects[0] instanceof MarkerCluster
+    const scale = refineByViewbox ? this.getScale(refineByViewbox) : this.getScale()
 
     for (let i = 0; i < mapObjects.length; i++) {
-      _bbox = mapObjects[i].getBBox()
-      xmin.push(_bbox.x)
-      ymin.push(_bbox.y)
-      const _w = _bbox.x + _bbox.width
-      const _h = _bbox.y + _bbox.height
-      xmax.push(_w)
-      ymax.push(_h)
+      _bbox = mapObjects[i].getBBox(scale)
+      // find viewbox that fits _bbox
+      // get it's scale
+      // redo _bbox = mapObjects[i].getBBox(scale) with the new scale
+      allX.push(_bbox.x)
+      allY.push(_bbox.y)
+      if (!skipWidth) {
+        allX.push(_bbox.x + _bbox.width)
+        allY.push(_bbox.y + _bbox.height)
+      }
     }
-    const _xmin = Math.min(...xmin)
-    const _ymin = Math.min(...ymin)
-    const width = Math.max(...xmax) - _xmin
-    const height = Math.max(...ymax) - _ymin
+    const _xmin = Math.min(...allX)
+    const _ymin = Math.min(...allY)
+    const _xmax = Math.max(...allX)
+    const _ymax = Math.max(...allY)
 
-    let padding = 10
-    const point1 = new ScreenPoint(padding, 0)
-    const point2 = new ScreenPoint(0, 0)
-    padding =
-      this.converter.convertPixelToSVG(point1).x - this.converter.convertPixelToSVG(point2).x
+    const width = _xmax - _xmin
+    const height = _ymax - _ymin
 
-    return new ViewBox(_xmin - padding, _ymin - padding, width + padding * 2, height + padding * 2)
+    const padding = 0
+    // const point1 = new ScreenPoint(padding, 0)
+    // const point2 = new ScreenPoint(0, 0)
+    // padding =
+    //   this.converter.convertPixelToSVG(point1).x - this.converter.convertPixelToSVG(point2).x
+
+    const preViewBox = new ViewBox(
+      _xmin - padding,
+      _ymin - padding,
+      width + padding * 2,
+      height + padding * 2,
+    )
+    const newViewBox = this.getViewBoxThatFitsViewBox(preViewBox)
+
+    return !refineByViewbox ? this.getGroupBBox(mapObjects, newViewBox) : preViewBox
   }
 
-  getZoomLevelByViewBox(viewBox: ViewBox, forceZoomLevel?: number): ViewBox {
+  getViewBoxThatFitsViewBox(viewBox: ViewBox, forceZoomLevel?: number): ViewBox {
     if (forceZoomLevel !== undefined) {
       return this.getZoomLevelViewBox(forceZoomLevel)
     }
@@ -5362,7 +5566,7 @@ export class MapSVGMap {
   }
 
   fitViewBox(viewBox: ViewBox, forceZoomLevel?: number | null): boolean {
-    const viewBoxFit = this.getZoomLevelByViewBox(viewBox, forceZoomLevel)
+    const viewBoxFit = this.getViewBoxThatFitsViewBox(viewBox, forceZoomLevel)
     if (this.googleMaps.map) {
       const bounds = this.getGeoBounds(viewBox)
       const latLngBounds = new google.maps.LatLngBounds(
@@ -6052,8 +6256,15 @@ export class MapSVGMap {
     const widthRatio = this.svgDefault.viewBox.width / this.viewBox.width
 
     // this.containers.scrollpane.style.transform = "translate(" + tx + "px," + ty + "px)"
-    this.containers.scrollpane.style.transform =
-      "translate(" + tx + "px, " + ty + "px) " + "scale(" + widthRatio + ")"
+    this.containers.svg.style.transform =
+      "translate(" +
+      tx +
+      "px, " +
+      ty +
+      "px) " +
+      "scale(" +
+      widthRatio * this.iosDownscaleFactor +
+      ")"
 
     this.scroll.tx = tx
     this.scroll.ty = ty
@@ -6954,12 +7165,8 @@ export class MapSVGMap {
       state: object.getData(),
       mapObject: mapObject,
       scrollable: true,
-      fullscreen: {
-        sm: this.options.popovers.mobileFullscreen,
-        md: this.options.popovers.mobileFullscreen,
-        lg: false,
-      },
-      withToolbar: !(isPhone() && this.options.popovers.mobileFullscreen),
+      fullscreen: isPhone() && this.options.popovers.mobileFullscreen,
+      useShadowRoot: this.useShadowRoot && isPhone() && this.options.popovers.mobileFullscreen,
       styles: {
         width: this.options.popovers.width + "px",
         backgroundColor: this.options.colors.popover,
@@ -7570,7 +7777,8 @@ export class MapSVGMap {
             $(e.target).closest(".mapsvg-popover").length ||
             $(e.target).hasClass("mapsvg-details-container") ||
             $(e.target).closest(".mapsvg-details-container").length ||
-            $(e.target).closest(".mapsvg-popover-container").length
+            $(e.target).closest(".mapsvg-popover-container").length ||
+            $(e.target).closest(".mapsvg-controller-view").length
           ) {
             // Prevent even dobule firing touchstart+mousedown on clicking popover close button
             if ($(e.target).hasClass("mapsvg-popover-close")) {
@@ -7993,13 +8201,17 @@ export class MapSVGMap {
     this.viewBox.update(this.svgDefault.viewBox)
 
     this.geoViewBox = this.getGeoViewBoxFromSvgTag(this.containers.svg)
+    if (this.geoViewBox) {
+      this.mapIsGeo = true
+      this.geoCoordinates = true
+    }
 
     svgTag.attr("preserveAspectRatio", "xMidYMid meet")
     svgTag.removeAttr("width")
     svgTag.removeAttr("height")
     $(this.containers.scrollpane).append(svgTag)
 
-    this.containers.svg.style.width = "auto"
+    // this.containers.svg.style.width = "auto"
 
     $(this.containers.svg)
       .find("path, polygon, circle, ellipse, rect, line, polyline")

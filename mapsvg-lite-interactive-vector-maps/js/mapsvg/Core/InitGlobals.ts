@@ -54,6 +54,7 @@ export class MapsvgClient extends Mapsvg {
   server = Server
   svgPoint = SVGPoint
   map = MapSVGMap
+  distanceSearch: any
   useRepository: typeof useRepository
   utils = utils
   initialized: boolean
@@ -65,16 +66,20 @@ export class MapsvgClient extends Mapsvg {
     this.mediaUploader = mapsvgCore.mediaUploader
     this.templatesLoaded = mapsvgCore.templatesLoaded
     this.routes = mapsvgCore.routes
+    this.styles = mapsvgCore.styles
     this.mouse = mapsvgCore.mouse
     this.useRepository = useRepository
   }
 }
 
+let mapsvgClient: MapsvgClient = null
+
 /**
  * @ignore
  */
 export const initGlobals = () => {
-  window.mapsvg = new MapsvgClient()
+  mapsvgClient = new MapsvgClient()
+  window.mapsvg = mapsvgClient
   window.MapSVG = Object.assign(
     Object.create(Object.getPrototypeOf(window.mapsvg)), // Create a new object with the same prototype as window.mapsvg
     window.mapsvg, // Copy own properties from window.mapsvg

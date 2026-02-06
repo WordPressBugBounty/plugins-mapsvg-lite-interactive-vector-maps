@@ -170,13 +170,22 @@ class MapsRepository extends Repository
 		unset($newMapData['id']);
 
 		$newMap = $this->create($newMapData, true);
+		$mapUpdate = array('id' => $newMap->id, 'options' => $newMapData['options']);
+		$needUpdate = false;
 
-
+		if (isset($newMapData['options']['templates']) && isset($newMapData['options']['templates']['directory'])) {
+			$dirTemplate = $newMapData['options']['templates']['directory'];
+			$dirTemplate = str_replace('{{>directoryItem-' . $map->id, '{{>directoryItem-' . $newMap->id, $dirTemplate);
+			$dirTemplate = str_replace('{{>directoryCategoryItem-' . $map->id, '{{>directoryCategoryItem-' . $newMap->id, $dirTemplate);
+			$mapUpdate['options']['templates']['directory'] = $dirTemplate;
+			$needUpdate = true;
+		}
 
 		if (isset($newMapData['options']['css'])) {
-			$mapUpdate = array('id' => $newMap->id, 'options' => $newMapData['options']);
 			$mapUpdate['options']['css'] = str_replace('#mapsvg-map-' . $map->id, '#mapsvg-map-' . $newMap->id, $newMapData['options']['css']);
-			//			$mapUpdate['options']['css'] = str_replace('#mapsvg-map-'. $map->id, '{{mapsvg_gallery '.$newMap->id, $newMapData['options']['css']);
+			$needUpdate = true;
+		}
+		if ($needUpdate) {
 			$newMap = $this->update($mapUpdate);
 		}
 
@@ -221,7 +230,7 @@ class MapsRepository extends Repository
 		$objectsSchemaData['name'] = 'objects_' . $toMap->id;
 		// Fix missing auto_increment
 		foreach ($objectsSchemaData["fields"] as $key => $field) {
-			if ($field->name === "id" && !isset($field->auto_increment) && $field->auto_increment !== true) {
+			if ($field->name === "id" && (!isset($field->auto_increment) || $field->auto_increment !== true)) {
 				$field->auto_increment = true;
 				$objectsSchemaData["fields"][$key] = $field;
 			}

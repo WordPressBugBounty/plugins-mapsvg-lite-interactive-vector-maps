@@ -64,6 +64,8 @@ class Admin
             wp_register_style('main.css', MAPSVG_PLUGIN_URL . 'css/mapsvg-admin.css', null, MAPSVG_ASSET_VERSION,);
             wp_enqueue_style('main.css');
         }
+        wp_register_style('mapsvg-styles-filters', MAPSVG_PLUGIN_URL . 'js/mapsvg/FormBuilder/form.css', null, MAPSVG_ASSET_VERSION,);
+        wp_enqueue_style('mapsvg-styles-filters');
 
         // Load common JS/CSS files
         \MapSVG\Front::addJsCss();

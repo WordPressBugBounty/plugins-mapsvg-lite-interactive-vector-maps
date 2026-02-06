@@ -34,7 +34,7 @@ export class ToolbarController extends Controller {
       opened: true,
       closable: false,
       scrollable: false,
-      fullscreen: { sm: false, md: false, lg: false },
+      fullscreen: false,
       autoresize: false,
       withToolbar: false,
       noPadding: true,

@@ -19,6 +19,10 @@ export type RegionStatusOptionsCollection = Record<string, RegionStatusOptions>
  * MapOptions interface is used to control the correct types of map options, passed during the initialization of the map or updating it.
  */
 export interface MapOptions {
+  useShadowRoot?: boolean
+  theme?: {
+    name: string
+  }
   id: number
   title?: string
   backend?: boolean // passed from admin
@@ -52,7 +56,7 @@ export interface MapOptions {
   fitSingleMarkerZoom?: number
   menu?: DirectoryOptions
   colors?: ColorsOptions
-  clustering?: { on: boolean }
+  clustering?: { on: boolean; maxZoom: number }
   /**
    * Zoom
    */

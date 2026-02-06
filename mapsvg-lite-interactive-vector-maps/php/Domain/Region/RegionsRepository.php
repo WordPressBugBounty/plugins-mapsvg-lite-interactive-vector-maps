@@ -25,12 +25,12 @@ class RegionsRepository extends Repository
 		$this->prefix = $prefix;
 	}
 
-	// /**
-	//  * Returns an array of Entities by provided Query
-	//  * @param Query $query Query for the database
-	//  * @return array<Schema>
-	//  */
-	public function find(Query | null $query = null)
+	/**
+	 * Returns an array of Entities by provided Query
+	 * @param Query|null $query
+	 * @return array<Schema>
+	 */
+	public function find($query = null)
 	{
 		if ($query === null) {
 			$query = new Query(array('perpage' => 0, 'filters' => array()));

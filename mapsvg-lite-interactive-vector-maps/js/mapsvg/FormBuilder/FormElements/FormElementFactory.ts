@@ -126,13 +126,13 @@ export class FormElementFactory {
       return extraParams
     }
 
-    const getFilterableFields = (schema: Schema) => {
+    const getFilterableFields = async (schema: Schema) => {
       const databaseFields: string[] = []
       const type = schema.type === "post" || schema.type === "api" ? "Object" : ucfirst(schema.type)
 
-      schema.getFields().forEach(async (obj) => {
+      for (const obj of schema.getFields()) {
         if (obj.type == "location" || obj.type == "image") {
-          return
+          continue
         }
 
         // START filters_posts
@@ -143,6 +143,7 @@ export class FormElementFactory {
           const response = await postTypesRepo.getPostFields()
 
           const { postType, meta, taxonomy } = response
+
           if (meta) {
             meta
               .filter((meta) => !["mapsvg_location", "footnotes"].includes(meta.name))
@@ -161,13 +162,15 @@ export class FormElementFactory {
         // REPLACE
         // databaseFields.push(`${type}.${obj.name}`)
         // END
-      })
+      }
       return databaseFields
     }
 
     if (this.mapsvg) {
-      databaseFieldsFilterable = getFilterableFields(this.mapsvg.objectsRepository.getSchema())
-      regionFieldsFilterable = getFilterableFields(this.mapsvg.regionsRepository.getSchema())
+      databaseFieldsFilterable = await getFilterableFields(
+        this.mapsvg.objectsRepository.getSchema(),
+      )
+      regionFieldsFilterable = await getFilterableFields(this.mapsvg.regionsRepository.getSchema())
     }
 
     return {

@@ -58,6 +58,10 @@ const defDBTemplate =
  */
 const DefaultOptions = {
   source: "",
+  useShadowRoot: true,
+  theme: {
+    name: "default",
+  },
   markerLastID: 0,
   regionLastID: 0,
   dataLastID: 1,
@@ -100,7 +104,7 @@ const DefaultOptions = {
     filtered: undefined,
     noObjects: undefined,
   },
-  clustering: { on: false },
+  clustering: { on: false, maxZoom: 17 },
   viewBox: [],
   cursor: "default",
   manualRegions: false,

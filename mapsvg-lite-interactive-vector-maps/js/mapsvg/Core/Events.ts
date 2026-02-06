@@ -9,7 +9,12 @@ interface BaseEvent {
 }
 
 function isGenericEvent(event?: any): event is GenericEvent {
-  return event && "clientX" in event && "clientY" in event
+  return (
+    event &&
+    (("clientX" in event && "clientY" in event) || // Mouse events
+      ("touches" in event && event.touches) ||
+      (event.originalEvent && "touches" in event.originalEvent && event.originalEvent.touches))
+  )
 }
 
 interface MouseEventLike extends BaseEvent {

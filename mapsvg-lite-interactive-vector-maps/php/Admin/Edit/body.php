@@ -16,8 +16,7 @@
       <div
         class="btn-group-xs btn-group-toggle"
         data-toggle="buttons"
-        id="mapsvg-preview-containers-toggle"
-      >
+        id="mapsvg-preview-containers-toggle">
         <input
           id="containerOption"
           class="btn-check"
@@ -25,20 +24,16 @@
           name="mapsvg-preview-containers-toggle"
           value="1"
           checked
-          autocomplete="off"
-        />
+          autocomplete="off" />
         <label
           for="containerOption"
-          class="btn btn-outline-secondary btn-xs"          
-        >
-          Containers</label
-        >
+          class="btn btn-outline-secondary btn-xs">
+          Containers</label>
       </div>
       <div
         class="btn-group-xs btn-group btn-group-toggle"
         data-toggle="buttons"
-        id="mapsvg-map-mode"
-      >
+        id="mapsvg-map-mode">
         <input
           id="previewOption"
           type="radio"
@@ -46,15 +41,12 @@
           name="mapsvg_map_mode"
           value="preview"
           autocomplete="off"
-          checked
-        />
+          checked />
         <label
           for="previewOption"
           class="btn btn-outline-secondary btn-xs active"
-          data-mode="preview"
-        >
-          Preview</label
-        >
+          data-mode="preview">
+          Preview</label>
 
         <input
           id="addRegOption"
@@ -62,16 +54,13 @@
           class="btn-check"
           name="mapsvg_map_mode"
           value="addRegions"
-          autocomplete="off"
-        />
+          autocomplete="off" />
         <label
           for="addRegOption"
           class="btn btn-outline-secondary btn-xs"
           data-mode="addRegions"
-          style="display: none"
-        >
-          Add regions</label
-        >
+          style="display: none">
+          Add regions</label>
 
         <input
           id="editRegOption"
@@ -79,11 +68,9 @@
           class="btn-check"
           name="mapsvg_map_mode"
           value="editRegions"
-          autocomplete="off"
-        />
+          autocomplete="off" />
         <label for="editRegOption" class="btn btn-outline-secondary btn-xs" data-mode="editRegions">
-          Edit regions</label
-        >
+          Edit regions</label>
 
         <input
           id="editDbOption"
@@ -91,11 +78,9 @@
           class="btn-check"
           name="mapsvg_map_mode"
           value="editData"
-          autocomplete="off"
-        />
+          autocomplete="off" />
         <label for="editDbOption" class="btn btn-outline-secondary btn-xs" data-mode="editData">
-          Edit DB objects</label
-        >
+          Edit DB objects</label>
       </div>
     </div>
     <div id="mapsvg-sizer">
@@ -103,7 +88,7 @@
     </div>
   </div>
   <div class="stretch mapsvg-panel mapsvg-panel-right">
-    <ul class="nav nav-tabs" id="mapsvg-tabs-menu">      
+    <ul class="nav nav-tabs" id="mapsvg-tabs-menu">
       <li class="toggle-tooltip nav-item" title="Settings">
         <a href="#tab_settings" class="nav-link active"><i class="bi-gear"></i></a>
       </li>
@@ -173,8 +158,7 @@
         <div
           class="tab-pane mapsvg-draw-controller"
           id="tab_draw_region"
-          data-controller="draw-region"
-        ></div>
+          data-controller="draw-region"></div>
         <div class="tab-pane" id="tab_gallery" data-controller="gallery"></div>
       </div>
     </div>

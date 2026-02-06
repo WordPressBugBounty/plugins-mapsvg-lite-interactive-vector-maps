@@ -75,25 +75,65 @@ class DbDataSource implements DataSourceInterface
           'post_type' => $postType,
           'fields' => 'ids',
           'posts_per_page' => -1,
+          'meta_query' => [
+            'relation' => 'AND'
+          ]
         ];
 
         if (isset($postFilter['meta']) && is_array($postFilter['meta'])) {
+          // $args['meta_query'] = ["relation" => "AND"];
+
           foreach ($postFilter['meta'] as $metaKey => $metaValue) {
-            $compare = '=';
-            if (is_array($metaValue)) {
-              $compare = 'IN';
+            $meta_query_items = [];
+            $acfField = null;
+            if (function_exists('get_field_object')) {
+              $acfField = acf_get_field($metaKey);
             }
-            $value = is_array($metaValue) ? array_map(function ($item) {
-              return isset($item['value']) ? $item['value'] : $item;
-            }, $metaValue) : $metaValue;
-            $args['meta_query'][] = [
-              'key' => $metaKey,
-              'value' => $metaValue,
-              'compare' => $compare
-            ];
+
+            if ($acfField && !empty($acfField['multiple']) && $acfField['multiple']) {
+              $compare = 'LIKE';
+              $meta_query_sub = ['relation' => 'OR'];
+
+              if (!is_array($metaValue)) {
+                $metaValue = array($metaValue);
+              }
+
+
+              foreach ($metaValue as $val) {
+
+                $valueFormatted = isset($val['value']) ? $val['value'] : $val;
+
+                $meta_query_sub[] = [
+                  'key'     => $metaKey,
+                  'value'   => '"' . $valueFormatted . '"',
+                  'compare' => 'LIKE'
+                ];
+              }
+              $meta_query_items[] = $meta_query_sub;
+            } else {
+              $compare = is_array($metaValue) ? 'IN'  : '=';
+              $value = is_array($metaValue) ? array_map(function ($item) {
+
+                $val = isset($item['value']) ? $item['value'] : $item;
+                return $val;
+              }, $metaValue) : $metaValue;
+
+              $meta_query_items[] = [
+                'key' => $metaKey,
+                'value' => $value,
+                'compare' => $compare
+              ];
+            }
+          }
+          // Set meta_query - always wrap in array, add relation only if multiple items
+          if (count($meta_query_items) > 1) {
+            $args['meta_query'] = array_merge(["relation" => "AND"], $meta_query_items);
+          } else {
+            $args['meta_query'] = $meta_query_items;
           }
         }
         if (isset($postFilter['taxonomy']) && is_array($postFilter['taxonomy'])) {
+          $args['tax_query'] = ["relation" => "AND"];
           foreach ($postFilter['taxonomy'] as $taxKey => $taxValue) {
             $operator = 'IN';
             $terms = $taxValue;
@@ -126,6 +166,7 @@ class DbDataSource implements DataSourceInterface
 
         $wpQuery = new \WP_Query($args);
         $postIds = $wpQuery->posts;
+        Logger::info($wpQuery);
 
         // In no posts were found, just return emty array - no need to run the query
         if (empty($postIds)) {

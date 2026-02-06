@@ -161,8 +161,6 @@
 
     this.contentView && this.contentView.html(this.templates.main(this.templateData))
     if (this.templates.toolbar) this.toolbarView.html(this.templates.toolbar(this.templateData))
-    console.log(this.name)
-    console.log(this.scrollable)
     if (this.scrollable) this.updateScroll()
   }
 

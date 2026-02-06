@@ -346,7 +346,6 @@ class Repository implements JsonSerializable
 		}
 		$data = $this->source->find($query);
 
-
 		if ($this->schema->isRemote()) {
 
 			// For remote API data sources, return data as-is

@@ -90,7 +90,41 @@
                      name="loadingText" value="{{loadingText}}" data-live="keyup">
           </div>
       </div>
-      <legend>Size and position</legend>
+
+      <legend>Appearance</legend>
+
+      <div class="form-group mb-3 row">
+        <label class="col-md-3 col-form-label">Theme</label>
+        <div class="col-md-9">
+            <select name="theme[name]" data-live="change" class="mapsvg-select2">
+                <option value="default" {{#ifeq  theme.name 'default'}}selected{{/ifeq}}>Default</option>
+                <option value="rounded" {{#ifeq theme.name
+                                                 'rounded'}}selected{{/ifeq}} >Rounded
+                </option>
+            </select>
+            <p class="form-text">Save the map settings and reload the page to apply the new theme.</p>
+        </div>
+
+    </div>
+
+      <div class="form-group mb-3 row">
+        <label class="col-md-3 col-form-label">Isolate map in a shadow root</label>
+        <div class="col-md-9">
+            <div class="form-switch form-switch-md btn-group mapsvg-toggle-visibility"
+                 data-object="options"
+                 data-toggle="buttons" id="mapsvg-controls-responsive">
+                <input type="checkbox" class="form-check-input" name="useShadowRoot" class="form-check-input" {{#if useShadowRoot}}checked{{/if}} data-live="change">
+            </div>
+            <p class="form-text">
+                Enable this if you want MapSVG styles to stay fully independent from your site's global CSS. It keeps the map’s appearance self-contained, with no style mixing between MapSVG and the rest of the page.
+            </p>
+        </div>
+
+
+
+
+    </div>
+      <legend>Map size and initial position</legend>
       <div class="form-group mb-3 row">
           <label class="col-md-3 col-form-label">Responsive</label>
           <div class="col-md-9">
@@ -212,7 +246,7 @@
 
           <div class="col-md-9">
               <div class="form-switch form-switch-md">
-                  <input type="checkbox" name="containers[leftSidebar][on]" class="form-check-input "
+                  <input type="checkbox" name="containers[leftSidebar][on]" class="form-check-input mapsvg-toggle-visibility"
                          data-toggle-visibility="#mapsvg-controls-left-sidebar"
                          {{#if  containers.leftSidebar.on}}checked{{/if}} data-live="change">
               </div>
@@ -737,6 +771,19 @@
                 </p>
           </div>
       </div>
+      <div class="form-group mb-3 row">
+        <label class="col-md-3 col-form-label">Markers clustering max. zoom</label>
+        <div class="col-md-9 ">
+
+            <div class="">
+              <select disabled="disabled" class="form-check-input"></select>
+            </div>
+              {{{premiumFeatureAlert}}}
+              <p class="form-text">
+                  Always unfold clusters after a certain zoom level
+              </p>
+        </div>
+    </div>
       <legend>Pagination</legend>
       <div class="form-group mb-3 row">
           <label class="col-md-3 col-form-label">Pagination</label>

@@ -167,14 +167,12 @@ class Router
 
 	public function handleMapsvgRequest($wp)
 	{
-
 		if (strpos($wp->request, '_mapsvg/') === 0) {
 			$path = trim($wp->request, '/');
 			$parts = explode('/', $path);
 
 			if (count($parts) > 1) {
 				$action = $parts[1];
-
 				switch ($action) {
 										
 							

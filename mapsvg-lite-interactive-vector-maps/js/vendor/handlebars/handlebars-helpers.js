@@ -419,7 +419,7 @@ Handlebars.registerHelper("premiumFeatureAlert", function (text, object) {
   return new Handlebars.SafeString(
     `<div class="alert alert-info mapsvg-premium-feature">
       <i class="bi bi-star-fill"></i> Premium feature${additionalTextDom} 
-      <a class="btn btn-xs mx-1 btn-outline-primary" target="_blank" href="https://mapsvg.com/pricing">Upgrade</a>
+      <a class="btn btn-xs mx-1 btn-outline-primary" target="_blank" href="https://mapsvg.com/pricing??utm_source=mapsvg-lite&utm_medium=lite-upgrade&utm_content=mapsvg&utm_campaign=mapsvg-lite">Upgrade</a>
     </div>`,
   )
 })

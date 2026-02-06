@@ -1,7 +1,9 @@
 <script type="text/x-handlebars-template" data-name="toolbar">
   <div class="row">
     <div class="col-4"></div>
-    <div class="mapsvg-toolbar-title col-4">Details View</div>
+    <div class="mapsvg-toolbar-title col-4">
+      Details View
+    </div>
     <div class="col-4"></div>
   </div>
 </script>
@@ -21,49 +23,49 @@
           <label class="col-md-3 col-form-label">Location</label>
           <div class="col-md-9">
               <div class="form-check">
-                  <input class="form-check-input" type="radio" name="detailsView[location]" value="map"
+                  <input id="detailsView-location-map" class="form-check-input" type="radio" name="detailsView[location]" value="map"
                          {{#ifeq detailsView.location 'map'}}checked{{/ifeq}} data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="detailsView-location-map">
                       Map
                       container</label>
               </div>
               <div class="form-check">
-                  <input class="form-check-input" type="radio" name="detailsView[location]" value="fullscreen"
+                  <input id="detailsView-location-fullscreen" class="form-check-input" type="radio" name="detailsView[location]" value="fullscreen"
                          {{#ifeq detailsView.location 'fullscreen'}}checked{{/ifeq}} data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="detailsView-location-fullscreen">
                       Fullscreen</label>
               </div>
               <div class="form-check">
-                  <input class="form-check-input" type="radio" name="detailsView[location]" value="leftSidebar"
+                  <input id="detailsView-location-leftSidebar" class="form-check-input" type="radio" name="detailsView[location]" value="leftSidebar"
                          {{#ifeq
                                  detailsView.location 'leftSidebar'}}checked{{/ifeq}} data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="detailsView-location-leftSidebar">
                       Left
                       sidebar</label>
               </div>
               <div class="form-check">
-                  <input class="form-check-input" type="radio" name="detailsView[location]" value="rightSidebar"
+                  <input id="detailsView-location-rightSidebar" class="form-check-input" type="radio" name="detailsView[location]" value="rightSidebar"
                          {{#ifeq detailsView.location 'rightSidebar'}}checked{{/ifeq}}
                          data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="detailsView-location-rightSidebar">
                       Right sidebar</label>
               </div>
               <div class="form-check">
-                  <input class="form-check-input" type="radio" name="detailsView[location]" value="header" {{#ifeq
+                  <input id="detailsView-location-header" class="form-check-input" type="radio" name="detailsView[location]" value="header" {{#ifeq
                           detailsView.location 'header'}}checked{{/ifeq}} data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="detailsView-location-header">
                       Header</label>
               </div>
               <div class="form-check">
-                  <input class="form-check-input" type="radio" name="detailsView[location]" value="footer" {{#ifeq
+                  <input id="detailsView-location-footer" class="form-check-input" type="radio" name="detailsView[location]" value="footer" {{#ifeq
                           detailsView.location 'footer'}}checked{{/ifeq}} data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="detailsView-location-footer">
                       Footer</label>
               </div>
               <div class="form-check">
-                  <input class="form-check-input" type="radio" name="detailsView[location]" value="custom" {{#ifeq
+                  <input id="detailsView-location-custom" class="form-check-input" type="radio" name="detailsView[location]" value="custom" {{#ifeq
                           detailsView.location 'custom'}}checked{{/ifeq}} data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="detailsView-location-custom">
                       Custom
                       container</label>
               </div>

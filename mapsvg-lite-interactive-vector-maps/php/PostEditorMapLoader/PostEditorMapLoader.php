@@ -271,8 +271,10 @@ class PostEditorMapLoader
     public function addJsCssCommon()
     {
         // Add common JS and CSS files
-        wp_enqueue_script('mapsvg', MAPSVG_PLUGIN_URL . 'js/mapsvg.min.js', array('jquery'), MAPSVG_VERSION, true);
-        wp_enqueue_style('mapsvg', MAPSVG_PLUGIN_URL . 'css/mapsvg.css', array(), MAPSVG_VERSION);
+        // wp_enqueue_script('mapsvg', MAPSVG_PLUGIN_URL . 'js/mapsvg.min.js', array('jquery'), MAPSVG_VERSION, true);
+        // wp_enqueue_style('mapsvg', MAPSVG_PLUGIN_URL . 'css/mapsvg.css', array(), MAPSVG_VERSION);
+        wp_register_style('mapsvg-styles-filters', MAPSVG_PLUGIN_URL . 'js/mapsvg/FormBuilder/form.css', null, MAPSVG_ASSET_VERSION,);
+        wp_enqueue_style('mapsvg-styles-filters');
 
         // Add jQuery Growl for notifications
         wp_enqueue_script('jquery-growl', MAPSVG_PLUGIN_URL . 'js/vendor/jquery-growl/jquery.growl.js', array('jquery'), "1.3.1", true);

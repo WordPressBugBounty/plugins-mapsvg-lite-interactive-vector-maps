@@ -10,15 +10,6 @@
   box-sizing: border-box;
 }
 
-body.admin-bar .mapsvg-details-container.mapsvg-container-fullscreen {
-  top: 32px;
-}
-@media screen and (max-width: 782px) {
-  body.admin-bar .mapsvg-details-container.mapsvg-container-fullscreen {
-    top: 46px;
-  }
-}
-
 .mapsvg-details-container.mapsvg-filters-wrap .mapsvg-controller-view-content {
   padding: 10px 10px 80px 10px;
 }

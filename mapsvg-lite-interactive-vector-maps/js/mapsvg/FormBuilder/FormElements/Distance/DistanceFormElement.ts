@@ -58,11 +58,12 @@ export class DistanceFormElement extends FormElement {
     this.distanceUnits = options.distanceUnits || "km"
     this.distanceUnitsLabel = options.distanceUnitsLabel || "km"
     this.fromLabel = options.fromLabel || "from"
-    this.placeholder = options.placeholder
+    this.placeholder = options.placeholder || options.addressFieldPlaceholder || "Address"
     this.userLocationButton = options.userLocationButton || false
     this.type = options.type
     this.addressField = options.addressField || true
-    this.addressFieldPlaceholder = options.addressFieldPlaceholder || "Address"
+    this.addressFieldPlaceholder =
+      options.placeholder || options.addressFieldPlaceholder || "Address"
     this.languages = [
       { value: "sq", label: "Albanian" },
       { value: "ar", label: "Arabic" },
@@ -446,11 +447,16 @@ export class DistanceFormElement extends FormElement {
     if ($().mselect2) {
       $(this.domElements.main)
         .find("select")
-        .mselect2()
+        .mselect2({
+          dropdownParent: $(this.formBuilder.form),
+        })
         .on("select2:focus", function () {
           $(this).mselect2("open")
         })
     }
+  }
+  setPlaceholder(placeholder: string) {
+    $(this.inputs.address).attr("placeholder", placeholder)
   }
 
   mayBeAddDistanceRow(): void {

@@ -193,6 +193,9 @@ export class FormElement implements FormElementInterface {
         .css("width", "100%")
     }
   }
+  setPlaceholder(placeholder: string) {
+    return
+  }
 
   setEditorEventHandlers() {
     const _this = this
@@ -260,6 +263,10 @@ export class FormElement implements FormElementInterface {
         _this.redraw()
       } else if (prop == "label" || prop == "name") {
         return false
+      } else if (prop === "placeholder") {
+        const value = $(this).val()
+        _this.setPlaceholder(value)
+        _this.update(prop, value)
       } else {
         let value
         value = $(this).attr("type") == "checkbox" ? $(this).prop("checked") : $(this).val()

@@ -57,28 +57,25 @@
   class="bi bi-trash"></i> Remove</button> </div>
 </script>
 <script type="text/x-handlebars-template" id="mapsvg-data-tmpl-checkbox-view">
-    <div class="form-group mb-3 row">
-        <label class="col-sm-3 col-form-label with-name">{{label}} <div class="field-name">{{_name}}</div></label>
+  <div class="form-group row">
+      <label class="col-sm-3 col-form-label with-name">{{label}} <div class="field-name">{{_name}}</div></label>
 
-        <div class="col-sm-9">
-            <div name="checkboxToSwitch" class=" checkbox {{#if showAsSwitch}} form-switch form-switch-md{{/if}}">
-                <input class="form-check-input" type="checkbox" name="{{name}}" {{#if value}}checked{{/if}}>
-                <label class="form-check-label">
-                    {{checkboxLabel}}
-                </label>
-            </div>
-            <p class="form-text">{{help}}</p>
-        </div>
-    </div>
+      <div class="col-sm-9">
+          <div name="checkboxToSwitch" class=" checkbox {{#if showAsSwitch}} form-switch form-switch-md{{/if}}">
+              <input class="form-check-input" type="checkbox" name="{{name}}" {{#if value}}checked{{/if}}>
+              <label class="form-check-label">
+                  {{checkboxLabel}}
+              </label>
+          </div>
+          <p class="form-text">{{help}}</p>
+      </div>
+  </div>
 </script>
 
 <script type="text/x-handlebars-template" id="mapsvg-filters-tmpl-checkboxes-control">
   <div class="form-group mb-3 ">
          <label class="form-label">Label</label>
          <input type="text" class="form-control" name="label" value="{{label}}" autocomplete="off"/>
-         <p class="form-text">
-             Label can be empty
-         </p>
      </div>
      <div class="form-group mb-3">
          <label class="form-label">Apply filter to the field</label>
@@ -125,21 +122,49 @@
 </script>
 
 <script type="text/x-handlebars-template" id="mapsvg-data-tmpl-checkboxes-control">
-  <div class="form-group mb-3 "> <label class="form-label">Label</label> <input type="text"
-  class="form-control" name="label" value="{{label}}" autocomplete="off"/> <p class="form-text">
-  Label can be empty </p> </div> <!--<div class="form-group mb-3 row">--> <!--<label
-  class="form-label">Default option text</label>--> <!--<input type="text" name="placeholder"
-  class="form-control" value="{{placeholder}}"/>--> <!--<p class="form-text">--> <!--Shows all
-  objects if selected--> <!--</p>--> <!--</div>--> <div class="form-group mb-3 "> <label
-  class="form-label">Options</label> <textarea name="options" class="form-control" rows="5">{{#each
-    options
-  }}{{label}}:{{value}}&#13;&#10;{{/each}}</textarea> </div> <div class="form-group mb-3 "> <label
-  class="form-label">Help</label> <textarea name="help" class="form-control">{{help}}</textarea>
-  </div> <div class="form-group mb-3 "> <button class="btn btn-outline-secondary mapsvg-remove"><i
-  class="bi bi-trash"></i> Remove</button> </div>
+  <div class="form-group mb-3">
+    <label class="form-label">
+      Label
+    </label>
+
+    <input type="text" class="form-control" name="label" value="{{label}}" autocomplete="off" />
+  </div>
+  <!--<div class="form-group mb-3 row">--><!--<label
+  class="form-label">Default option text</label>--><!--<input type="text" name="placeholder"
+  class="form-control" value="{{placeholder}}"/>--><!--<p class="form-text">--><!--Shows all
+  objects if selected--><!--</p>--><!--</div>-->
+  <div class="form-group mb-3">
+    <label class="form-label">
+      Options
+    </label>
+
+    <textarea name="options" class="form-control" rows="5">
+      {{#each options}}
+        {{label}}:{{value}}&#13;&#10;
+      {{/each}}
+    </textarea>
+  </div>
+
+  <div class="form-group mb-3">
+    <label class="form-label">
+      Help
+    </label>
+
+    <textarea name="help" class="form-control">
+      {{help}}
+    </textarea>
+  </div>
+
+  <div class="form-group mb-3">
+    <button class="btn btn-outline-secondary mapsvg-remove">
+      <i class="bi bi-trash"></i>
+      Remove
+    </button>
+  </div>
 </script>
+
 <script type="text/x-handlebars-template" id="mapsvg-filters-tmpl-checkboxes-view">
-  <div class="form-group mb-3  mapsvg-checkbox-group">
+  <div class="form-group mapsvg-checkbox-group">
       <label class="col-sm-3 col-form-label row mapsvg-filter-label">{{label}}</label>
 
       <div class="col-sm-9">
@@ -157,7 +182,7 @@
 </script>
 
 <script type="text/x-handlebars-template" id="mapsvg-data-tmpl-checkboxes-view">
-  <div class="form-group mb-3 row mapsvg-checkbox-group">
+  <div class="form-group row mapsvg-checkbox-group">
          <label class="col-sm-3 col-form-label mapsvg-filter-label">{{label}}</label>
 
          <div class="col-sm-9">
@@ -224,21 +249,22 @@
   <div class="form-group mb-3 ">
        <label class="form-label">Label</label>
        <input type="text" class="form-control" name="label" value="{{label}}" autocomplete="off" />
-       <p class="form-text">
-           Label can be empty
-       </p>
+
    </div>
+
+  <div class="form-group mb-3">
+       <label class="form-label">Placeholder</label>
+       <div>
+           <input type="text" class="form-control" name="placeholder"  value="{{placeholder}}" />
+       </div>
+   </div>
+
    <div class="form-group mb-3">
        <label class="form-label">Apply filter to the field</label>
        <input type="text" class="form-control" value="Location" disabled="disabled"/>
    </div>
 
-   <div class="form-group mb-3">
-       <label class="form-label">Search field placeholder</label>
-       <div>
-           <input type="text" class="form-control" name="addressFieldPlaceholder"  value="{{addressFieldPlaceholder}}" />
-       </div>
-   </div>
+
 
    <div class="form-group mb-3 ">
        <label class="form-label">User location button</label>
@@ -328,7 +354,7 @@
 </script>
 
 <script type="text/x-handlebars-template" id="mapsvg-filters-tmpl-distance-view">
-  <div class="form-group">
+  <div class="form-group mapsvg-form-field-distance">
 
       {{#if label}}
           <label class="col-form-label mapsvg-filter-label">{{label}}</label>
@@ -341,7 +367,7 @@
               <input type="hidden" data-parameter-name="distanceLatLng" name="distanceGeoPoint" value="{{value.geoPoint}}"/>
               <input type="hidden" name="distanceUnits" value="{{units}}"/>
               <div class="distance-search-wrap {{#if userLocationButton}}with-user-location-button{{/if}}">
-                  <input type="text" class="form-control mapsvg-address-search typeahead" value="{{value.address}}" name="distance" placeholder="{{addressFieldPlaceholder}}" autocomplete="off" {{#if searchByZip}}maxlength="{{zipLength}}"{{/if}}/>
+                  <input type="text" class="form-control mapsvg-address-search typeahead" value="{{value.address}}" name="distance" placeholder="{{placeholder}}" autocomplete="off" {{#if searchByZip}}maxlength="{{zipLength}}"{{/if}}/>
                   {{#if userLocationButton}}
                       <svg class="user-location-button" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 447.342 447.342" style="enable-background:new 0 0 447.342 447.342;" xml:space="preserve"><path d="M443.537,3.805c-3.84-3.84-9.686-4.893-14.625-2.613L7.553,195.239c-4.827,2.215-7.807,7.153-7.535,12.459 c0.254,5.305,3.727,9.908,8.762,11.63l129.476,44.289c21.349,7.314,38.125,24.089,45.438,45.438l44.321,129.509 c1.72,5.018,6.325,8.491,11.63,8.762c5.306,0.271,10.244-2.725,12.458-7.535L446.15,18.429 C448.428,13.491,447.377,7.644,443.537,3.805z"/></svg>
                   {{/if}}
@@ -819,9 +845,7 @@
   <div class="form-group mb-3 ">
         <label class="form-label">Label</label>
         <input type="text" class="form-control" name="label" value="{{label}}" autocomplete="off"/>
-        <p class="form-text">
-            Label can be empty
-        </p>
+
     </div>
     <div class="form-group mb-3">
         <label class="form-label">What fields to filter by</label>
@@ -886,7 +910,7 @@
   bi-trash"></i> Remove</button> </div>
 </script>
 <script type="text/x-handlebars-template" id="mapsvg-filters-tmpl-radio-view">
-  <div class="form-group mb-3 ">
+  <div class="form-group">
          <label class="col-sm-3 col-form-label mapsvg-filter-label">{{label}}</label>
 
          <div class="col-sm-9">
@@ -978,9 +1002,7 @@
   <div class="form-group mb-3 ">
         <label class="form-label">Label</label>
         <input type="text" class="form-control" name="label" value="{{label}}" autocomplete="off" />
-        <p class="form-text">
-            Label can be empty
-        </p>
+
     </div>
     <div class="form-group mb-3">
         <label class="form-label">Apply filter to the field</label>
@@ -1059,8 +1081,9 @@
   class="form-group mb-3 "> <button class="btn btn-outline-secondary mapsvg-remove"><i class="bi
   bi-trash"></i> Remove</button> </div>
 </script>
+
 <script type="text/x-handlebars-template" id="mapsvg-filters-tmpl-select-view">
-  <div class="form-group">
+  <div class="form-group mapsvg-form-field-select">
           {{#if label}}
               <label class="col-sm-3 col-form-label mapsvg-filter-label">{{label}}</label>
           {{/if}}
@@ -1085,50 +1108,51 @@
 </script>
 
 <script type="text/x-handlebars-template" id="mapsvg-data-tmpl-select-view">
- <div class="form-group mb-3 row">
-        <label class="col-sm-3 col-form-label with-name">{{label}}<div class="field-name">{{_name}}</div></label>
-        <div class="col-sm-9">
-            <select name="{{name}}" class="form-control" {{#if multiselect}}multiple="multiple"{{/if}} data-value="{{value}}">
+   <div class="form-group mb-3 row mapsvg-form-field-select">
+          <label class="col-sm-3 col-form-label with-name">{{label}}<div class="field-name">{{_name}}</div></label>
+          <div class="col-sm-9">
+              <select name="{{name}}" class="form-control" {{#if multiselect}}multiple="multiple"{{/if}} data-value="{{value}}">
 
-                {{#if optionsGrouped}}
-    {{#each options}}
-                            <optgroup label="{{title}}">{{title}}</optgroup>
-                        {{#if options}}
-        {{#unless ../multiselect}}
-            {{#each options}}
-                                    <option value="{{value}}" {{#ifeq value ../../value}}selected{{/ifeq}}>{{label}}</option>
-                                {{/each}}
-        {{/unless}}
-        {{#if ../multiselect}}
-            {{#each options}}
-                                    <option value="{{value}}" {{#ifselected value ../../value}}selected{{/ifselected}}>{{label}}</option>
-                                {{/each}}
-        {{/if}}
-    {{/if}}
-        {{#unless options}}
-                            <option disabled>empty</option>
-                        {{/unless}}
-    {{/each}}
-{{/if}}
-    {{#unless optionsGrouped}}
-        {{#unless multiselect}}
-                        <option value="" {{#ifeq value ../../value}}selected{{/ifeq}}>...</option>
-                        {{#each options}}
-                            <option value="{{value}}" {{#ifeq value ../value}}selected{{/ifeq}}>{{label}}</option>
-                        {{/each}}
-        {{/unless}}
-        {{#if multiselect}}
-            {{#each options}}
-                            <option value="{{value}}" {{#ifselected value ../value}}selected{{/ifselected}}>{{label}}</option>
-                        {{/each}}
-        {{/if}}
-    {{/unless}}
+                  {{#if optionsGrouped}}
+      {{#each options}}
+                              <optgroup label="{{title}}">{{title}}</optgroup>
+                          {{#if options}}
+          {{#unless ../multiselect}}
+              {{#each options}}
+                                      <option value="{{value}}" {{#ifeq value ../../value}}selected{{/ifeq}}>{{label}}</option>
+                                  {{/each}}
+          {{/unless}}
+          {{#if ../multiselect}}
+              {{#each options}}
+                                      <option value="{{value}}" {{#ifselected value ../../value}}selected{{/ifselected}}>{{label}}</option>
+                                  {{/each}}
+          {{/if}}
+      {{/if}}
+          {{#unless options}}
+                              <option disabled>empty</option>
+                          {{/unless}}
+      {{/each}}
+  {{/if}}
+      {{#unless optionsGrouped}}
+          {{#unless multiselect}}
+                          <option value="" {{#ifeq value ../../value}}selected{{/ifeq}}>...</option>
+                          {{#each options}}
+                              <option value="{{value}}" {{#ifeq value ../value}}selected{{/ifeq}}>{{label}}</option>
+                          {{/each}}
+          {{/unless}}
+          {{#if multiselect}}
+              {{#each options}}
+                              <option value="{{value}}" {{#ifselected value ../value}}selected{{/ifselected}}>{{label}}</option>
+                          {{/each}}
+          {{/if}}
+      {{/unless}}
 
-            </select>
-            <p class="form-text">{{help}}</p>
-        </div>
-    </div>
+              </select>
+              <p class="form-text">{{help}}</p>
+          </div>
+      </div>
 </script>
+
 <script type="text/x-handlebars-template" id="mapsvg-data-tmpl-status-control">
   <div class="form-group mb-3">
     <label class="form-label">Label</label>

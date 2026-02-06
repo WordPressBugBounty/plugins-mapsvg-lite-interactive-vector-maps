@@ -884,7 +884,9 @@ function loadDeps() {
     },
     toggleContainers: function (on) {
       on = on === undefined ? !_this.containersVisible : on
-      $(".mapsvg-top-container").toggleClass("mapsvg-hidden", !on)
+      $(editingMap.containers.wrapAll)
+        .find(".mapsvg-top-container")
+        .toggleClass("mapsvg-hidden", !on)
       _this.containersVisible = on
     },
 
@@ -1876,8 +1878,6 @@ function loadDeps() {
      * @param {MapsvgBackendParams} options - The configuration options for initialization.
      */
     init: async function (options) {
-      console.log("Init MapSVG backend")
-
       /**
        * Mapsvg backend parameters localized for use in JS.
        * @type {MapsvgBackendParams}
@@ -1972,6 +1972,12 @@ function loadDeps() {
           )
           this.mapsvg = editingMap
 
+          editingMap.events.on("resize", () => {
+            setTimeout(function () {
+              _this.resizeSVGCanvas()
+            }, 1)
+          })
+
           editingMap.events.on("afterInit", function (event) {
             const { map } = event
             _this.setMapTitles(map)
@@ -1980,11 +1986,11 @@ function loadDeps() {
               window.m = editingMap
             }
 
-            new ResizeSensor($(".mapsvg-header")[0], function () {
-              setTimeout(function () {
-                _this.resizeSVGCanvas()
-              }, 1)
-            })
+            // new ResizeSensor($(".mapsvg-header")[0], function () {
+            //   setTimeout(function () {
+            //     _this.resizeSVGCanvas()
+            //   }, 1)
+            // })
 
             // TODO change this to onCLick events
             //msvg.setMarkerEditHandler(methods.markerEditHandler);

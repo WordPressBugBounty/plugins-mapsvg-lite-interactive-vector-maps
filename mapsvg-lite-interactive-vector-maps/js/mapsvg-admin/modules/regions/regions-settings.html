@@ -106,7 +106,6 @@
                 <label class="col-md-3 col-form-label">Status of Regions that are filtered out</label>
                 <div class="col-md-9">{{#if statuses}}
                 <div class="form-check">
-                    {{log regionsDynamicStatus}}
                 <input id="radio-filtered-undefined" class="form-check-input" type="radio" name="regionsDynamicStatus[filtered]" value  {{#ifeq
                     regionsDynamicStatus.filtered  ''}}checked{{/ifeq}}  data-live="change">
                 <label class="form-check-label" for="radio-filtered-undefined">

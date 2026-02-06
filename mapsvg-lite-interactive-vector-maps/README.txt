@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 8.7.14
+Stable tag: 8.9.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -309,6 +309,72 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 
 = 8.7.14 = 
 * Fixed: SVG file reload failed when regions had no Title field.
+
+= 8.7.15 = 
+* Fixed: prevent loading of Google Maps API for incompatible (uncalibrated) maps
+* Fixed: user and access token creation (for support)
+* Fixed: Clockwork issues in Laravel environment
+* Fixed: filter tags were not loading when no filterSchema was provided
+* Fixed: passing correct data to custom event handlers on mobile devices
+
+= 8.7.16 = 
+* Fixed: duplicating maps created in older version of mapsvg was triggering an error about auto_increment
+* Fixed: improved world.svg map calibration
+
+= 8.7.17 = 
+* Fixed: unserialized ACF field values in filter options
+
+= 8.7.18 = 
+* Fixed: filtering by ACF select and multiselect fields
+* Fixed: added compatibility with PHP 7.4
+
+= 8.7.19 = 
+* Fixed: filtering by ACF using checkboxes fields
+* Fixed: migration issues
+
+= 8.7.20 = 
+* Fixed: zoom to a cluster did not always reveal its markers
+
+= 8.7.21 = 
+* Fixed: empty directory in duplicated maps
+* Fixed: "deprecated" error in logs
+
+= 8.7.22 = 
+* Feature: Maximum zoom level for clustering
+* Fixed: blurred map on zoom in Safari
+* Fixed: zoom to cluster on Google Maps
+
+= 8.7.23 = 
+* Fixed: XSS vulnerability in shortcode attributes
+
+= 8.8.0 = 
+* Feature: Isolate CSS to shadow root (optional)
+* Fixed: blurred map on zoom in Safari
+
+= 8.8.1 = 
+* Fixed: not working {{distanceTo ...}} Handlebars tag
+
+= 8.8.2 =
+* Fixed: Handlebars templates not loading correctly when multiple maps were on the same page
+* Fixed: location form styles in Gutenberg
+
+= 8.8.3 =
+* Fixed: tooltip flickering during mirroring near map edges
+
+= 8.8.4 =
+* Fixed: map visibility in Classic Post Editor
+
+= 8.9.0 =
+* Feature: map themes: default, rounded
+
+= 8.9.1 =
+* Fixed: styles for multiselect fields
+
+= 8.9.2 =
+* Feature: rounded map buttons
+* Fixed: check if phpinfo() is available
+
+
 
 
 == Upgrade Notice ==

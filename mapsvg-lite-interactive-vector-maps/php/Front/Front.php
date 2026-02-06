@@ -21,19 +21,19 @@ class Front
 	/**
 	 * Add common JS & CSS
 	 */
-	public static function addJsCss()
+	public static function addJsCss($theme = "default")
 	{
 
 		// wp_register_style('mapsvg', MAPSVG_PLUGIN_URL . 'dist/mapsvg.css', null, MAPSVG_ASSET_VERSION);
 		// wp_enqueue_style('mapsvg');
-		wp_register_style('mapsvg', MAPSVG_PLUGIN_URL . 'dist/mapsvg-bundle.css', null, MAPSVG_ASSET_VERSION);
-		wp_enqueue_style('mapsvg');
+		// wp_register_style('mapsvg', MAPSVG_PLUGIN_URL . 'dist/mapsvg-bundle.css', null, MAPSVG_ASSET_VERSION);
+		// wp_enqueue_style('mapsvg');
 
-		wp_register_style('nanoscroller', MAPSVG_PLUGIN_URL . 'js/vendor/nanoscroller/nanoscroller.css', null, '0.8.7');
-		wp_enqueue_style('nanoscroller');
+		// wp_register_style('nanoscroller', MAPSVG_PLUGIN_URL . 'js/vendor/nanoscroller/nanoscroller.css', null, '0.8.7');
+		// wp_enqueue_style('nanoscroller');
 
-		wp_register_style('select2', MAPSVG_PLUGIN_URL . 'js/vendor/select2/select2.min.css', null, '4.0.31');
-		wp_enqueue_style('select2');
+		// wp_register_style('select2', MAPSVG_PLUGIN_URL . 'js/vendor/select2/select2.min.css', null, '4.0.31');
+		// wp_enqueue_style('select2');
 
 		// wp_register_script('jquery.mousewheel', MAPSVG_PLUGIN_URL . 'js/vendor/jquery-mousewheel/jquery.mousewheel.min.js', array('jquery'), '3.0.6');
 		// wp_enqueue_script('jquery.mousewheel', null, '3.0.6');
@@ -67,6 +67,29 @@ class Front
 				'maps'      => wp_parse_url(MAPSVG_MAPS_URL, PHP_URL_PATH),
 				'uploads'   => wp_parse_url(MAPSVG_UPLOADS_URL, PHP_URL_PATH),
 				'home' => home_url()
+			),
+			'styles' => array(
+				[
+					'name' => 'nanoscroller',
+					'url' => MAPSVG_PLUGIN_URL . 'js/vendor/nanoscroller/nanoscroller.css',
+					'version' => 	'0.8.7'
+				],
+				[
+					'name' => 'select2',
+					'url' => MAPSVG_PLUGIN_URL . 'js/vendor/select2/select2.min.css',
+					'version' => 	'4.0.31'
+				],
+				[
+					'name' => 'mapsvg',
+					'url' => MAPSVG_PLUGIN_URL . 'dist/mapsvg-bundle.css',
+					'version' => 	MAPSVG_ASSET_VERSION
+				],
+				// ADD THEME FILES
+				// [
+				// 	'name' => 'mapsvg-theme',
+				// 	'url' => MAPSVG_PLUGIN_URL . 'themes/' . $theme . '/assets/css/styles.css',
+				// 	'version' => 	MAPSVG_ASSET_VERSION
+				// ],
 			),
 			'nonce' => wp_create_nonce('wp_rest'),
 			'google_maps_api_key' => Options::get("google_api_key"),
@@ -136,16 +159,22 @@ class Front
 	 */
 	function renderShortcode($atts)
 	{
+		// Sanitize all attributes to prevent XSS
+		$atts = array_map('sanitize_text_field', $atts);
 
 		if (!isset($atts['id'])) {
 			return 'Error: no ID in mapsvg shortcode.';
 		}
 
+		// Sanitize ID as integer
+		$atts['id'] = absint($atts['id']);
+
 		$mapsRepo = RepositoryFactory::get("map");
 		$map = $mapsRepo->findById($atts['id']);
 
 		// Load JS/CSS files
-		static::addJsCss();
+		$theme = isset($map->options["theme"]) && isset($map->options["theme"]["name"]) ? $map->options["theme"]["name"] : "default";
+		static::addJsCss($theme);
 		do_action('mapsvg_shortcode');
 
 		$width = isset($map->options["width"]) ? round((float)$map->options["width"], 2) : 1280;

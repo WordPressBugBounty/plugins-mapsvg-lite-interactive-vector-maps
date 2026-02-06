@@ -32,53 +32,55 @@
       </div>
 
       <div class="form-group row mb-3">
-          <label class="col-md-3 col-form-label">Location</label>
-          <div class="col-md-9">
-              <!--<div class="form-check">-->
-              <!--<label>-->
-              <!--<input type="radio" name="filters[location]" value="mapContainer"
-          {{#ifeq filters.location 'map'}}checked{{/ifeq}} data-live="change"/>-->
-              <!--Map container-->
-              <!--</label>-->
-              <!--</div>-->
-                <div class="form-check">
-
-                    <input class="form-check-input" type="radio" name="filters[location]" value="leftSidebar" {{#ifeq
-                            filters.location  'leftSidebar'}}checked{{/ifeq}}  data-live="change">
-                  <label class="form-check-label">
-                      Left
-                      sidebar</label>
-              </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="filters[location]" value="rightSidebar" {{#ifeq
-                            filters.location  'rightSidebar'}}checked{{/ifeq}}  data-live="change">
-                  <label class="form-check-label">
-                      Right
-                      sidebar</label>
-              </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="filters[location]" value="header" {{#ifeq
-                            filters.location  'header'}}checked{{/ifeq}}  data-live="change">
-                  <label class="form-check-label">
-                      Header</label>
-              </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="filters[location]" value="footer" {{#ifeq
-      filters.location  'footer'}}checked{{/ifeq}}  data-live="change">
-                  <label class="form-check-label">
-                      Footer</label>
-              </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="filters[location]" value="custom" {{#ifeq
-      filters.location  'custom'}}checked{{/ifeq}}  data-live="change">
-                  <label class="form-check-label">
-                      Custom
-                      container</label>
-              </div>
-              <p class="form-text">Manage containers in the <a href="#tab_settings"
-                                                               class="mapsvg-tab-link">Settings</a> tab.</p>
-          </div>
-      </div>
+        <label class="col-md-3 col-form-label">Location</label>
+        <div class="col-md-9">
+            <!--<div class="form-check">-->
+            <!--<label>-->
+            <!--<input type="radio" name="filters[location]" value="mapContainer"
+        {{#ifeq filters.location 'map'}}checked{{/ifeq}} data-live="change"/>-->
+            <!--Map container-->
+            <!--</label>-->
+            <!--</div>-->
+            <div class="form-check">
+                <input id="input-location-filter-map" class="form-check-input" type="radio" name="filters[location]" value="map"
+                       {{#ifeq filters.location 'map'}}checked{{/ifeq}} data-live="change">
+                <label class="form-check-label" for="input-location-filter-map">Map container</label>
+            </div>
+              <div class="form-check">
+                  <input id="input-location-filter-leftSidebar" class="form-check-input" type="radio" name="filters[location]" value="leftSidebar" {{#ifeq
+                          filters.location  'leftSidebar'}}checked{{/ifeq}}  data-live="change">
+                <label class="form-check-label" for="input-location-filter-leftSidebar">Left sidebar</label>
+            </div>
+              <div class="form-check">
+                  <input id="input-location-filter-rightSidebar" class="form-check-input" type="radio" name="filters[location]" value="rightSidebar" {{#ifeq
+                          filters.location  'rightSidebar'}}checked{{/ifeq}}  data-live="change">
+                <label class="form-check-label" for="input-location-filter-rightSidebar">
+                    Right
+                    sidebar</label>
+            </div>
+              <div class="form-check">
+                  <input id="input-location-filter-header" class="form-check-input" type="radio" name="filters[location]" value="header" {{#ifeq
+                          filters.location  'header'}}checked{{/ifeq}}  data-live="change">
+                <label class="form-check-label" for="input-location-filter-header">
+                    Header</label>
+            </div>
+              <div class="form-check">
+                  <input id="input-location-filter-footer" class="form-check-input" type="radio" name="filters[location]" value="footer" {{#ifeq
+    filters.location  'footer'}}checked{{/ifeq}}  data-live="change">
+                <label class="form-check-label" for="input-location-filter-footer">
+                    Footer</label>
+            </div>
+              <div class="form-check">
+                  <input id="input-location-filter-custom" class="form-check-input" type="radio" name="filters[location]" value="custom" {{#ifeq
+    filters.location  'custom'}}checked{{/ifeq}}  data-live="change">
+                <label class="form-check-label" for="input-location-filter-custom">
+                    Custom
+                    container</label>
+            </div>
+            <p class="form-text">Manage containers in the <a href="#tab_settings"
+                                                             class="mapsvg-tab-link">Settings</a> tab.</p>
+        </div>
+    </div>
       <div class="form-group row mb-3" id="mapsvg-directory-container-id">
           <label class="col-md-3 col-form-label">Custom container ID</label>
           <div class="col-md-9">
@@ -104,7 +106,7 @@
                   20px)</p>
           </div>
       </div>
-      <div class="form-group row mb-3">
+      <!-- <div class="form-group row mb-3">
           <label class="col-md-3 col-form-label">Compact mode on desktop</label>
           <div class="col-md-9 ">
               <div style="margin-bottom: 10px;" class="form-switch form-switch form-switch-md">
@@ -124,49 +126,42 @@
                          {{#if  filters.hideOnMobile}}checked{{/if}}  data-live="change">
               </div>
           </div>
-      </div>
-      <div class="form-group row mb-3">
+      </div> -->
+      <!-- <div class="form-group row mb-3">
           <label class="col-md-3 col-form-label">Modal location</label>
           <div class="col-md-9">
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="filters[modalLocation]" value="mapContainer"
+                    <input id="input-modal-map" class="form-check-input" type="radio" name="filters[modalLocation]" value="mapContainer"
                             {{#ifeq  filters.modalLocation  'map'}}checked{{/ifeq}}  data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="input-modal-map">
                       Map container</label>
               </div>
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="filters[modalLocation]" value="leftSidebar"
+                    <input id="input-modal-leftSidebar" class="form-check-input" type="radio" name="filters[modalLocation]" value="leftSidebar"
                             {{#ifeq  filters.modalLocation  'leftSidebar'}}checked{{/ifeq}}
                             data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="input-modal-leftSidebar">
                       Left sidebar</label>
               </div>
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="filters[modalLocation]" value="rightSidebar"
+                    <input id="input-modal-right-sidebar" class="form-check-input" type="radio" name="filters[modalLocation]" value="rightSidebar"
                             {{#ifeq  filters.modalLocation  'rightSidebar'}}checked{{/ifeq}}
                             data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="input-modal-right-sidebar">
                       Right sidebar</label>
               </div>
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="filters[modalLocation]" value="header" {{#ifeq
+                    <input id="input-modal-header" class="form-check-input" type="radio" name="filters[modalLocation]" value="header" {{#ifeq
       filters.modalLocation  'header'}}checked{{/ifeq}}  data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="input-modal-header">
                      Header</label>
               </div>
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="filters[modalLocation]" value="footer" {{#ifeq
+                    <input id="input-modal-footer" class="form-check-input" type="radio" name="filters[modalLocation]" value="footer" {{#ifeq
       filters.modalLocation  'footer'}}checked{{/ifeq}}  data-live="change">
-                  <label class="form-check-label">
+                  <label class="form-check-label" for="input-modal-footer">
                      Footer</label>
               </div>
-              <!--<div class="form-check">-->
-              <!--<label>-->
-              <!--<input type="radio" name="filters[modalLocation]" value="custom" {{#ifeq
-      filters.modalLocation 'custom'}}checked{{/ifeq}} data-live="change"/>-->
-              <!--Custom container-->
-              <!--</label>-->
-              <!--</div>-->
               <p class="form-text">Manage containers in the <a href="#tab_settings"
                                                                class="mapsvg-tab-link">Settings</a> tab.</p>
           </div>
@@ -179,7 +174,7 @@
                       <i>100%</i>).</p>
               </div>
           </div>
-      </div>
+      </div> -->
       <div class="form-group row mb-3">
           <label class="col-md-3 col-form-label">"Filters" button text</label>
           <div class="col-md-9">
