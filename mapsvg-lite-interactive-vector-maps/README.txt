@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 8.9.2
+Stable tag: 8.10.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -374,7 +374,20 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 * Feature: rounded map buttons
 * Fixed: check if phpinfo() is available
 
+= 8.9.3 =
+* Fixed: Windows OS incompatibility 
 
+= 8.10.0 =
+* Feature: added wp-cli export/import commands.
+
+= 8.10.1 =
+* Fixed: show previous map button functionality
+
+
+Examples:
+* `wp mapsvg export` - Export all MapSVG database tables to SQL file
+* `wp mapsvg export --toDomain=mapsvg.com` - Export and replace current domain with a new one in the .sql file
+* `wp mapsvg import /path/to/file.sql` - Import MapSVG data from SQL file 
 
 
 == Upgrade Notice ==

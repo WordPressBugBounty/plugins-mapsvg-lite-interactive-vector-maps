@@ -135,4 +135,107 @@ class Database
 	{
 		return $this->db->esc_like($data);
 	}
+
+	/**
+	 * Start a database transaction
+	 *
+	 * @return bool
+	 */
+	public function startTransaction(): bool
+	{
+		return (bool) $this->query('START TRANSACTION');
+	}
+
+	/**
+	 * Commit a database transaction
+	 *
+	 * @return bool
+	 */
+	public function commit(): bool
+	{
+		return (bool) $this->query('COMMIT');
+	}
+
+	/**
+	 * Rollback a database transaction
+	 *
+	 * @return bool
+	 */
+	public function rollback(): bool
+	{
+		return (bool) $this->query('ROLLBACK');
+	}
+
+	/**
+	 * Check if mysqli is available
+	 *
+	 * @return bool
+	 */
+	public function isMysqli(): bool
+	{
+		return $this->db->dbh instanceof \mysqli;
+	}
+
+	/**
+	 * Execute multiple SQL queries at once using mysqli_multi_query
+	 * This handles semicolons inside JSON data correctly
+	 *
+	 * @param string $sql SQL queries separated by semicolons
+	 * @return bool True on success, false on failure
+	 */
+	public function multiQuery(string $sql): bool
+	{
+		if (!$this->isMysqli()) {
+			return false;
+		}
+
+		return mysqli_multi_query($this->db->dbh, $sql);
+	}
+
+	/**
+	 * Process all results from multi_query to clear the buffer
+	 *
+	 * @return void
+	 */
+	public function processMultiQueryResults(): void
+	{
+		if (!$this->isMysqli()) {
+			return;
+		}
+
+		do {
+			// Store result if available
+			if ($result = mysqli_store_result($this->db->dbh)) {
+				mysqli_free_result($result);
+			}
+		} while (mysqli_next_result($this->db->dbh));
+	}
+
+	/**
+	 * Get last mysqli error number
+	 *
+	 * @return int Error number, 0 if no error
+	 */
+	public function getMysqliErrno(): int
+	{
+		if (!$this->isMysqli()) {
+			return 0;
+		}
+
+		return mysqli_errno($this->db->dbh);
+	}
+
+	/**
+	 * Get last mysqli error message
+	 *
+	 * @return string Error message, empty string if no error
+	 */
+	public function getMysqliError(): string
+	{
+		if (!$this->isMysqli()) {
+			return '';
+		}
+
+		return mysqli_error($this->db->dbh);
+	}
 }
