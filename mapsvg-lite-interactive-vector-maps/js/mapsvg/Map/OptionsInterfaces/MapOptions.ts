@@ -132,6 +132,7 @@ export interface MapOptions {
       afterLoad: {
         selectRegion: boolean
         selectMarker: boolean
+        loadPost: "objectsRepository" | "regionsRepository" | null | false
       }
     }
     directoryItem: {

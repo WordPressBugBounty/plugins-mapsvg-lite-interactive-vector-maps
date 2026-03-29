@@ -742,6 +742,7 @@ export class MapSVGMap {
         })
     } else {
       const dataTypes = []
+
       const withData =
         this.options?.database?.loadOnStart === true || this.inBackend
           ? "objects,regions"
@@ -1909,7 +1910,8 @@ export class MapSVGMap {
           }
         } else {
           try {
-            if (name == "directory" || name == "directoryCategoryItem") {
+            if (name == "directory") {
+              this.options.templates[name] = templates[name]
               templates[name] = templates[name]
                 .replace(/\{\{\s*>?\s*directoryItem\s*\}\}/g, "{{>directoryItem-" + this.id + "}}")
                 .replace(
@@ -1917,7 +1919,6 @@ export class MapSVGMap {
                   "{{>directoryCategoryItem-" + this.id + "}}",
                 )
             }
-            this.options.templates[name] = templates[name]
             this.templates[name] = Handlebars.compile(templates[name], { strict: false })
           } catch (err) {
             console.error(err)
@@ -2302,11 +2303,11 @@ export class MapSVGMap {
     for (const i in colors) {
       if (i === "status") {
         for (const s in colors[i] as object) {
-          fixColorHash(colors[i][s])
+          colors[i][s] = fixColorHash(colors[i][s] as string)
         }
       } else {
         if (typeof colors[i] == "string") {
-          fixColorHash(colors[i] as string)
+          colors[i] = fixColorHash(colors[i] as string)
         }
       }
     }
@@ -2370,7 +2371,12 @@ export class MapSVGMap {
     }
 
     if (!this.containers.clustersCss) {
-      this.containers.clustersCss = <HTMLStyleElement>$("<style></style>").appendTo("body")[0]
+      this.containers.clustersCss = <HTMLStyleElement>$("<style></style>")[0]
+      if (this.useShadowRoot) {
+        this.containers.shadowRoot.appendChild(this.containers.clustersCss)
+      } else {
+        document.head.appendChild(this.containers.clustersCss)
+      }
     }
     let css = ""
     if (this.options.colors.clusters) {
@@ -2401,6 +2407,11 @@ export class MapSVGMap {
 
     if (!this.containers.markersCss) {
       this.containers.markersCss = <HTMLStyleElement>$("<style></style>").appendTo("head")[0]
+      if (this.useShadowRoot) {
+        this.containers.shadowRoot.appendChild(this.containers.markersCss)
+      } else {
+        document.head.appendChild(this.containers.markersCss)
+      }
     }
     const markerCssText =
       ".mapsvg-with-marker-active .mapsvg-marker {\n" +
@@ -2518,13 +2529,13 @@ export class MapSVGMap {
   setSvgTagViewBox(viewBox: ViewBox) {
     this.containers.svg.setAttribute("viewBox", viewBox.toString())
 
-    if (env.getBrowser().safari) {
+    if (env.getBrowser().safari && !this.useShadowRoot) {
       // const maxSize = 4096 // текущий WebKit порог около 4k
       // const maxDim = Math.max(this.svgDefault.viewBox.width, this.svgDefault.viewBox.height)
       // const factor = Math.ceil(maxDim / maxSize)
       this.containers.svg.style.width = "1000%"
       this.iosDownscaleFactor = 0.1
-      //this.containers.svg.style.transform = "scale(.01)"
+      // this.containers.svg.style.transform = "scale(.01)"
     } else {
       this.containers.svg.style.width = "auto"
     }
@@ -5409,13 +5420,14 @@ export class MapSVGMap {
     mapObjects: Region | Marker | MarkerCluster | Marker[] | Region[] | MarkerCluster[],
     zoomToLevel?: number,
   ): boolean {
-    if (Array.isArray(mapObjects) || mapObjects.type === MapObjectType.REGION) {
-      const convertedObjects = !Array.isArray(mapObjects) ? [mapObjects] : mapObjects
+    const zoomTo = Array.isArray(mapObjects) ? mapObjects : [mapObjects]
+
+    if (zoomTo.length > 1 || zoomTo[0].type === MapObjectType.REGION) {
       if (!this.googleMaps?.map) {
-        const bbox = this.getGroupBBox(convertedObjects)
+        const bbox = this.getGroupBBox(zoomTo)
         return this.fitViewBox(bbox, zoomToLevel)
       } else {
-        const bounds = this.getGroupBounds(convertedObjects)
+        const bounds = this.getGroupBounds(zoomTo)
         const latLngBounds = new google.maps.LatLngBounds(
           new google.maps.LatLng(bounds.sw),
           new google.maps.LatLng(bounds.ne),
@@ -5424,8 +5436,8 @@ export class MapSVGMap {
       }
     } else {
       // Single Marker / cluster
-      if (mapObjects.isMarker() || mapObjects.isCluster()) {
-        return this.zoomToMarkerOrCluster(mapObjects, zoomToLevel)
+      if (zoomTo[0].isMarker() || zoomTo[0].isCluster()) {
+        return this.zoomToMarkerOrCluster(zoomTo[0], zoomToLevel)
       }
     }
   }
@@ -8360,6 +8372,12 @@ export class MapSVGMap {
   finalizeMapLoading(): void {
     if (this.afterLoadBlockers > 0 || this.loaded) {
       return
+    }
+
+    if (!this.inBackend && this.options.actions?.map?.afterLoad?.loadPost) {
+      const slug = new URL(window.location.href).pathname.replace(/\/$/, "").split("/").pop()
+      const repoName = this.options.actions.map.afterLoad.loadPost
+      this[repoName].find({ filters: { post: { name: slug } } })
     }
 
     this.selectObjectsByIdFromUrl()

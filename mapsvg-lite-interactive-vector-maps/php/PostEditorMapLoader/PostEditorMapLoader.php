@@ -110,10 +110,17 @@ class PostEditorMapLoader
             'location' => $location
         );
 
-        if (!$location || !$location['geoPoint']) {
+
+        // If the post is not published or doesn't have a valid location with a geoPoint, remove it from the MapSVG table.
+        if (
+            $post->post_status !== 'publish'
+            || empty($location)
+            || empty($location['geoPoint'])
+        ) {
             $this->deletePostData($id);
             return;
         }
+
         $postsRepo = RepositoryFactory::get($table);
 
         if (!$postsRepo) {

@@ -14,6 +14,20 @@
           <div class="form-group row mb-3">
               <label class="col-md-3 col-form-label" for="mapsvg-actions-map-afterload">On map load</label>
               <div class="col-md-9">
+                  {{#if hasPosts}}
+                    <div class="form-check pt-2">
+                            <input type="checkbox"
+                                id="mapsvg-actions-map-afterload-loadpost"
+                                class="form-check-input"
+                                name="actions[map][afterLoad][loadPost]"
+                                value="{{postRepoName}}"
+                                {{#if actions.map.afterLoad.loadPost}}checked{{/if}}
+                                data-live="change">
+                            <label class="form-check-label" for="mapsvg-actions-map-afterload-loadpost">
+                                Load location only for post matching current page URL (permalink slug). Works only when post slug is the last segment of the URL. Turn off <em>Database &gt; Settings &gt; Load on start</em> to avoid double request to the backend on map load.
+                            </label>
+                    </div>
+                  {{/if}}
                   <div class="form-check pt-2">
                       <input type="checkbox"
                              id="mapsvg-actions-map-afterload-selectregion"

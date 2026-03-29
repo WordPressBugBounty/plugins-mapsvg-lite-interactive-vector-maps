@@ -80,6 +80,10 @@ class DbDataSource implements DataSourceInterface
           ]
         ];
 
+        if (isset($postFilter['name'])) {
+          $args['name'] = $postFilter['name'];
+        }
+
         if (isset($postFilter['meta']) && is_array($postFilter['meta'])) {
           // $args['meta_query'] = ["relation" => "AND"];
 
@@ -240,19 +244,27 @@ class DbDataSource implements DataSourceInterface
           } else {
             if (isset($field->multiselect) && $field->multiselect === true) {
 
+              // Support new format: {operator: "in"|"or"|"and", value: [...]}
+              $multiselect_operator = 'and';
+              if (is_array($fieldValue) && isset($fieldValue['operator']) && isset($fieldValue['value'])) {
+                $multiselect_operator = strtolower($fieldValue['operator']);
+                $fieldValue            = $fieldValue['value'];
+              }
+
+              // "in" and "or" both produce OR logic; "and" (default) produces AND logic
+              $multiselect_glue = in_array($multiselect_operator, ['in', 'or'], true) ? ' OR ' : ' AND ';
+
               if (is_array($fieldValue)) {
                 foreach ($fieldValue as $index => $v) {
                   if (is_array($v) && isset($v["label"]) && isset($v["value"])) {
-                    $label = $v["label"];
                     $value = $v["value"];
                   } else {
                     $value = $v;
                   }
                   $fieldValue[$index] = "`{$field->name}` LIKE %s";
-                  $value = "%\"" . $this->db->esc_like($value) . "\"%";
-                  $filters_sql_fields[] = $value;
+                  $filters_sql_fields[] = "%\"" . $this->db->esc_like($value) . "\"%";
                 }
-                $filters_sql[] = "(" . implode(' AND ', $fieldValue) . ")";
+                $filters_sql[] = "(" . implode($multiselect_glue, $fieldValue) . ")";
               } else {
                 $filters_sql[] = "`{$field->name}` LIKE %s";
                 $filters_sql_fields[] = "%\"" . $this->db->esc_like($fieldValue) . "\"%";

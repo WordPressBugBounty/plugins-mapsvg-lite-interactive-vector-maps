@@ -1,2 +1,2 @@
-export{A as Map,M as Mapsvg,m as mapsvgCore}from"./Mapsvg-Bx64Gq2u.js";
+export{A as Map,M as Mapsvg,m as mapsvgCore}from"./Mapsvg-F1vsmsE7.js";
 //# sourceMappingURL=mapsvg.js.map

@@ -6,7 +6,21 @@
   window.MapSVGAdminActionsController = MapSVGAdminActionsController
   MapSVG.extend(MapSVGAdminActionsController, window.MapSVGAdminController)
 
-  MapSVGAdminActionsController.prototype.viewLoaded = function () {
+  MapSVGAdminActionsController.prototype.viewLoaded = function (data) {
+    const updateLoadPostAction = (event) => {
+      const schema = event.data.schema
+      if (!schema.getField("post")) {
+        this.mapsvg.options.actions.map.afterLoad.loadPost = null
+        this.admin.save(true)
+      }
+      this.render()
+    }
+    this.mapsvg.regionsRepository
+      .getSchema()
+      .events.on("update", (event) => updateLoadPostAction(event))
+    this.mapsvg.objectsRepository
+      .getSchema()
+      .events.on("update", (event) => updateLoadPostAction(event))
     this.updateDirSource()
   }
   MapSVGAdminActionsController.prototype.setEventHandlers = function () {
@@ -33,6 +47,15 @@
         .data("template", "detailsViewRegion")
         .html("Region details view template")
     }
+  }
+  MapSVGAdminActionsController.prototype.mapHasPosts = function () {
+    return this.mapsvg.database.getSchema().getField("post") &&
+      this.mapsvg.database.getSchema().getField("post").type === "post"
+      ? "objectsRepository"
+      : this.mapsvg.regionsRepository.getSchema().getField("post") &&
+          this.mapsvg.regionsRepository.getSchema().getField("post").type === "post"
+        ? "regionsRepository"
+        : null
   }
 
   MapSVGAdminActionsController.prototype.getTemplateData = function () {
@@ -88,6 +111,10 @@
         ],
       },
     }
+
+    options.hasPosts = this.mapHasPosts()
+    options.postRepoName = this.mapHasPosts()
+
     return options
   }
 })(jQuery, window, window.MapSVG)

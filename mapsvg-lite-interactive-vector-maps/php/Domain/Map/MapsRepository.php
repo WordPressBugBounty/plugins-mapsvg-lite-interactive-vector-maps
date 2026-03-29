@@ -173,14 +173,6 @@ class MapsRepository extends Repository
 		$mapUpdate = array('id' => $newMap->id, 'options' => $newMapData['options']);
 		$needUpdate = false;
 
-		if (isset($newMapData['options']['templates']) && isset($newMapData['options']['templates']['directory'])) {
-			$dirTemplate = $newMapData['options']['templates']['directory'];
-			$dirTemplate = str_replace('{{>directoryItem-' . $map->id, '{{>directoryItem-' . $newMap->id, $dirTemplate);
-			$dirTemplate = str_replace('{{>directoryCategoryItem-' . $map->id, '{{>directoryCategoryItem-' . $newMap->id, $dirTemplate);
-			$mapUpdate['options']['templates']['directory'] = $dirTemplate;
-			$needUpdate = true;
-		}
-
 		if (isset($newMapData['options']['css'])) {
 			$mapUpdate['options']['css'] = str_replace('#mapsvg-map-' . $map->id, '#mapsvg-map-' . $newMap->id, $newMapData['options']['css']);
 			$needUpdate = true;

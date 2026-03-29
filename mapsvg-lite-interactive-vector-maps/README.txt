@@ -2,8 +2,8 @@
 Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
-Tested up to: 6.8
-Stable tag: 8.10.1
+Tested up to: 6.9
+Stable tag: 8.11.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -383,11 +383,22 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 = 8.10.1 =
 * Fixed: show previous map button functionality
 
-
 Examples:
 * `wp mapsvg export` - Export all MapSVG database tables to SQL file
 * `wp mapsvg export --toDomain=mapsvg.com` - Export and replace current domain with a new one in the .sql file
 * `wp mapsvg import /path/to/file.sql` - Import MapSVG data from SQL file 
+
+= 8.11.0 =
+* Feature: load 1 post location only, for the currently opened post page
+* Feature: choose AND/OR logic for the multiselect filters
+
+= 8.11.1 =
+* Fixed: map data now updates correctly when connected posts are published, unpublished, trashed, or restored.
+* Fixed: directory item templates rendering issues.
+* Fixed: zoom to a single marker after filtering.
+* Fixed: region status colors not applying correctly.
+* Fixed: Slovenia map calibration.
+
 
 
 == Upgrade Notice ==

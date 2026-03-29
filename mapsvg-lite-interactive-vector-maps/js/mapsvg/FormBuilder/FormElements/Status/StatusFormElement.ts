@@ -1,4 +1,4 @@
-import { deepMerge, parseBoolean } from "@/Core/Utils"
+import { deepMerge, fixColorHash, parseBoolean } from "@/Core/Utils"
 import { SchemaField } from "../../../Infrastructure/Server/SchemaField"
 import { FormBuilder } from "../../FormBuilder"
 import { FormElement } from "../FormElement"
@@ -21,24 +21,8 @@ export class StatusFormElement extends FormElement {
 
   setDomElements() {
     super.setDomElements()
+
     this.inputs.select = $(this.domElements.main).find("select")[0]
-    if ($().colorpicker) {
-      $(this.domElements.main)
-        .find(".cpicker")
-        .colorpicker()
-        .on("changeColor.colorpicker", function (event) {
-          const input = $(this).find("input")
-          if (input.val() == "") $(this).find("i").css({ "background-color": "" })
-        })
-      this.domElements.edit &&
-        $(this.domElements.edit)
-          .find(".cpicker")
-          .colorpicker()
-          .on("changeColor.colorpicker", function (event) {
-            const input = $(this).find("input")
-            if (input.val() == "") $(this).find("i").css({ "background-color": "" })
-          })
-    }
   }
 
   destroy() {
@@ -74,6 +58,7 @@ export class StatusFormElement extends FormElement {
           color: "",
           disabled: false,
         }
+        input[0].value = fixColorHash(input.val())
         _this.options[index]["color"] = input.val()
       })
     _this.mayBeAddStatusRow()

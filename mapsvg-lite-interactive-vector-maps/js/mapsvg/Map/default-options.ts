@@ -738,6 +738,7 @@ const DefaultOptions = {
       afterLoad: {
         selectRegion: true,
         selectMarker: true,
+        loadPost: false,
       },
     },
     region: {

@@ -263,8 +263,14 @@ export class Controller implements BaseController {
       this.middlewareOptions.forEach((mw) => this.middlewares.add(mw.name, mw.handler))
     }
     this.templates = {
-      toolbar: Handlebars.compile(this.getToolbarTemplate()),
-      main: Handlebars.compile(this.getMainTemplate()),
+      toolbar:
+        typeof this.getToolbarTemplate() === "function"
+          ? (this.getToolbarTemplate() as unknown as HandlebarsTemplateDelegate<any>)
+          : Handlebars.compile(this.getToolbarTemplate()),
+      main:
+        typeof this.getMainTemplate() === "function"
+          ? (this.getMainTemplate() as unknown as HandlebarsTemplateDelegate<any>)
+          : Handlebars.compile(this.getMainTemplate()),
     }
     this.render()
   }
@@ -287,7 +293,7 @@ export class Controller implements BaseController {
   /**
    * This method must be overriden by a child class and  to return an HTML code for the main content
    */
-  getMainTemplate() {
+  getMainTemplate(): string | HandlebarsTemplateDelegate<any> {
     return this.template || ""
   }
 

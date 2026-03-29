@@ -30,7 +30,7 @@ export class SchemaRepository extends Repository<SchemaModel> {
         defer.resolve(response)
         this.events.trigger(RepositoryEvent.AFTER_UPDATE, { schema: response })
         if (schema instanceof Schema) {
-          schema.events.trigger("update")
+          schema.events.trigger("update", { schema })
         }
       })
       .fail(() => {
