@@ -71,7 +71,7 @@ class Database
 	{
 		if ($this->db->last_error) {
 			// $caller = $this->getCaller();
-			Logger::error($this->db->last_error);
+			Logger::error("[SERVER-003] " . $this->db->last_error . " — Read more: https://mapsvg.com/docs/errors#SERVER-003");
 		}
 	}
 

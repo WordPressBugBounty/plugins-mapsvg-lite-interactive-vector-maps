@@ -169,7 +169,7 @@ export class Events {
           }
         } catch (err) {
           console.error(
-            `MapSVG: event handler error for "${this.contextName}.${eventName}" on map  ID=${this.map?.id || "unknown"} with data:`,
+            `[CLIENT-030] MapSVG: event handler error for "${this.contextName}.${eventName}" on map ID=${this.map?.id || "unknown"} — Read more: https://mapsvg.com/docs/errors#CLIENT-030`,
             { handler: event.handler, data },
             err,
           )

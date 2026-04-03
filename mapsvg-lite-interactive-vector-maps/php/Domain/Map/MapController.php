@@ -174,7 +174,7 @@ class MapController extends Controller
 			// Use WordPress Filesystem to read and output file
 			echo $wp_filesystem->get_contents($svgFile->serverPath); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		} else {
-			Logger::error("SVG file not found: " . $svgFile->serverPath);
+			Logger::error("[SERVER-004] SVG file not found: " . $svgFile->serverPath . " — Read more: https://mapsvg.com/docs/errors#SERVER-004");
 			return new \WP_Error('file_open_error', 'Unable to open SVG file', array('status' => 404));
 		}
 

@@ -462,7 +462,7 @@ export class Controller implements BaseController {
     try {
       $(this.containers.contentView).html(this.templates.main(formattedData))
     } catch (err) {
-      console.error(err)
+      console.error("[CLIENT-022] Handlebars rendering error — Read more: https://mapsvg.com/docs/errors#CLIENT-022", err)
       $(this.containers.contentView).html("")
     }
 

@@ -502,7 +502,7 @@ class DbDataSource implements DataSourceInterface
     try {
       $data = $this->db->get_results($query_sql, ARRAY_A);
     } catch (\Exception $e) {
-      Logger::error($e);
+      Logger::error("[SERVER-002] " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-002");
       $data = [];
     }
 
@@ -551,7 +551,7 @@ class DbDataSource implements DataSourceInterface
   {
     $query = "TRUNCATE TABLE `" . $this->getTableName() . "`";
     $this->db->query($query);
-    return $this->db->affected_rows;
+    return $this->db->rows_affected;
   }
 
   public function import($data)

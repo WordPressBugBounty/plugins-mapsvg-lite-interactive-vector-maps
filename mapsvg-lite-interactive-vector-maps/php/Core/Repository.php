@@ -361,7 +361,7 @@ class Repository implements JsonSerializable
 						$objectFormatted = $this->decodeParams($object);
 						$items[] = $objectFormatted;
 					} catch (\Exception $e) {
-						Logger::error($e);
+						Logger::error("[SERVER-017] " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-017");
 					}
 				}
 			}
@@ -445,6 +445,32 @@ class Repository implements JsonSerializable
 		if (isset($_data[0]['regions'])) {
 			$this->setRelationsForAllObjects();
 		}
+	}
+
+	/**
+	 * Streams a CSV file and bulk-inserts rows.
+	 *
+	 * Delegates all parsing to CsvImporter + field-type-specific FieldParsers.
+	 * After the import, rebuilds the region↔object relation table.
+	 *
+	 * @param string $filePath                Absolute path to the uploaded CSV file.
+	 * @param bool   $convertLatlngToAddress  Reverse-geocode lat/lng rows to get address text.
+	 * @param bool   $convertAddressToLatlng  Forward-geocode address strings to get lat/lng.
+	 * @param string $language                Language code for later geocoding requests.
+	 * @param string $regionsTableName        Short table name of the map's regions (e.g. "regions_115").
+	 * @return array{count: int, needs_geocoding: bool}
+	 * @throws \Exception on file / format errors.
+	 */
+	public function importFromCsv(string $filePath, bool $convertLatlngToAddress, bool $convertAddressToLatlng = true, string $language = 'en', string $regionsTableName = ''): array
+	{
+		/** @var DbDataSource $source */
+		$source   = $this->source;
+		$importer = new CsvImporter($this->schema, $source);
+		$result   = $importer->import($filePath, $convertLatlngToAddress, $convertAddressToLatlng, $regionsTableName);
+
+		$this->setRelationsForAllObjects();
+
+		return $result;
 	}
 
 	public function setRelationsForAllObjects() {}

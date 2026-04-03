@@ -320,7 +320,7 @@ export class DistanceFormElement extends FormElement {
         wildcard: "%QUERY%",
         transform: function (response) {
           if (response.error_message) {
-            console.error(response.error_message)
+            console.error("[CLIENT-023] Google geocoding error — Read more: https://mapsvg.com/docs/errors#CLIENT-023", response.error_message)
           }
           return response.results
         },

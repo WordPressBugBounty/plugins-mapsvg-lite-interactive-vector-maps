@@ -55,7 +55,7 @@ class FilesRepository
 
 			sort($files);
 		} catch (\InvalidArgumentException $e) {
-			Logger::error($e);
+			Logger::error("[SERVER-016] " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-016");
 		}
 
 		return $files;

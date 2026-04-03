@@ -684,7 +684,7 @@ export class MapSVGMap {
         if (this.inBackend) {
           $.growl.error({ message: error, duration: 60000 })
         } else {
-          console.error("MapSVG couldn't load SVG file")
+          console.error("[CLIENT-001] MapSVG couldn't load SVG file — Read more: https://mapsvg.com/docs/errors#CLIENT-001")
         }
       })
     return this.svgFilePromise
@@ -737,7 +737,7 @@ export class MapSVGMap {
           this.initMap(options)
         })
         .catch((error) => {
-          console.error("Failed to update options:", error)
+          console.error("[CLIENT-002] Failed to update options — Read more: https://mapsvg.com/docs/errors#CLIENT-002", error)
           // Handle the error, maybe with a fallback or notification
         })
     } else {
@@ -880,7 +880,7 @@ export class MapSVGMap {
         })
         .catch((error) => {
           // Handle network or HTTP error
-          console.error("Fetch error:", error)
+          console.error("[CLIENT-003] Fetch error — Read more: https://mapsvg.com/docs/errors#CLIENT-003", error)
         })
     }
 
@@ -1906,7 +1906,7 @@ export class MapSVGMap {
             Handlebars.registerPartial(name + "-" + this.id, templates[name])
           } catch (error) {
             Handlebars.registerPartial(name + "-" + this.id, "")
-            console.error(error)
+            console.error("[CLIENT-004] Handlebars template error — Read more: https://mapsvg.com/docs/errors#CLIENT-004", error)
           }
         } else {
           try {
@@ -1921,7 +1921,7 @@ export class MapSVGMap {
             }
             this.templates[name] = Handlebars.compile(templates[name], { strict: false })
           } catch (err) {
-            console.error(err)
+            console.error("[CLIENT-005] Handlebars compilation error — Read more: https://mapsvg.com/docs/errors#CLIENT-005", err)
             this.templates[name] = Handlebars.compile("", { strict: false })
           }
         }
@@ -2246,7 +2246,7 @@ export class MapSVGMap {
     // Update or add new regions based on incoming options
     for (const [id, regionOptions] of Object.entries(options)) {
       if (Array.isArray(regionOptions.style)) {
-        console.error("MapSVG: wrong format of region style options.")
+        console.error("[CLIENT-006] MapSVG: wrong format of region style options. Read more: https://mapsvg.com/docs/errors#CLIENT-006")
         continue
       }
       if (this.options.regions[id]) {
@@ -3650,7 +3650,7 @@ export class MapSVGMap {
         } else {
           this.decrementAfterloadBlockers()
           console.error(
-            "MapSVG: filter container #" + this.options.filters.containerId + " does not exist",
+            "[CLIENT-007] MapSVG: filter container #" + this.options.filters.containerId + " does not exist — Read more: https://mapsvg.com/docs/errors#CLIENT-007",
           )
           return
         }
@@ -4271,7 +4271,7 @@ export class MapSVGMap {
 
     if (this.options.googleMaps.on) {
       if (!mapsvgCore.googleMaps.apiKey) {
-        console.error("Google Maps API key is required no enable Google Maps")
+        console.error("[CLIENT-009] Google Maps API key is required to enable Google Maps. Read more: https://mapsvg.com/docs/errors#CLIENT-009")
         return
       }
       $(this.containers.map).toggleClass("mapsvg-with-google-map", true)
@@ -4495,7 +4495,7 @@ export class MapSVGMap {
       return
     }
     if (!mapsvgCore.googleMaps.apiKey) {
-      console.error("MapSVG: can't load Google API because no API key has been provided")
+      console.error("[CLIENT-010] MapSVG: can't load Google API because no API key has been provided. Read more: https://mapsvg.com/docs/errors#CLIENT-010")
       return
     }
     if (window.google !== undefined && google.maps) {
@@ -4521,7 +4521,7 @@ export class MapSVGMap {
 
     // @ts-ignore
     window.gm_authFailure = () => {
-      console.error("MapSVG: Google maps API key is incorrect.")
+      console.error("[CLIENT-011] MapSVG: Google maps API key is incorrect. Read more: https://mapsvg.com/docs/errors#CLIENT-011")
     }
     this.googleMapsScript = document.createElement("script")
     this.googleMapsScript.async = true
@@ -4553,7 +4553,7 @@ export class MapSVGMap {
     try {
       document.head.appendChild(this.googleMapsScript)
     } catch (e) {
-      console.error(e)
+      console.error("[CLIENT-012] Google Maps script loading error — Read more: https://mapsvg.com/docs/errors#CLIENT-012", e)
       this.decrementAfterloadBlockers()
       this.finalizeMapLoading()
     }
@@ -7513,7 +7513,7 @@ export class MapSVGMap {
     })
     this.objectsRepository.events.on(RepositoryEvent.FAILED_LOAD, () => {
       this.hideLoadingMessage()
-      console.error("Could not load objects")
+      console.error("[CLIENT-014] Could not load objects. Read more: https://mapsvg.com/docs/errors#CLIENT-014")
     })
 
     this.objectsRepository.events.on(
@@ -7587,7 +7587,7 @@ export class MapSVGMap {
     })
     this.regionsRepository.events.on(RepositoryEvent.FAILED_LOAD, () => {
       this.hideLoadingMessage()
-      console.error("Could not load regions")
+      console.error("[CLIENT-015] Could not load regions. Read more: https://mapsvg.com/docs/errors#CLIENT-015")
     })
     this.regionsRepository.events.on(RepositoryEvent.AFTER_LOAD, () => {
       this.hideLoadingMessage()
@@ -7886,7 +7886,7 @@ export class MapSVGMap {
         try {
           $(region.label).html(this.templates.labelRegion(region.forTemplate()))
         } catch (err) {
-          console.error('MapSVG: Error in the "Region Label" template')
+          console.error('[CLIENT-016] MapSVG: Error in the "Region Label" template. Read more: https://mapsvg.com/docs/errors#CLIENT-016')
         }
       })
       this.labelsRegionsAdjustScreenPosition()
@@ -7915,7 +7915,7 @@ export class MapSVGMap {
         try {
           marker.setLabel(this.templates.labelMarker(marker.object.getData()))
         } catch (err) {
-          console.error('MapSVG: Error in the "Marker Label" template')
+          console.error('[CLIENT-017] MapSVG: Error in the "Marker Label" template. Read more: https://mapsvg.com/docs/errors#CLIENT-017')
         }
       })
     } else {
@@ -8205,7 +8205,7 @@ export class MapSVGMap {
       if (this.inBackend) {
         $.growl.error({ message: msg, duration: 60000 })
       } else {
-        console.error("MapSVG couldn't load SVG file")
+        console.error("[CLIENT-001] MapSVG couldn't load SVG file — Read more: https://mapsvg.com/docs/errors#CLIENT-001")
       }
       return false
     }
@@ -8294,14 +8294,14 @@ export class MapSVGMap {
           location.reload()
         }
       } else {
-        console.error(msg)
+        console.error("[CLIENT-018] " + msg + " — Read more: https://mapsvg.com/docs/errors#CLIENT-018")
       }
     } else {
       const msg = "MapSVG: can't load SVG file for unknown reason. Please contact support."
       if (this.inBackend) {
         alert(msg)
       } else {
-        console.error(msg)
+        console.error("[CLIENT-019] " + msg + " — Read more: https://mapsvg.com/docs/errors#CLIENT-019")
       }
     }
   }

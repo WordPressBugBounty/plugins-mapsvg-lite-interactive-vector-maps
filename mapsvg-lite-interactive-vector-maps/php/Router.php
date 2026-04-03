@@ -439,6 +439,15 @@ class Router
 				}
 			)
 		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\RegionsController::importCsv',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
+				}
+			)
+		));
 		register_rest_route('mapsvg/v1', $baseRoute . '/distinct/(?P<_field_name>.+)', array(
 			array(
 				'methods' => 'GET',
@@ -534,6 +543,24 @@ class Router
 				}
 			)
 		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\ObjectsController::importCsv',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
+				}
+			)
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv/process', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\ObjectsController::importCsvProcess',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
+				}
+			)
+		));
 		register_rest_route('mapsvg/v1', $baseRoute . '/distinct/(?P<_field_name>.+)', array(
 			array(
 				'methods' => 'GET',
@@ -554,6 +581,15 @@ class Router
 				'callback' => '\MapSVG\GeocodingController::index',
 				'permission_callback' => function () {
 					return true;
+				}
+			)
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/queue', array(
+			array(
+				'methods'  => 'GET',
+				'callback' => '\MapSVG\ObjectsController::geocodeStatus',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
 				}
 			)
 		));

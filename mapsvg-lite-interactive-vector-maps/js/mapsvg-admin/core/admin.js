@@ -1152,7 +1152,7 @@ function loadDeps() {
           }
           reader.readAsDataURL(blob)
         } catch (error) {
-          console.error("There has been a problem with your fetch operation:", error)
+          console.error("[CLIENT-031] There has been a problem with your fetch operation — Read more: https://mapsvg.com/docs/errors#CLIENT-031", error)
         }
       })
 
@@ -1774,7 +1774,7 @@ function loadDeps() {
                           })
                         })
                         .catch((err) => {
-                          console.error("Failed to copy text: ", err)
+                          console.error("[CLIENT-032] Failed to copy text — Read more: https://mapsvg.com/docs/errors#CLIENT-032", err)
                         })
                     })
                   break
@@ -1801,7 +1801,7 @@ function loadDeps() {
                         })
                       })
                       .catch((err) => {
-                        console.error("Failed to copy text: ", err)
+                        console.error("[CLIENT-032] Failed to copy text — Read more: https://mapsvg.com/docs/errors#CLIENT-032", err)
                       })
                   })
                   break
@@ -2297,7 +2297,7 @@ trigger: "click", // or 'click' depending on how you want it triggered
             wildcard: "%QUERY%",
             transform: function (response) {
               if (response.error_message) {
-                console.error(response.error_message)
+                console.error("[CLIENT-033] Google geocoding API error — Read more: https://mapsvg.com/docs/errors#CLIENT-033", response.error_message)
               }
               return response.results
             },

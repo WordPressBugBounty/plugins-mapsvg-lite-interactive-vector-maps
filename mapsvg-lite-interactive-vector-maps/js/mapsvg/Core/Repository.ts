@@ -176,7 +176,9 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
         schemaRepo.find({ filters: { name: schema } }).done((response) => {
           const schema = response.items[0]
           if (!schema) {
-            console.error("Schema not found")
+            console.error(
+              "[CLIENT-026] Schema not found. Read more: https://mapsvg.com/docs/errors#CLIENT-026",
+            )
             return
           }
           this.setSchema(schema)
@@ -531,84 +533,20 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
   }
 
   /**
-   * Imports data from a CSV file.
-   *
+   * Sends one batch of CSV rows to the server.
+   * Chunking and sequencing are handled by the controller (pause/resume on PapaParse parser).
    */
   import(data: { [key: string]: any }, convertLatlngToAddress: boolean, map: MapSVGMap) {
-    const _this = this
+    const locationField = this.schema.getFieldByType("location")
+    const language = locationField?.language ?? "en"
 
-    const locationField = _this.schema.getFieldByType("location")
-    let language = "en"
-    if (locationField && locationField.language) {
-      language = locationField.language
-    }
+    const formatted = this.formatCSV(data, map)
 
-    data = this.formatCSV(data, map)
+    const postData: { [key: string]: any } = { language, convertLatlngToAddress }
+    postData[this.schema.objectNamePlural] = JSON.stringify(formatted)
 
-    return this.importByChunks(data, language, convertLatlngToAddress).done(function () {
-      _this.find()
-    })
-  }
-
-  /**
-   * Splits data to small chunks and sends every chunk separately to the server
-   *
-   * @param data - Data to import
-   * @param language - Language for Geocoding conversions
-   * @param convertLatlngToAddress - Whether lat/lng coordinates should be converted to addresses via Geocoding service
-   */
-  importByChunks(data: { [key: string]: any }, language: string, convertLatlngToAddress: boolean) {
-    const _this = this
-
-    let i, j, temparray
-    const chunk = 50
-    const chunks = []
-
-    for (i = 0, j = data.length; i < j; i += chunk) {
-      temparray = data.slice(i, i + chunk)
-      chunks.push(temparray)
-    }
-
-    if (chunks.length > 0) {
-      let delay = 0
-      const delayPlus = chunks[0][0] && chunks[0][0].location ? 1000 : 0
-
-      const defer = $.Deferred()
-      defer.promise()
-
-      _this.completeChunks = 0
-
-      chunks.forEach(function (chunk) {
-        delay += delayPlus
-        setTimeout(function () {
-          const data = {
-            language: language,
-            convertLatlngToAddress: convertLatlngToAddress,
-          }
-
-          data[_this.schema.objectNamePlural] = JSON.stringify(chunk)
-
-          const objectNamePlural = _this.schema.type === "region" ? "regions" : "objects"
-          _this.server
-            .post(objectNamePlural + "/" + _this.schema.name + "/import", data)
-            .done(function (_data) {
-              _this.completeChunk(chunks, defer)
-            })
-            .fail((response) => {
-              console.error(response)
-            })
-        }, delay)
-      })
-      return defer
-    }
-    return null
-  }
-
-  completeChunk(chunks, defer) {
-    this.completeChunks++
-    if (this.completeChunks === chunks.length) {
-      defer.resolve()
-    }
+    const objectNamePlural = this.schema.type === "region" ? "regions" : "objects"
+    return this.server.post(`${objectNamePlural}/${this.schema.name}/import`, postData)
   }
 
   formatCSV(data: { [key: string]: any }, map: MapSVGMap) {
@@ -780,7 +718,11 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
       }
       default: {
         if (nestedFields.length > 0) {
-          console.error("Nested fields are not supported for this field type: " + fieldName)
+          console.error(
+            "[CLIENT-028] Nested fields are not supported for this field type: " +
+              fieldName +
+              ". Read more: https://mapsvg.com/docs/errors#CLIENT-028",
+          )
           return new Promise((resolve) => {
             resolve([])
           })

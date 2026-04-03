@@ -124,7 +124,7 @@ class PostEditorMapLoader
         $postsRepo = RepositoryFactory::get($table);
 
         if (!$postsRepo) {
-            Logger::error("MapSVG: trying to update location meta field of the post type that is not connected to any map: " . $post->post_type);
+            Logger::error("[SERVER-001] MapSVG: trying to update location meta field of the post type that is not connected to any map: " . $post->post_type . " — Read more: https://mapsvg.com/docs/errors#SERVER-001");
         } else {
             $post = $postsRepo->findOne(["post" => $id]);
 

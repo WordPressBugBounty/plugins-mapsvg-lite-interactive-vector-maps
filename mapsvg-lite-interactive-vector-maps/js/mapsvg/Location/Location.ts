@@ -28,7 +28,7 @@ export class SVGPoint {
         _x = parseFloat(x.x + "")
         _y = parseFloat(x.y + "")
       } else {
-        console.error("MapSVG: incorrect format of {x, y} object for SVGPoint.")
+        console.error("[CLIENT-024] MapSVG: incorrect format of {x, y} object for SVGPoint. Read more: https://mapsvg.com/docs/errors#CLIENT-024")
         _x = 0
         _y = 0
       }
@@ -66,7 +66,7 @@ export class GeoPoint {
         _lat = parseFloat(lat.lat + "")
         _lng = parseFloat(lat.lng + "")
       } else {
-        console.error("MapSVG: incorrect format of {lat, lng} object for GeoPoint.")
+        console.error("[CLIENT-025] MapSVG: incorrect format of {lat, lng} object for GeoPoint. Read more: https://mapsvg.com/docs/errors#CLIENT-025")
         _lat = 0
         _lng = 0
       }

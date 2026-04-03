@@ -21,12 +21,12 @@ return function () {
 
         $db->query($sql);
         if ($db->last_error) {
-            Logger::error("Error creating tokens table: " . $db->last_error);
+            Logger::error("[SERVER-011] Error creating tokens table: " . $db->last_error . " — Read more: https://mapsvg.com/docs/errors#SERVER-011");
         } else {
             // Check if the table was actually created
             $tableExists = $db->get_var("SHOW TABLES LIKE '{$tableName}'");
             if (!$tableExists) {
-                Logger::error("Failed to create tokens table. Table does not exist after creation attempt.");
+                Logger::error("[SERVER-012] Failed to create tokens table. Table does not exist after creation attempt. Read more: https://mapsvg.com/docs/errors#SERVER-012");
             }
         }
     };

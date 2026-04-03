@@ -399,11 +399,11 @@ class Map extends Model implements \JsonSerializable
 					return $error->message;
 				}, $errors);
 				$errorString = implode(', ', $errorMessages);
-				Logger::error("Failed to load SVG file: $fileServerPath. Errors: $errorString");
+				Logger::error("[SERVER-014] Failed to load SVG file: $fileServerPath. Errors: $errorString — Read more: https://mapsvg.com/docs/errors#SERVER-014");
 				throw new \Exception('Failed to load SVG file: ' . esc_html($errorString), 500);
 			}
 		} else {
-			Logger::error("SVG file does not exist: $fileServerPath");
+			Logger::error("[SERVER-015] SVG file does not exist: $fileServerPath — Read more: https://mapsvg.com/docs/errors#SERVER-015");
 			throw new \Exception('File does not exist: ' . esc_html($fileServerPath), 404);
 		}
 

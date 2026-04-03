@@ -119,32 +119,64 @@ class ObjectsRepository extends Repository
 
 
 	/**
-	 * Sets relations for all objects
+	 * Sets relations for all objects, processed in chunks to avoid memory exhaustion
+	 * on large tables.
 	 */
 	public function setRelationsForAllObjects()
 	{
 		if ($this->schema->isRemote()) {
 			return;
 		}
-		$db = Database::get();
+		$db       = Database::get();
+		$table    = esc_sql($db->mapsvg_prefix . $this->id);
+		$r2oTable = $db->mapsvg_prefix . 'r2o';
 
 		$this->deleteAllRelations();
 
-		$objects = $this->source->find($this->id);
+		$chunkSize = 500;
+		$offset    = 0;
 
-		$regions_sql_values = array();
-		foreach ($objects as $object) {
-			$_regions = json_decode($object->regions);
-			if ($_regions) {
-				foreach ($_regions as $region) {
-					$regions_sql_values[] = "('" . esc_sql($this->id) . "','" . esc_sql($region->tableName) . "','" . esc_sql($object->id) . "','" . esc_sql($region->id) . "')";
+		do {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $db->get_results(
+				$db->prepare(
+					"SELECT `id`, `regions` FROM `{$table}` WHERE `regions` IS NOT NULL AND `regions` != '' AND `regions` != '[]' LIMIT %d OFFSET %d",
+					[ $chunkSize, $offset ]
+				),
+				ARRAY_A
+			);
+
+			if (empty($rows)) {
+				break;
+			}
+
+			$r2oValues = [];
+			foreach ($rows as $row) {
+				$_regions = json_decode( (string) ( $row['regions'] ?? '' ) );
+				if ( ! is_array( $_regions ) ) {
+					continue;
+				}
+				foreach ( $_regions as $region ) {
+					if ( empty( $region->tableName ) || empty( $region->id ) ) {
+						continue;
+					}
+					$r2oValues[] = "('"
+						. esc_sql( $this->id ) . "','"
+						. esc_sql( $region->tableName ) . "','"
+						. esc_sql( $row['id'] ) . "','"
+						. esc_sql( $region->id ) . "')";
 				}
 			}
-		}
-		if (!empty($regions_sql_values)) {
-			$query2 = "INSERT INTO " . $db->mapsvg_prefix . 'r2o' . " (objects_table, regions_table, object_id, region_id) VALUES ";
-			$query2 .= implode(", ", $regions_sql_values);
-			$db->query($query2);
-		}
+
+			if ( ! empty( $r2oValues ) ) {
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$db->query(
+					"INSERT INTO `{$r2oTable}` (objects_table, regions_table, object_id, region_id) VALUES "
+					. implode( ', ', $r2oValues )
+				);
+			}
+
+			$offset += $chunkSize;
+		} while ( count( $rows ) === $chunkSize );
 	}
 }

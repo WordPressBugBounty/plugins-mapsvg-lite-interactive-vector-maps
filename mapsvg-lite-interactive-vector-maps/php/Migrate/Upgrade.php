@@ -41,7 +41,7 @@ class Upgrade
                     $this->applyMigration($migrationFile);
                 } catch (\Exception $e) {
                     // Optionally log the error or handle it as needed
-                    Logger::error("Migration failed: " . $e->getMessage());
+                    Logger::error("[SERVER-005] Migration failed: " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-005");
                     break;
                 }
             }
@@ -68,12 +68,12 @@ class Upgrade
 
 
         if (!is_dir($migrationDir)) {
-            Logger::error("MapSVG: Migration directory does not exist: $migrationDir");
+            Logger::error("[SERVER-006] MapSVG: Migration directory does not exist: $migrationDir — Read more: https://mapsvg.com/docs/errors#SERVER-006");
             return $migrations;
         }
 
         if (!is_readable($migrationDir)) {
-            Logger::error("MapSVG: Migration directory is not readable: $migrationDir");
+            Logger::error("[SERVER-007] MapSVG: Migration directory is not readable: $migrationDir — Read more: https://mapsvg.com/docs/errors#SERVER-007");
             return $migrations;
         }
 
@@ -81,12 +81,12 @@ class Upgrade
         $files = glob($globPattern);
 
         if ($files === false) {
-            Logger::error("MapSVG: glob() failed for pattern: $globPattern");
+            Logger::error("[SERVER-008] MapSVG: glob() failed for pattern: $globPattern — Read more: https://mapsvg.com/docs/errors#SERVER-008");
             return $migrations;
         }
 
         if (empty($files)) {
-            Logger::error("MapSVG: No migration files found in: $migrationDir");
+            Logger::error("[SERVER-009] MapSVG: No migration files found in: $migrationDir — Read more: https://mapsvg.com/docs/errors#SERVER-009");
             return $migrations;
         }
 
@@ -112,7 +112,7 @@ class Upgrade
         if (is_callable($migration)) {
             $migration();
         } else {
-            Logger::error("MapSVG: Migration file is not callable: $migrationFile");
+            Logger::error("[SERVER-010] MapSVG: Migration file is not callable: $migrationFile — Read more: https://mapsvg.com/docs/errors#SERVER-010");
         }
     }
 }

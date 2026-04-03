@@ -46,7 +46,7 @@ class MapUpdater
 					// An error occurred, rollback the map to its original state
 					$map = $originalMap;
 					// Optionally log the error or handle it as needed
-					Logger::error("Migration failed: " . $e->getMessage());
+					Logger::error("[SERVER-013] Migration failed: " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-013");
 					break;
 				}
 			}

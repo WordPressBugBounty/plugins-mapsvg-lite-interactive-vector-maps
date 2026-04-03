@@ -139,7 +139,7 @@ export class MiddlewareList {
       try {
         res = middleware.apply(this, params)
       } catch (e) {
-        console.error(`Error in middleware ${type}:`, e)
+        console.error(`[CLIENT-021] Error in middleware ${type} — Read more: https://mapsvg.com/docs/errors#CLIENT-021`, e)
         res = params[0]
       }
       data = res

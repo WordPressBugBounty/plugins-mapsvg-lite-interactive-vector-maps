@@ -36,7 +36,7 @@ export const migrate = (fromVersion: string, options: MapOptions) => {
         modifiedOptions = migration.handler(modifiedOptions)
         currentVersion = migration.version
       } catch (e) {
-        console.error(`Could not update options to version ${toVersion} due to error:`, e)
+        console.error(`[CLIENT-029] Could not update options to version ${toVersion} due to error — Read more: https://mapsvg.com/docs/errors#CLIENT-029`, e)
         // Return the original options if migration fails
         return {
           options: originalOptions,

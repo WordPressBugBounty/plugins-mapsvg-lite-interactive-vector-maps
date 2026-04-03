@@ -271,7 +271,7 @@ export const debounce = (func: (...args: any[]) => void, wait: number) => {
 let geocoder: google.maps.Geocoder
 export const geocode = (query, callback) => {
   if (!window.google) {
-    console.error("MapSVG: Google Maps API is not loaded.")
+    console.error("[CLIENT-020] MapSVG: Google Maps API is not loaded. Read more: https://mapsvg.com/docs/errors#CLIENT-020")
     jQuery.growl.error({
       title: "Error",
       message: "Google Maps API is not loaded",

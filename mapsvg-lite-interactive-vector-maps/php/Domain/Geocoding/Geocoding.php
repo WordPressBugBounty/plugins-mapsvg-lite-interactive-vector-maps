@@ -62,6 +62,29 @@ class Geocoding
 				sleep(1);
 				$this->geocoding_quota_per_second = 1;
 			}
+			$this->geocoding_quota_per_second++;
+
+		// ── Daily budget guard (shared across imports + live map searches) ──
+		$today      = gmdate('Y-m-d');
+		$dailyDate  = Options::get('geocoding_daily_date');
+		$dailyCount = (int) Options::get('geocoding_daily_count');
+
+		if ($dailyDate !== $today) {
+			$dailyCount = 0;
+			Options::set('geocoding_daily_date', $today);
+			Options::set('geocoding_daily_count', 0);
+		}
+
+		$dailyLimit = (int) (Options::get('google_geocoding_daily_limit') ?: 1300);
+
+		if ($dailyCount >= $dailyLimit) {
+			return $return_as_array
+				? ['status' => 'OVER_DAILY_LIMIT', 'error_message' => 'MapSVG daily geocoding budget of ' . $dailyLimit . ' requests reached. Resets tomorrow (UTC).']
+				: wp_json_encode(['status' => 'OVER_DAILY_LIMIT']);
+		}
+
+		Options::set('geocoding_daily_count', $dailyCount + 1);
+
 			$address = urlencode($address);
 
 			// if (!isset($_REQUEST['_wpnonce']) || !wp_verify_nonce($_REQUEST['_wpnonce'], 'mapsvg_geocoding')) {
