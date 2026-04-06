@@ -74,16 +74,18 @@
     var source = $("#mapsvg-directory-data-source :radio:checked").val()
     var _fields = []
     var schema = this.database.getSchema()
-    var _fieldsSelect = []
+    var fieldsForCategories = []
     if (schema) {
       schema.fields.forEach(function (obj) {
         _fields.push(obj.name)
         if (
           (obj.type === "select" && !obj.multiselect) ||
           obj.type === "radio" ||
-          obj.type === "status"
+          obj.type === "status" ||
+          obj.type === "text" ||
+          obj.type === "date"
         ) {
-          _fieldsSelect.push(obj.name)
+          fieldsForCategories.push(obj.name)
         }
       })
     }
@@ -111,7 +113,7 @@
         "</option>"
       )
     })
-    var options3 = _fieldsSelect.map(function (field) {
+    var options3 = fieldsForCategories.map(function (field) {
       return (
         "<option " +
         (_this.templateData.menu.categories.groupBy == field ? "selected" : "") +

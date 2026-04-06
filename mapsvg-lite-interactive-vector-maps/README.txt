@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.9
-Stable tag: 8.12.0
+Stable tag: 8.12.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -402,6 +402,9 @@ Examples:
 = 8.12.0 =
 * Improved: CSV import — large files (100K+ rows) are now processed in the background using chunked server-side parsing and WordPress Cron. Progress is tracked live and survives page reloads. Supports all field types including Location (with background geocoding), Image (remote URLs downloaded to WP Media Library with deduplication), Regions, Select, Checkboxes, Post, and Date.
 * Improved: Error handling — all errors now include unique error codes. Extended descriptions are available at [mapsvg.com/docs/errors](https://mapsvg.com/docs/errors).
+
+= 8.12.1 =
+* Improved: categories can now group by text fields
 
 == Upgrade Notice ==
 
