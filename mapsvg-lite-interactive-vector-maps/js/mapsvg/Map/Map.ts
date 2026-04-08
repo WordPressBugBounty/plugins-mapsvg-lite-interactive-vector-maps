@@ -5476,11 +5476,15 @@ export class MapSVGMap {
         return this.fitViewBox(bbox, zoomToLevel)
       } else {
         const bounds = this.getGroupBounds(zoomTo)
+
         const latLngBounds = new google.maps.LatLngBounds(
           new google.maps.LatLng(bounds.sw),
           new google.maps.LatLng(bounds.ne),
         )
         this.googleMaps.map.fitBounds(latLngBounds, 10)
+        if (bounds.ne.lat === bounds.sw.lat && bounds.ne.lng === bounds.sw.lng) {
+          this.googleMaps.map.setZoom(zoomToLevel)
+        }
       }
     } else {
       // Single Marker / cluster
@@ -5548,7 +5552,7 @@ export class MapSVGMap {
     const allX: number[] = []
     const allY: number[] = []
 
-    const skipWidth = mapObjects[0] instanceof Marker || mapObjects[0] instanceof MarkerCluster
+    // const skipWidth = mapObjects[0] instanceof Marker || mapObjects[0] instanceof MarkerCluste
     const scale = refineByViewbox ? this.getScale(refineByViewbox) : this.getScale()
 
     for (let i = 0; i < mapObjects.length; i++) {
@@ -5558,10 +5562,10 @@ export class MapSVGMap {
       // redo _bbox = mapObjects[i].getBBox(scale) with the new scale
       allX.push(_bbox.x)
       allY.push(_bbox.y)
-      if (!skipWidth) {
-        allX.push(_bbox.x + _bbox.width)
-        allY.push(_bbox.y + _bbox.height)
-      }
+      // if (!skipWidth) {
+      allX.push(_bbox.x + _bbox.width)
+      allY.push(_bbox.y + _bbox.height)
+      // }
     }
     const _xmin = Math.min(...allX)
     const _ymin = Math.min(...allY)
@@ -6764,7 +6768,14 @@ export class MapSVGMap {
   markerClusterClickHandler(e: JQuery.TriggeredEvent, markerCluster: MarkerCluster): void {
     this.objectClickedBeforeScroll = null
     if (this.eventsPreventList["click"]) return
-    this.zoomTo(markerCluster.markers)
+
+    const allSamePoint = markerCluster.markers.every(
+      (m) =>
+        m.svgPoint.x === markerCluster.markers[0].svgPoint.x &&
+        m.svgPoint.y === markerCluster.markers[0].svgPoint.y,
+    )
+    const zoomLevel = allSamePoint ? this.options.clustering.maxZoom : undefined
+    this.zoomTo(markerCluster.markers, zoomLevel)
     return
   }
   regionClickHandler(e: JQuery.TriggeredEvent, region: Region): void {

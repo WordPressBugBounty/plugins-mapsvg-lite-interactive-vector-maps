@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.9
-Stable tag: 8.12.1
+Stable tag: 8.12.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -405,6 +405,9 @@ Examples:
 
 = 8.12.1 =
 * Improved: categories can now group by text fields
+
+= 8.12.2 =
+* Fixed: zoom to cluster with markers at the same location
 
 == Upgrade Notice ==
 
