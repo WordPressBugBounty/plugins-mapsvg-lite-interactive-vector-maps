@@ -296,7 +296,8 @@ class Repository implements JsonSerializable
 		$dataForDB = $this->encodeParams($object->getData());
 
 		$data = $this->source->create($dataForDB);
-		$object->setId($data["id"]);
+		$pkField = $this->schema->getPrimaryKeyFieldName();
+		$object->setId($data[$pkField]);
 
 		return $object;
 	}
@@ -307,7 +308,8 @@ class Repository implements JsonSerializable
 	 */
 	public function findById($id)
 	{
-		$data = $this->source->findOne(["id" => $id]);
+		$pkField = $this->schema->getPrimaryKeyFieldName();
+		$data = $this->source->findOne([$pkField => $id]);
 
 		if ($this->schema->isRemote()) {
 			return $data;
@@ -386,6 +388,35 @@ class Repository implements JsonSerializable
 	}
 
 	/**
+	 * Insert or update an entity matched by a given field value.
+	 *
+	 * Looks up an existing record where $idFieldName equals the corresponding
+	 * value in $data. If found it merges and updates; otherwise it creates a new
+	 * record. Always returns the resulting entity object.
+	 *
+	 * @param array  $data
+	 * @param string $idFieldName Field to match on (defaults to 'id').
+	 * @return mixed
+	 */
+	public function upsert(array $data, ?string $idFieldName = null)
+	{
+		if ($idFieldName === null) {
+			$idFieldName = $this->schema->getPrimaryKeyFieldName();
+		}
+		$idValue = $data[$idFieldName] ?? ($data['id'] ?? null);
+
+		if ($idValue !== null) {
+			$existing = $this->findOne([$idFieldName => $idValue]);
+			if ($existing) {
+				$merged = array_merge((array) $existing, $data);
+				return $this->update($merged);
+			}
+		}
+
+		return $this->create($data);
+	}
+
+	/**
 	 * Updates an Entity in the database
 	 * @param $object
 	 *
@@ -394,7 +425,8 @@ class Repository implements JsonSerializable
 	public function update($object)
 	{
 		$params = $this->encodeParams($object);
-		$this->source->update($params, array('id' => $params['id']));
+		$pkField = $this->schema->getPrimaryKeyFieldName();
+		$this->source->update($params, array($pkField => $params[$pkField]));
 		return is_object($object) ? $object : $this->newObject($object);
 	}
 
@@ -406,7 +438,8 @@ class Repository implements JsonSerializable
 	 */
 	public function delete($id)
 	{
-		return $this->source->delete(array('id' => $id));
+		$pkField = $this->schema->getPrimaryKeyFieldName();
+		return $this->source->delete(array($pkField => $id));
 	}
 
 
@@ -455,18 +488,19 @@ class Repository implements JsonSerializable
 	 *
 	 * @param string $filePath                Absolute path to the uploaded CSV file.
 	 * @param bool   $convertLatlngToAddress  Reverse-geocode lat/lng rows to get address text.
-	 * @param bool   $convertAddressToLatlng  Forward-geocode address strings to get lat/lng.
+	 * @param bool   $convertAddressToLatLng  Forward-geocode address strings to get lat/lng.
 	 * @param string $language                Language code for later geocoding requests.
-	 * @param string $regionsTableName        Short table name of the map's regions (e.g. "regions_115").
+	 * @param string          $regionsTableName Short table name of the map's regions (e.g. "regions_115").
+	 * @param callable|null   $onBatchFlush     Optional callback after each INSERT batch (single-shot imports).
 	 * @return array{count: int, needs_geocoding: bool}
 	 * @throws \Exception on file / format errors.
 	 */
-	public function importFromCsv(string $filePath, bool $convertLatlngToAddress, bool $convertAddressToLatlng = true, string $language = 'en', string $regionsTableName = ''): array
+	public function importFromCsv(string $filePath, bool $convertLatlngToAddress, bool $convertAddressToLatLng = true, string $language = 'en', string $regionsTableName = '', $onBatchFlush = null, bool $upsert = true): array
 	{
 		/** @var DbDataSource $source */
 		$source   = $this->source;
 		$importer = new CsvImporter($this->schema, $source);
-		$result   = $importer->import($filePath, $convertLatlngToAddress, $convertAddressToLatlng, $regionsTableName);
+		$result   = $importer->import($filePath, $convertLatlngToAddress, $convertAddressToLatLng, $regionsTableName, $onBatchFlush, $upsert);
 
 		$this->setRelationsForAllObjects();
 
@@ -490,6 +524,13 @@ class Repository implements JsonSerializable
 
 		if (is_object($data) && method_exists($data, 'getData')) {
 			$data = $data->getData();
+		}
+
+		// Map 'id' alias to the actual primary key column name
+		$pkField = $this->schema->getPrimaryKeyFieldName();
+		if ($pkField !== 'id' && isset($data['id']) && !isset($data[$pkField])) {
+			$data[$pkField] = $data['id'];
+			unset($data['id']);
 		}
 
 		$formattedData = array();
@@ -579,11 +620,13 @@ class Repository implements JsonSerializable
 								&& (isset($location['geoPoint']) && !empty($location['geoPoint']));
 
 							if ($addressYesCoordsNo || $addressNoCoordsYes) {
+								$locationField = $this->schema->getField($key);
+								$language = $locationField->language ?? 'en';
 								$geo = new Geocoding();
 								if ($addressNoCoordsYes) {
-									$response = $geo->get($location['geoPoint']['lat'] . ',' . $location['geoPoint']['lng'], true, $convertLatLngToAddress);
+									$response = $geo->get($location['geoPoint']['lat'] . ',' . $location['geoPoint']['lng'], true, $convertLatLngToAddress, $language);
 								} elseif ($addressYesCoordsNo) {
-									$response = $geo->get($location['address']);
+									$response = $geo->get($location['address'], true, true, $language);
 								}
 
 								if ($response && isset($response['status'])) {
@@ -606,7 +649,8 @@ class Repository implements JsonSerializable
 												$formattedData['location_lng'] = $location['geoPoint']['lng'];
 											}
 											$address = array();
-											$address['formatted'] = $result['formatted_address'];
+											$address['address_formatted'] = $result['formatted_address'];
+											$address['formatted']        = $result['formatted_address'];
 											foreach ($result['address_components'] as $addr_item) {
 												$type = $addr_item['types'][0];
 												$address[$type] = $addr_item['long_name'];
@@ -615,7 +659,8 @@ class Repository implements JsonSerializable
 												}
 											}
 
-											$formattedData['location_address'] = wp_json_encode($address, JSON_UNESCAPED_UNICODE);
+											$formattedData['location_address']           = wp_json_encode($address, JSON_UNESCAPED_UNICODE);
+											$formattedData['location_geocoding_status'] = LocationGeocodingStatus::DONE;
 
 											break;
 										case 'ZERO_RESULTS':
@@ -636,6 +681,11 @@ class Repository implements JsonSerializable
 								}
 							}
 						}
+						if (! empty($formattedData['location_lat']) && ! empty($formattedData['location_lng'])
+							&& (float) $formattedData['location_lat'] !== 0.0
+							&& ! empty($formattedData['location_address'])) {
+							$formattedData['location_geocoding_status'] = LocationGeocodingStatus::DONE;
+						}
 					} else {
 						$formattedData['location_address'] = '';
 						$formattedData['location_lat'] = null;
@@ -643,6 +693,7 @@ class Repository implements JsonSerializable
 						$formattedData['location_x'] = null;
 						$formattedData['location_y'] = null;
 						$formattedData['location_img'] = '';
+						$formattedData['location_geocoding_status'] = LocationGeocodingStatus::SKIPPED;
 					}
 					break;
 				case 'json':
@@ -669,7 +720,8 @@ class Repository implements JsonSerializable
 
 		$data_formatted = array();
 
-		$data_formatted['id'] = $data['id'];
+		$pkField = $this->schema->getPrimaryKeyFieldName();
+		$data_formatted['id'] = isset($data[$pkField]) ? $data[$pkField] : (isset($data['id']) ? $data['id'] : null);
 		$fieldTypes = $this->schema->getFieldTypes();
 
 
@@ -777,8 +829,12 @@ class Repository implements JsonSerializable
 						||
 						($data['location_x'] && $data['location_y'])
 					) {
+						$addrRaw = isset($data['location_address']) ? json_decode($data['location_address']) : '';
+						if (is_object($addrRaw) && isset($addrRaw->address_formatted) && ! isset($addrRaw->formatted)) {
+							$addrRaw->formatted = $addrRaw->address_formatted;
+						}
 						$data_formatted[$field_name] = array(
-							'address' => isset($data['location_address']) ? json_decode($data['location_address']) : '',
+							'address' => $addrRaw ?: '',
 							'img'     => isset($data['location_img'])     ? $data['location_img'] : ''
 						);
 						if (!empty($data['location_lat']) && !empty($data['location_lng'])) {

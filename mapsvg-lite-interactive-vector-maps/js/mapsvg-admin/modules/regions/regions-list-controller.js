@@ -6,6 +6,12 @@
     _this.database.events.on("afterLoad", function () {
       _this.redrawDataList()
     })
+    _this.database.events.on("afterUpdateImportSettings", function () {
+      _this._importSettingsFetchInProgress = false
+      _this._importSettingsFetchAttempted = false
+    })
+    this._importSettingsFetchInProgress = false
+    this._importSettingsFetchAttempted = false
     this.enableHorizontalScroll = true
     MapSVGAdminController.call(this, container, admin, mapsvg)
   }
@@ -74,7 +80,7 @@
   MapSVGAdminRegionsListController.prototype.setEventHandlers = function () {
     var _this = this
 
-    this.toolbarView.on("click", ".mapsvg-data-cols a", function (e) {
+    this.view.on("click", ".mapsvg-data-cols a", function (e) {
       e.preventDefault()
 
       // $(this).closest('li').toggleClass('active');
@@ -95,6 +101,11 @@
         this.schemaRepo.init()
         this.schemaRepo.update(schema)
       }
+    })
+
+    $("#mapsvg-btn-regions-reload").on("click", function (e) {
+      e.preventDefault()
+      _this.database.find(_this.database.query || {})
     })
 
     this.view.on("click", ".region-cpicker", function (e) {
@@ -325,6 +336,23 @@
 
   MapSVGAdminRegionsListController.prototype.editRegion = function (region, scrollTo) {
     var _this = this
+    if (
+      this.database &&
+      typeof this.database.getImportSettings === "function" &&
+      !this.database.importSettingsLoaded &&
+      !this._importSettingsFetchInProgress &&
+      !this._importSettingsFetchAttempted
+    ) {
+      this._importSettingsFetchInProgress = true
+      this._importSettingsFetchAttempted = true
+      this.database.getImportSettings().always(
+        function () {
+          this._importSettingsFetchInProgress = false
+          this.editRegion(region, scrollTo)
+        }.bind(this),
+      )
+      return
+    }
 
     var row = _this.view.find(
       "#mapsvg-region-" +
@@ -360,14 +388,27 @@
     this.formContainer = _this.formContainer || $('<div class="mapsvg-modal-edit"></div>')
     this.view.append(_this.formContainer)
 
+    var schema = this.database.getSchema()
+    var importSettings = (this.database && this.database.importSettings) || {}
+    var isReadOnly = !!(
+      importSettings.gsImportSource === "remote" &&
+      importSettings.gsAutoRefetch !== false &&
+      importSettings.gsAutoRefetch !== "0" &&
+      importSettings.gsAutoRefetch !== 0 &&
+      (importSettings.gsSyncMode || "r") !== "w"
+    )
+
     this.formBuilder = new mapsvg.formBuilder({
       container: _this.formContainer,
-      schema: this.database.getSchema(),
+      schema: schema,
       editMode: false,
       mapsvg: _this.mapsvg,
       mediaUploader: mediaUploader,
       data: region.getModel().getData(),
       admin: _this.admin,
+      readOnly: isReadOnly,
+      readOnlyMessage:
+        "This record is read-only because data is automatically synced from a remote CSV.",
       events: {
         save: ({ data: { formBuilder, data } }) => {
           this.updateDataObject(data)
@@ -444,7 +485,7 @@
     // });
 
     var fieldsAll = _this.database.getSchema().getColumns()
-    var colsList = _this.toolbarView.find(".mapsvg-data-cols")
+    var colsList = _this.view.find(".mapsvg-data-cols")
     colsList.empty()
     fieldsAll.forEach(function (field) {
       colsList.append(

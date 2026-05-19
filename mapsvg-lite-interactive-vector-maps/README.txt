@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.9
-Stable tag: 8.12.2
+Stable tag: 8.13.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -408,6 +408,19 @@ Examples:
 
 = 8.12.2 =
 * Fixed: zoom to cluster with markers at the same location
+
+= 8.13.0 =
+* Improved: **Google Sheets auto-sync** — added a full Google Sheets/remote CSV data source flow with scheduled auto-refetch support.
+* Improved: **CSV import** — improved import flow with preflight validation, clearer ID-field handling, and smarter append/upsert behavior.
+* Improved: **Admin UX** — improved CSV/database/regions controls, including geocoding options, read-only behavior, and add/edit button state updates.
+
+= 8.13.1 =
+* Fixed: **Forms** — improved multiselect tag layout so tags don’t overlap other elements.
+* Fixed: **Popovers** — fixed popovers closing when clicking inside them.
+
+= 8.13.2 =
+* Fixed: data table was not getting created for new or duplicated maps
+
 
 == Upgrade Notice ==
 

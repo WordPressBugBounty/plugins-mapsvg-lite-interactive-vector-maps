@@ -4,6 +4,7 @@
     this.scrollable = false
     this.isParent = true
     this.database = mapsvg.objectsRepository
+    this._listFormOpen = false
     this.deps = [
       { path: "js/mapsvg-admin/modules/database/database-list-controller.js" },
       { path: "js/mapsvg-admin/modules/database/database-csv-controller.js" },
@@ -13,6 +14,13 @@
     ]
 
     MapSVGAdminController.call(this, container, admin, mapsvg)
+
+    this.database.events.on(
+      "afterUpdateImportSettings",
+      function () {
+        this.syncAddButtonState()
+      }.bind(this),
+    )
   }
   window.MapSVGAdminDatabaseController = MapSVGAdminDatabaseController
   MapSVG.extend(MapSVGAdminDatabaseController, window.MapSVGAdminController)
@@ -43,7 +51,9 @@
     this.controllers.list.toolbarView = this.toolbarView
     this.controllers.structure.toolbarView = this.toolbarView
     this.controllers.settings.toolbarView = this.toolbarView
+    this.btnAdd = this.toolbarView.find("#mapsvg-btn-data-add")
     _this.activeController = this.controllers.list
+    this.syncAddButtonState()
     MapSVGAdminController.prototype.viewLoaded.call(this)
   }
 
@@ -71,6 +81,38 @@
       .toggle(!this.isDbConnectedToPosts && !this.isApiSource)
     this.toolbarView.find("#mapsvg-btn-data-add").toggle(!this.isDbConnectedToPosts)
     this.container.toggleClass("mapsvg-db-type-posts", this.isDbConnectedToPosts)
+    this.syncAddButtonState()
+  }
+
+  MapSVGAdminDatabaseController.prototype.isImportReadOnly = function () {
+    var importSettings = (this.database && this.database.importSettings) || {}
+    return !!(
+      importSettings.gsImportSource === "remote" &&
+      importSettings.gsAutoRefetch !== false &&
+      importSettings.gsAutoRefetch !== "0" &&
+      importSettings.gsAutoRefetch !== 0 &&
+      (importSettings.gsSyncMode || "r") !== "w"
+    )
+  }
+
+  MapSVGAdminDatabaseController.prototype.setListFormOpen = function (isOpen) {
+    this._listFormOpen = !!isOpen
+    this.syncAddButtonState()
+  }
+
+  MapSVGAdminDatabaseController.prototype.syncAddButtonState = function () {
+    var btnAdd = this.btnAdd || this.toolbarView.find("#mapsvg-btn-data-add")
+    if (!btnAdd || !btnAdd.length) {
+      return
+    }
+
+    var isImportReadOnly = this.isImportReadOnly()
+    var shouldDisable = !!this._listFormOpen || !!this.isDbConnectedToPosts || isImportReadOnly
+
+    btnAdd.toggleClass("disabled", shouldDisable)
+    btnAdd.toggleClass("mapsvg-btn-muted-disabled", isImportReadOnly)
+    btnAdd.prop("disabled", shouldDisable)
+    btnAdd.attr("aria-disabled", shouldDisable ? "true" : "false")
   }
 
   MapSVGAdminDatabaseController.prototype.viewDidDisappear = function () {

@@ -112,17 +112,19 @@
   right: 0;
 }
 .mapsvg-with-google-map.mapsvg-google-map-loading svg,
-.mapsvg-with-google-map.mapsvg-google-map-loading .mapsvg-scrollpane {
+.mapsvg-with-google-map.mapsvg-google-map-loading .mapsvg-scrollpane,
+.mapsvg-with-google-map.mapsvg-google-map-loading .mapsvg-layers-wrap {
   opacity: 0;
 }
 .mapsvg-google-map-loading.mapsvg-fade-in svg,
-.mapsvg-google-map-loading.mapsvg-fade-in .mapsvg-scrollpane {
+.mapsvg-google-map-loading.mapsvg-fade-in .mapsvg-scrollpane,
+.mapsvg-google-map-loading.mapsvg-fade-in .mapsvg-layers-wrap {
   opacity: 1;
-  -webkit-transition: opacity 0.3s ease-out !important;
-  -moz-transition: opacity 0.3s ease-out !important;
-  -ms-transition: opacity 0.3s ease-out !important;
-  -o-transition: opacity 0.3s ease-out !important;
-  transition: opacity 0.3s ease-out !important;
+  -webkit-transition: opacity 0.5s ease-out 0.5s !important;
+  -moz-transition: opacity 0.5s ease-out 0.5s !important;
+  -ms-transition: opacity 0.5s ease-out 0.5s !important;
+  -o-transition: opacity 0.5s ease-out 0.5s !important;
+  transition: opacity 0.5s ease-out 0.5s !important;
 }
 
 .mapsvg-with-google-map .mapsvg-scrollpane,

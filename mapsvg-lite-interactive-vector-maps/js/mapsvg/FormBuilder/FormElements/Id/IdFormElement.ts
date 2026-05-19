@@ -12,6 +12,6 @@ export class IdFormElement extends FormElement {
   }
 
   getData(): any {
-    return { name: "id", value: this.value }
+    return { name: this.name, value: this.value }
   }
 }

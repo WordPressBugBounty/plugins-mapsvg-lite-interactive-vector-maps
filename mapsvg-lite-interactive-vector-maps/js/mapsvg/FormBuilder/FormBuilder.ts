@@ -73,6 +73,9 @@ export class FormBuilder {
   location: Location
   scrollApi: any // jScrollPane instance
 
+  readOnly: boolean
+  readOnlyMessage: string
+
   backupData?: {
     location: Location
     marker: Marker
@@ -106,6 +109,8 @@ export class FormBuilder {
         ? options.scrollable
         : !_this.editMode && !_this.filtersMode
     this.showNames = typeof options.showNames !== "undefined" ? options.showNames : true
+    this.readOnly = options.readOnly === true
+    this.readOnlyMessage = options.readOnlyMessage || "This record is read-only."
 
     this.events = new Events({
       context: this,

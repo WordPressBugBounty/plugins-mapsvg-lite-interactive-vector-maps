@@ -1812,7 +1812,7 @@ export class MapSVGMap {
         break
       }
       default:
-        null
+        break
     }
   }
 
@@ -4352,6 +4352,13 @@ export class MapSVGMap {
             zoomControl: false,
             styles: options.styleJSON,
             tilt: 0,
+            // Keep the viewport anchored to the primary world copy so markers
+            // are never hidden behind a longitudinally-wrapped duplicate.
+            // strictBounds:false still allows zooming out to see world copies.
+            restriction: {
+              latLngBounds: { north: 85, south: -85, west: -180, east: 180 },
+              strictBounds: false,
+            },
           })
           let overlay
 
@@ -4376,22 +4383,22 @@ export class MapSVGMap {
           })
           google.maps.event.addListenerOnce(this.googleMaps.map, "idle", () => {
             setTimeout(() => {
+              this.googleMaps.initialized = true
+              if (!this.options.googleMaps.center || !this.options.googleMaps.zoom) {
+                this.options.googleMaps.center = this.googleMaps.map.getCenter().toJSON()
+                this.options.googleMaps.zoom = this.googleMaps.map.getZoom()
+              }
+              this.updateGoogleMapsMaxZoom(this.options.googleMaps.center)
+              this.setViewBoxByGoogleMapsOverlay()
+              this.throttle(this.toggleSvgLayerOnZoom, 50, this)
+              this.events.trigger("afterLoad.googleMaps")
+              this.decrementAfterloadBlockers()
+              this.finalizeMapLoading()
               $(this.containers.map).addClass("mapsvg-fade-in")
               setTimeout(() => {
-                this.googleMaps.initialized = true
                 $(this.containers.map).removeClass("mapsvg-google-map-loading")
                 $(this.containers.map).removeClass("mapsvg-fade-in")
-                if (!this.options.googleMaps.center || !this.options.googleMaps.zoom) {
-                  this.options.googleMaps.center = this.googleMaps.map.getCenter().toJSON()
-                  this.options.googleMaps.zoom = this.googleMaps.map.getZoom()
-                }
-                this.updateGoogleMapsMaxZoom(this.options.googleMaps.center)
-                this.setViewBoxByGoogleMapsOverlay()
-                this.throttle(this.toggleSvgLayerOnZoom, 50, this)
-                this.events.trigger("afterLoad.googleMaps")
-                this.decrementAfterloadBlockers()
-                this.finalizeMapLoading()
-              }, 400)
+              }, 1000)
             }, 1)
           })
           this.events.on("boundsChanged.googleMaps", ({ data }) => {
@@ -7294,11 +7301,19 @@ export class MapSVGMap {
     this.controllers.popover.open()
     setTimeout(() => {
       $("body").on(`mouseup.popover.mapsvg-${this.id} touchend.popover.mapsvg-${this.id}`, (e) => {
+        const path =
+          typeof e.originalEvent?.composedPath === "function"
+            ? e.originalEvent.composedPath()
+            : typeof (e as any).composedPath === "function"
+              ? (e as any).composedPath()
+              : [e.target]
+        const hit = (sel: string) =>
+          path.some((n) => n instanceof Element && (n.matches(sel) || !!n.closest(sel)))
         if (
           this.isScrolling ||
-          $(e.target).closest(".mapsvg-directory").length ||
-          $(e.target).closest(".mapsvg-popover").length ||
-          $(e.target).hasClass("mapsvg-btn-map")
+          hit(".mapsvg-directory") ||
+          hit(".mapsvg-popover") ||
+          hit(".mapsvg-btn-map") // или classList на узле из path
         )
           return
         this.controllers.popover.close()
@@ -8173,6 +8188,7 @@ export class MapSVGMap {
    * @private
    */
   fixMarkersWorldScreen(): void {
+    return
     if (this.googleMaps.map)
       setTimeout(() => {
         const markers = { left: 0, right: 0, leftOut: 0, rightOut: 0 }

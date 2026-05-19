@@ -18,7 +18,8 @@
       "type": "id",
       "db_type": "int(11)",
       "visible": true,
-      "protected": true
+      "protected": true,
+      "auto_increment": true
     },
     {
       "name": "title",
@@ -40,6 +41,13 @@
       "type": "text",
       "db_type": "longtext",
       "visible": true
+    },
+    {
+      "name": "primaryKeyField",
+      "label": "Primary Key Field",
+      "type": "text",
+      "db_type": "varchar(50)",
+      "visible": false
     }
   ]
 }

@@ -24,14 +24,15 @@ class CsvImportJob {
 	public static function create( array $params ): string {
 		$token = wp_generate_password( 24, false );
 
-		$job = array_merge( $params, [
-			'token'           => $token,
-			'status'          => 'pending',
-			'processed'       => 0,
-			'needs_geocoding' => false,
-			'errors'          => [],
-			'error_count'     => 0,
-		] );
+        $job = array_merge( $params, [
+            'token'           => $token,
+            'status'          => 'pending',
+            'processed'       => 0,
+            'needs_geocoding' => false,
+            'errors'          => [],
+            'error_count'     => 0,
+            'started_at'      => time(),
+        ] );
 
 		set_transient( self::TRANSIENT_PREFIX . $token, $job, self::TTL );
 

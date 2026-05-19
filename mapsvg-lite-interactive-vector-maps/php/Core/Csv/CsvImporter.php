@@ -15,7 +15,8 @@ namespace MapSVG;
  * Third-party code can inject extra parsers via the 'mapsvg_csv_register_field_parsers'
  * WordPress action, which receives the CsvRowParser instance.
  */
-class CsvImporter {
+class CsvImporter
+{
 
 	/** Rows per single INSERT statement. 5000 is safe under MySQL's default 64 MB max_allowed_packet. */
 	private const BATCH_SIZE        = 5000;
@@ -23,7 +24,7 @@ class CsvImporter {
 	/** Rows read + inserted per importChunk() call (poll-driven / cron-driven). */
 	private const CHUNK_SIZE        = 50000;
 
-	private const DELIMITER_OPTIONS = [ ',', ';', "\t", '|' ];
+	private const DELIMITER_OPTIONS = [',', ';', "\t", '|'];
 
 	public function __construct(
 		private Schema $schema,
@@ -33,33 +34,36 @@ class CsvImporter {
 	// ── Single-shot import ───────────────────────────────────────────────────
 
 	/**
-	 * @param string $filePath              Absolute path to the uploaded CSV file.
-	 * @param bool   $convertLatlngToAddress
-	 * @param bool   $convertAddressToLatlng
-	 * @param string $regionsTableName      Short table name, e.g. "regions_115".
+	 * @param string        $filePath              Absolute path to the uploaded CSV file.
+	 * @param bool          $convertLatlngToAddress
+	 * @param bool          $convertAddressToLatLng
+	 * @param string        $regionsTableName      Short table name, e.g. "regions_115".
+	 * @param callable|null $onBatchFlush          Optional heartbeat after each inserted batch.
 	 * @return array{count: int, needs_geocoding: bool}
 	 * @throws \Exception on file / format errors.
 	 */
 	public function import(
 		string $filePath,
 		bool   $convertLatlngToAddress  = false,
-		bool   $convertAddressToLatlng  = false,
-		string $regionsTableName        = ''
+		bool   $convertAddressToLatLng  = false,
+		string $regionsTableName        = '',
+		$onBatchFlush = null,
+		bool   $upsert = true
 	): array {
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
-		$handle = fopen( $filePath, 'r' );
-		if ( $handle === false ) {
-			throw new \Exception( 'Cannot open CSV file: ' . esc_html( basename( $filePath ) ) );
+		$handle = fopen($filePath, 'r');
+		if ($handle === false) {
+			throw new \Exception('Cannot open CSV file: ' . esc_html(basename($filePath)));
 		}
 
-		$separator = $this->sniffDelimiter( $handle );
-		$headers   = $this->readHeaders( $handle, $separator );
+		$separator = $this->sniffDelimiter($handle);
+		$headers   = $this->readHeaders($handle, $separator);
 
 		$rowParser = $this->buildRowParser();
 
 		$context = [
 			'convertLatlngToAddress' => $convertLatlngToAddress,
-			'convertAddressToLatlng' => $convertAddressToLatlng,
+			'convertAddressToLatLng' => $convertAddressToLatLng,
 			'regionsTableName'       => $regionsTableName,
 			'needsGeocoding'         => false,
 		];
@@ -67,28 +71,36 @@ class CsvImporter {
 		$batch     = [];
 		$totalRows = 0;
 
-		while ( ( $csvRow = fgetcsv( $handle, 0, $separator, '"', '' ) ) !== false ) {
+		while (($csvRow = fgetcsv($handle, 0, $separator, '"', '')) !== false) {
 			// Skip blank lines
-			if ( count( $csvRow ) === 1 && $csvRow[0] === null ) {
+			if (count($csvRow) === 1 && $csvRow[0] === null) {
 				continue;
 			}
 
-			$rawRow  = array_combine( $headers, array_pad( $csvRow, count( $headers ), '' ) );
-			$batch[] = $rowParser->parseRow( $rawRow, $context );
+			$rawRow  = array_combine($headers, array_pad($csvRow, count($headers), ''));
+			$batch[] = $rowParser->parseRow($rawRow, $context);
 			$totalRows++;
 
-			if ( count( $batch ) >= self::BATCH_SIZE ) {
-				$this->source->import( $batch );
+			if (count($batch) >= self::BATCH_SIZE) {
+
+				$this->source->import($batch, $upsert);
 				$batch = [];
+				if (is_callable($onBatchFlush)) {
+					$onBatchFlush();
+				}
 			}
 		}
 
-		if ( ! empty( $batch ) ) {
-			$this->source->import( $batch );
+		if (! empty($batch)) {
+
+			$this->source->import($batch, $upsert);
+			if (is_callable($onBatchFlush)) {
+				$onBatchFlush();
+			}
 		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
-		fclose( $handle );
+		fclose($handle);
 
 		return [
 			'count'           => $totalRows,
@@ -107,26 +119,27 @@ class CsvImporter {
 	 * @return array{separator: string, headers: string[], data_offset: int, total: int}
 	 * @throws \Exception on file / format errors.
 	 */
-	public function initialize( string $filePath ): array {
+	public function initialize(string $filePath): array
+	{
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
-		$handle = fopen( $filePath, 'r' );
-		if ( $handle === false ) {
-			throw new \Exception( 'Cannot open CSV file: ' . esc_html( basename( $filePath ) ) );
+		$handle = fopen($filePath, 'r');
+		if ($handle === false) {
+			throw new \Exception('Cannot open CSV file: ' . esc_html(basename($filePath)));
 		}
 
-		$separator  = $this->sniffDelimiter( $handle );
-		$headers    = $this->readHeaders( $handle, $separator );
-		$dataOffset = ftell( $handle );
+		$separator  = $this->sniffDelimiter($handle);
+		$headers    = $this->readHeaders($handle, $separator);
+		$dataOffset = ftell($handle);
 
 		// Quick row count — no parsing, just counting non-blank lines.
 		$total = 0;
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fgets
-		while ( fgets( $handle ) !== false ) {
+		while (fgets($handle) !== false) {
 			$total++;
 		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
-		fclose( $handle );
+		fclose($handle);
 
 		return [
 			'separator'   => $separator,
@@ -144,7 +157,7 @@ class CsvImporter {
 	 * @param string[] $headers              Header names returned by initialize().
 	 * @param int      $byteOffset           Byte position to seek to (0 = start of data).
 	 * @param bool     $convertLatlngToAddress
-	 * @param bool     $convertAddressToLatlng
+	 * @param bool     $convertAddressToLatLng
 	 * @param string   $regionsTableName
 	 * @return array{
 	 *   rows_processed: int,
@@ -161,22 +174,23 @@ class CsvImporter {
 		array  $headers,
 		int    $byteOffset,
 		bool   $convertLatlngToAddress  = false,
-		bool   $convertAddressToLatlng  = false,
-		string $regionsTableName        = ''
+		bool   $convertAddressToLatLng  = false,
+		string $regionsTableName        = '',
+		bool   $upsert                  = true
 	): array {
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
-		$handle = fopen( $filePath, 'r' );
-		if ( $handle === false ) {
-			throw new \Exception( 'Cannot open CSV file for chunk processing.' );
+		$handle = fopen($filePath, 'r');
+		if ($handle === false) {
+			throw new \Exception('Cannot open CSV file for chunk processing.');
 		}
 
-		fseek( $handle, $byteOffset );
+		fseek($handle, $byteOffset);
 
 		$rowParser = $this->buildRowParser();
 
 		$context = [
 			'convertLatlngToAddress' => $convertLatlngToAddress,
-			'convertAddressToLatlng' => $convertAddressToLatlng,
+			'convertAddressToLatLng' => $convertAddressToLatLng,
 			'regionsTableName'       => $regionsTableName,
 			'needsGeocoding'         => false,
 		];
@@ -185,41 +199,41 @@ class CsvImporter {
 		$rowsRead  = 0;
 		$errors    = [];
 
-		while ( $rowsRead < self::CHUNK_SIZE ) {
-			$csvRow = fgetcsv( $handle, 0, $separator, '"', '' );
-			if ( $csvRow === false ) {
+		while ($rowsRead < self::CHUNK_SIZE) {
+			$csvRow = fgetcsv($handle, 0, $separator, '"', '');
+			if ($csvRow === false) {
 				break;
 			}
-			if ( count( $csvRow ) === 1 && $csvRow[0] === null ) {
+			if (count($csvRow) === 1 && $csvRow[0] === null) {
 				continue; // blank line
 			}
 
-			$rawRow  = array_combine( $headers, array_pad( $csvRow, count( $headers ), '' ) );
-			$batch[] = $rowParser->parseRow( $rawRow, $context );
+			$rawRow  = array_combine($headers, array_pad($csvRow, count($headers), ''));
+			$batch[] = $rowParser->parseRow($rawRow, $context);
 			$rowsRead++;
 
 			// Flush sub-batches to the DB every BATCH_SIZE rows to keep memory bounded.
-			if ( count( $batch ) >= self::BATCH_SIZE ) {
+			if (count($batch) >= self::BATCH_SIZE) {
 				try {
-					$this->source->import( $batch );
-				} catch ( \Exception $e ) {
-					$errors[] = [ 'message' => $e->getMessage() ];
+					$this->source->import($batch, $upsert);
+				} catch (\Exception $e) {
+					$errors[] = ['message' => $e->getMessage()];
 				}
 				$batch = [];
 			}
 		}
 
-		$nextOffset = (int) ftell( $handle );
-		$eof        = feof( $handle );
+		$nextOffset = (int) ftell($handle);
+		$eof        = feof($handle);
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
-		fclose( $handle );
+		fclose($handle);
 
-		if ( ! empty( $batch ) ) {
+		if (! empty($batch)) {
 			try {
-				$this->source->import( $batch );
-			} catch ( \Exception $e ) {
-				$errors[] = [ 'message' => $e->getMessage() ];
+				$this->source->import($batch, $upsert);
+			} catch (\Exception $e) {
+				$errors[] = ['message' => $e->getMessage()];
 			}
 		}
 
@@ -237,15 +251,16 @@ class CsvImporter {
 	/**
 	 * Peek at the first line, count candidate delimiters, pick the most frequent.
 	 */
-	private function sniffDelimiter( $handle ): string {
+	private function sniffDelimiter($handle): string
+	{
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fgets
-		$firstLine = fgets( $handle );
-		rewind( $handle );
+		$firstLine = fgets($handle);
+		rewind($handle);
 
 		$line   = $firstLine !== false ? $firstLine : '';
-		$counts = array_map( fn( string $d ): int => substr_count( $line, $d ), self::DELIMITER_OPTIONS );
+		$counts = array_map(fn(string $d): int => substr_count($line, $d), self::DELIMITER_OPTIONS);
 
-		return self::DELIMITER_OPTIONS[ (int) array_search( max( $counts ), $counts, true ) ];
+		return self::DELIMITER_OPTIONS[(int) array_search(max($counts), $counts, true)];
 	}
 
 	/**
@@ -254,16 +269,17 @@ class CsvImporter {
 	 * @return string[]
 	 * @throws \Exception if the file is empty.
 	 */
-	private function readHeaders( $handle, string $separator ): array {
-		$rawHeaders = fgetcsv( $handle, 0, $separator, '"', '' );
-		if ( $rawHeaders === false ) {
+	private function readHeaders($handle, string $separator): array
+	{
+		$rawHeaders = fgetcsv($handle, 0, $separator, '"', '');
+		if ($rawHeaders === false) {
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
-			fclose( $handle );
-			throw new \Exception( 'CSV file is empty or invalid.' );
+			fclose($handle);
+			throw new \Exception('CSV file is empty or invalid.');
 		}
 
 		return array_map(
-			fn( string $h ): string => strtolower( str_replace( ' ', '_', trim( $h ) ) ),
+			fn(string $h): string => strtolower(str_replace(' ', '_', trim($h))),
 			$rawHeaders
 		);
 	}
@@ -272,17 +288,18 @@ class CsvImporter {
 	 * Build a CsvRowParser pre-loaded with all built-in field parsers.
 	 * Fires an action so external code can add or replace parsers.
 	 */
-	private function buildRowParser(): CsvRowParser {
-		$rowParser = new CsvRowParser( $this->schema );
+	private function buildRowParser(): CsvRowParser
+	{
+		$rowParser = new CsvRowParser($this->schema);
 
-		$rowParser->register( new SelectFieldParser( $this->schema ) );
-		$rowParser->register( new CheckboxesFieldParser( $this->schema ) );
-		$rowParser->register( new LocationFieldParser() );
-		$rowParser->register( new RegionFieldParser() );
-		$rowParser->register( new CheckboxFieldParser() );
-		$rowParser->register( new PostFieldParser() );
-		$rowParser->register( new DateFieldParser() );
-		$rowParser->register( new ImageFieldParser() );
+		$rowParser->register(new SelectFieldParser($this->schema));
+		$rowParser->register(new CheckboxesFieldParser($this->schema));
+		$rowParser->register(new LocationFieldParser());
+		$rowParser->register(new RegionFieldParser());
+		$rowParser->register(new CheckboxFieldParser());
+		$rowParser->register(new PostFieldParser());
+		$rowParser->register(new DateFieldParser());
+		$rowParser->register(new ImageFieldParser());
 
 		/**
 		 * Action: mapsvg_csv_register_field_parsers
@@ -291,7 +308,7 @@ class CsvImporter {
 		 * @param CsvRowParser $rowParser The parser instance to call ->register() on.
 		 * @param Schema       $schema    The active schema.
 		 */
-		do_action( 'mapsvg_csv_register_field_parsers', $rowParser, $this->schema );
+		do_action('mapsvg_csv_register_field_parsers', $rowParser, $this->schema);
 
 		return $rowParser;
 	}

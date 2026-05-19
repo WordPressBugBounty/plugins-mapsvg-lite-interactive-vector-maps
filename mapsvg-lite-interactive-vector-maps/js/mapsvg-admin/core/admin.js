@@ -89,6 +89,7 @@ function loadDeps() {
   const files = [
     // {path:'css/mapsvg-admin.css'},
     { path: "js/vendor/papaparse/papaparse.min.js" },
+
     {
       path: "js/vendor/popper/popper.min.js",
       children: [
@@ -143,6 +144,7 @@ function loadDeps() {
     {
       path: "js/mapsvg-admin/core/controller.js",
       children: [
+        { path: "js/mapsvg-admin/modules/csv/csv-controller.js" },
         { path: "js/mapsvg-admin/modules/settings/settings-controller.js" },
         { path: "js/mapsvg-admin/modules/database/database-controller.js" },
         { path: "js/mapsvg-admin/modules/regions/regions-controller.js" },
@@ -1152,7 +1154,10 @@ function loadDeps() {
           }
           reader.readAsDataURL(blob)
         } catch (error) {
-          console.error("[CLIENT-031] There has been a problem with your fetch operation — Read more: https://mapsvg.com/docs/errors#CLIENT-031", error)
+          console.error(
+            "[CLIENT-031] There has been a problem with your fetch operation — Read more: https://mapsvg.com/docs/errors#CLIENT-031",
+            error,
+          )
         }
       })
 
@@ -1774,7 +1779,10 @@ function loadDeps() {
                           })
                         })
                         .catch((err) => {
-                          console.error("[CLIENT-032] Failed to copy text — Read more: https://mapsvg.com/docs/errors#CLIENT-032", err)
+                          console.error(
+                            "[CLIENT-032] Failed to copy text — Read more: https://mapsvg.com/docs/errors#CLIENT-032",
+                            err,
+                          )
                         })
                     })
                   break
@@ -1801,7 +1809,10 @@ function loadDeps() {
                         })
                       })
                       .catch((err) => {
-                        console.error("[CLIENT-032] Failed to copy text — Read more: https://mapsvg.com/docs/errors#CLIENT-032", err)
+                        console.error(
+                          "[CLIENT-032] Failed to copy text — Read more: https://mapsvg.com/docs/errors#CLIENT-032",
+                          err,
+                        )
                       })
                   })
                   break
@@ -2297,7 +2308,10 @@ trigger: "click", // or 'click' depending on how you want it triggered
             wildcard: "%QUERY%",
             transform: function (response) {
               if (response.error_message) {
-                console.error("[CLIENT-033] Google geocoding API error — Read more: https://mapsvg.com/docs/errors#CLIENT-033", response.error_message)
+                console.error(
+                  "[CLIENT-033] Google geocoding API error — Read more: https://mapsvg.com/docs/errors#CLIENT-033",
+                  response.error_message,
+                )
               }
               return response.results
             },

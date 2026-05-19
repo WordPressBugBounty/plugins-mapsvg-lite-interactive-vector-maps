@@ -5,6 +5,96 @@ namespace MapSVG;
 
 class SchemaController extends Controller
 {
+	/**
+	 * Returns import settings for a schema.
+	 *
+	 * @param \WP_REST_Request $request
+	 * @return \WP_REST_Response
+	 */
+	public static function getImportSettings(\WP_REST_Request $request): \WP_REST_Response
+	{
+		$schemaRepository = RepositoryFactory::get("schema");
+		$schema = $schemaRepository->findById((int) $request['id']);
+		if (!$schema) {
+			return self::render(['error' => 'Schema not found.'], 404);
+		}
+
+		$settings = ImportSettingsService::getForSchema($schema);
+		return self::render(['importSettings' => $settings], 200);
+	}
+
+	/**
+	 * Updates import settings for a schema.
+	 *
+	 * @param \WP_REST_Request $request
+	 * @return \WP_REST_Response
+	 */
+	public static function updateImportSettings(\WP_REST_Request $request): \WP_REST_Response
+	{
+
+		$schemaRepository = RepositoryFactory::get("schema");
+		$schema = $schemaRepository->findById((int) $request['id']);
+		if (!$schema) {
+			return self::render(['error' => 'Schema not found.'], 404);
+		}
+
+		$body = $request->get_params();
+		$allowed = [
+			'gsSync',
+			'gsAutoRefetch',
+			'gsSyncMode',
+			'gsCsvUrl',
+			'gsCsvHash',
+			'gsRefetchInterval',
+			'gsAutoId',
+			'gsIdFieldName',
+			'gsSheetName',
+			'gsGeocode',
+			'gsGeocodeConvertLatLngToAddress',
+			'gsGeocodeConvertAddressToLatLng',
+			'gsPaidGeocoding',
+			'gsAppScriptUrl',
+			'gsSecret',
+			'gsImportFinishedAt',
+			'gsImportStartedAt',
+			'gsImportLastUpdatedAt',
+			'gsImportEstimatedSeconds',
+			'gsImportSource',
+			'gsImportSourceValid',
+			'gsImportSkipFields'
+		];
+		$payload = [];
+		foreach ($allowed as $key) {
+			if (array_key_exists($key, $body)) {
+				$payload[$key] = $body[$key];
+			}
+		}
+
+
+		$settings = ImportSettingsService::updateForSchema($schema, $payload);
+		GoogleSheetSync::syncCronAfterImportSettingsChange($schema);
+		return self::render(['importSettings' => $settings], 200);
+	}
+
+	/**
+	 * Resets import settings for a schema to defaults.
+	 *
+	 * @param \WP_REST_Request $request
+	 * @return \WP_REST_Response
+	 */
+	public static function deleteImportSettings(\WP_REST_Request $request): \WP_REST_Response
+	{
+		$schemaRepository = RepositoryFactory::get("schema");
+		$schema = $schemaRepository->findById((int) $request['id']);
+		if (!$schema) {
+			return self::render(['error' => 'Schema not found.'], 404);
+		}
+
+		$repo = ImportSettingsService::repo();
+		$settings = ImportSettingsService::updateForSchema($schema, $repo->defaultPayloadForSchema($schema));
+		GoogleSheetSync::syncCronAfterImportSettingsChange($schema);
+		return self::render(['importSettings' => $settings], 200);
+	}
 
 	/**
 	 * Returns all schemas
@@ -82,6 +172,24 @@ class SchemaController extends Controller
 			}
 		}
 		$schemaRepository->update($data);
+
+		return self::render([], 200);
+	}
+
+	/**
+	 * Deletes a schema and clears any associated Google Sheets cron event.
+	 * @param \WP_REST_Request $request
+	 * @return \WP_REST_Response
+	 */
+	public static function delete($request)
+	{
+		$schemaRepository = RepositoryFactory::get("schema");
+		$schema = $schemaRepository->findById((int)$request['id']);
+
+		if ($schema) {
+			GoogleSheetSync::clearForSchema($schema->name);
+			$schemaRepository->delete((int)$request['id']);
+		}
 
 		return self::render([], 200);
 	}

@@ -1,5 +1,6 @@
 {
   "name": "posts_",
+  "primaryKeyField": "id",
   "objectNameSingular": "post",
   "objectNamePlural": "posts",
   "apiEndpoints": [

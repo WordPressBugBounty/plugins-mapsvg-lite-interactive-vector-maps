@@ -6,6 +6,12 @@
     this.database.events.on("afterLoad", function () {
       _this.redrawDataList()
     })
+    this.database.events.on("afterUpdateImportSettings", function () {
+      _this._importSettingsFetchInProgress = false
+      _this._importSettingsFetchAttempted = false
+    })
+    this._importSettingsFetchInProgress = false
+    this._importSettingsFetchAttempted = false
     this.enableHorizontalScroll = true
 
     MapSVGAdminController.call(this, container, admin, mapsvg)
@@ -18,7 +24,6 @@
     // this.databaseTimestamp = Date.now();
 
     _this.redrawDataList()
-    _this.btnAdd = $("#mapsvg-btn-data-add")
   }
 
   MapSVGAdminDatabaseListController.prototype.viewDidAppear = function () {
@@ -54,7 +59,7 @@
       _this.searchField = field
     })
 
-    this.toolbarView.on("click", ".mapsvg-data-cols a", function (e) {
+    this.view.on("click", ".mapsvg-data-cols a", function (e) {
       e.preventDefault()
 
       $(this).closest("li").toggleClass("active")
@@ -77,8 +82,17 @@
       }
     })
 
-    $("#mapsvg-btn-data-add").on("click", function (e) {
+    this.toolbarView.on("click", "#mapsvg-btn-data-reload", function (e) {
       e.preventDefault()
+      _this.database.find()
+    })
+
+    this.toolbarView.on("click", "#mapsvg-btn-data-add", function (e) {
+      e.preventDefault()
+      var databaseController = _this.admin.getData().controllers.database
+      if (databaseController && databaseController.isImportReadOnly()) {
+        return
+      }
       _this.showNewObjectForm()
     })
 
@@ -160,7 +174,7 @@
       $("#mapsvg-data-list-table").hide()
       $("#mapsvg-setup-database-msg").show()
     }
-    var colsList = _this.toolbarView.find(".mapsvg-data-cols")
+    var colsList = _this.view.find(".mapsvg-data-cols")
     colsList.empty()
     fields.forEach(function (field) {
       colsList.append(
@@ -311,6 +325,24 @@
     scrollTo,
     closeOnSave,
   ) {
+    if (
+      this.database &&
+      typeof this.database.getImportSettings === "function" &&
+      !this.database.importSettingsLoaded &&
+      !this._importSettingsFetchInProgress &&
+      !this._importSettingsFetchAttempted
+    ) {
+      this._importSettingsFetchInProgress = true
+      this._importSettingsFetchAttempted = true
+      this.database.getImportSettings().always(
+        function () {
+          this._importSettingsFetchInProgress = false
+          this.editDataObject(object, scrollTo, closeOnSave)
+        }.bind(this),
+      )
+      return
+    }
+
     let newRecord
     if (typeof object == "string" || typeof object == "number") {
       object = this.database.getLoadedObject(object)
@@ -323,8 +355,6 @@
     this.objectCopy = objectCopy
 
     closeOnSave = closeOnSave !== true ? (newRecord ? false : true) : true
-
-    this.btnAdd.addClass("disabled")
 
     if (this.tableDataActiveRow) this.tableDataActiveRow.removeClass("mapsvg-row-selected")
 
@@ -360,15 +390,28 @@
     var marker_id = object.marker && object.marker.id ? object.marker.id : ""
     // this.mapsvg.hideMarkersExceptOne(marker_id);
 
+    var schema = this.database.getSchema()
+    var importSettings = (this.database && this.database.importSettings) || {}
+    var isReadOnly = !!(
+      importSettings.gsImportSource === "remote" &&
+      importSettings.gsAutoRefetch !== false &&
+      importSettings.gsAutoRefetch !== "0" &&
+      importSettings.gsAutoRefetch !== 0 &&
+      (importSettings.gsSyncMode || "r") !== "w"
+    )
+
     this.formBuilder = new mapsvg.formBuilder({
       container: this.formContainer,
-      schema: this.database.getSchema(),
+      schema: schema,
       editMode: false,
       mapsvg: this.mapsvg,
       mediaUploader: this.admin.mediaUploader,
       data: objectCopy.getData(),
       admin: this.admin,
       closeOnSave: closeOnSave,
+      readOnly: isReadOnly,
+      readOnlyMessage:
+        "This record is read-only because data is automatically synced from a remote CSV.",
       events: {
         save: (event) => {
           const { formBuilder, data } = event.data
@@ -451,6 +494,7 @@
         },
       },
     })
+    this.admin.getData().controllers.database.setListFormOpen(true)
     this.formBuilder.init()
   }
 
@@ -526,7 +570,6 @@
   }
   MapSVGAdminDatabaseListController.prototype.closeFormHandler = function () {
     var _this = this
-    _this.btnAdd.removeClass("disabled")
     _this.mapsvg.showMarkers()
 
     if (this.objectCopy && this.objectCopy.location && this.objectCopy.location.marker) {
@@ -560,6 +603,7 @@
         _this.admin.setPreviousMode()
       }
     }
+    _this.admin.getData().controllers.database.setListFormOpen(false)
     this.updateScroll()
   }
 })(jQuery, window, window.MapSVG, mapsvg)

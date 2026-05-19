@@ -1,5 +1,6 @@
 {
   "name": "objects_%MAP_ID%",
+  "primaryKeyField": "id",
   "objectNameSingular": "object",
   "objectNamePlural": "objects",
   "apiEndpoints": [

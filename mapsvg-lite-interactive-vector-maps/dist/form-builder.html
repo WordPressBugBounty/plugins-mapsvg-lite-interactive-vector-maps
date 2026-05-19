@@ -237,14 +237,34 @@
 </script>
 
 <script type="text/x-handlebars-template" id="mapsvg-data-tmpl-date-view">
+  <div class="form-group mb-3 row">
+    <label class="col-sm-3 col-form-label with-name">
+      {{label}}
+      <div class="field-name">
+        {{_name}}
+      </div>
+    </label>
 
-  <div class="form-group mb-3 row"> <label class="col-sm-3 col-form-label with-name">{{label}}
-  <div class="field-name">{{_name}}</div></label> <div class="col-sm-9"> <div class="input-group
-  date" data-provide="datepicker" data-date-language="{{language}}" data-date-autoclose="true"
-  data-date-today-highlight="true"> <input type="text" name="{{name}}" class="form-control" value="{{value}}"
-  /> <div class="input-group-text"> <i class="bi bi-calendar"></i> </div> </div> <p
-  class="form-text">{{help}}</p> </div> </div>
+    <div class="col-sm-9">
+      <div
+        class="input-group date"
+        data-provide="datepicker"
+        data-date-language="{{language}}"
+        data-date-autoclose="true"
+        data-date-today-highlight="true"
+      >
+        <input type="text" name="{{name}}" class="form-control" value="{{value}}" />
+        <div class="input-group-text">
+          <i class="bi bi-calendar"></i>
+        </div>
+      </div>
+      <p class="form-text">
+        {{help}}
+      </p>
+    </div>
+  </div>
 </script>
+
 <script type="text/x-handlebars-template" id="mapsvg-filters-tmpl-distance-control">
   <div class="form-group mb-3 ">
        <label class="form-label">Label</label>
@@ -434,12 +454,21 @@
   btn-outline-secondary btn-close">Close</button> </div>
 </script>
 <script type="text/x-handlebars-template" id="mapsvg-data-tmpl-id-view">
+{{#if auto_increment}}
  <div class="form-group mb-3 row {{#unless value}}hidden{{/unless}}">
         <label class="col-sm-3 col-form-label with-name">ID</label>
         <div class="col-sm-9 col-form-label" style="text-align:left;">
             {{value}}
         </div>
     </div>
+{{else}}
+ <div class="form-group mb-3 row">
+        <label class="col-sm-3 col-form-label with-name">{{label}}</label>
+        <div class="col-sm-9">
+            <input type="text" class="form-control" name="{{name}}" value="{{value}}" {{#if readonly}}readonly{{/if}} />
+        </div>
+    </div>
+{{/if}}
 </script>
 <script type="text/x-handlebars-template" id="mapsvg-data-tmpl-image-control">
   <div class="form-group mb-3 "> <label class="form-label">Label</label> <input type="text"
@@ -506,6 +535,15 @@
 
       <table class="" id="markers-by-field" style="margin-top: 20px;">
       </table>
+  </div>
+
+  <div class="form-group mb-3">
+      <label class="form-label">Language</label>
+      <select class="mapsvg-select2 form-control" name="language">
+          <option value="">— same as map (Google Maps URL) —</option>
+          {{#each languages}}<option value="{{value}}" {{#ifeq value ../language}}selected{{/ifeq}}>{{label}}</option>{{/each}}
+      </select>
+      <p class="form-text">Address language used when geocoding (converting addresses ↔ coordinates) in the background. Leave blank to inherit the language set in the Google Maps settings.</p>
   </div>
 
   <div class="form-group mb-3 ">
@@ -993,8 +1031,14 @@
     <div class="form-group mb-3 row">
         <div class="col-sm-3 col-form-label"></div>
         <div class="col-sm-9">
-            <button class="btn btn-outline-secondary  btn-save">OK&nbsp;<span class="mapsvg-hotkey-mac">⌘↵</span><span class="mapsvg-hotkey-others">Ctrl+↵</span></button>
-            <button class="btn btn-outline-secondary  mapsvg-close" >Close <span class="mapsvg-hotkey">Esc</span></button>
+            <button class="btn btn-outline-secondary btn-save"{{#if readOnly}} disabled{{/if}}>OK&nbsp;<span class="mapsvg-hotkey-mac">⌘↵</span><span class="mapsvg-hotkey-others">Ctrl+↵</span></button>
+            <button class="btn btn-outline-secondary mapsvg-close">Close <span class="mapsvg-hotkey">Esc</span></button>
+            {{#if readOnly}}
+            <div class="alert alert-info py-2 mt-2 mb-0 d-flex align-items-center gap-2">
+                <i class="bi bi-lock-fill"></i>
+                <span>{{readOnlyMessage}}</span>
+            </div>
+            {{/if}}
         </div>
     </div>
 </script>

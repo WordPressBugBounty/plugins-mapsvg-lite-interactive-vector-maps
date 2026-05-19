@@ -5,14 +5,8 @@ namespace MapSVG;
 /**
  * Manages the background geocoding queue.
  *
- * The queue is stored as a JSON object in the MapSVG options table, keyed by table
- * name so multiple tables can be geocoded concurrently without a numeric pointer.
- * The "needs geocoding" state lives directly in the row data:
- *   - location_address = '{"raw":"..."}' → forward geocode needed
- *   - location_lat set, location_address empty, convert_latlng_to_address=true → reverse geocode needed
- *
- * The cron handler queries up to BATCH_SIZE rows per table on each run and reschedules
- * itself every second until all queued tables are fully geocoded.
+ * Queue stored in a transient keyed by table name.
+ * Row eligibility uses location_geocoding_status only (1 forward, 2 reverse) with schema flags.
  */
 class GeocodingQueue
 {
@@ -24,9 +18,7 @@ class GeocodingQueue
 	// ─── Queue storage (wp_options via transients — longtext, no size limit) ─
 
 	/**
-	 * Returns the full queue array keyed by table name.
-	 *
-	 * @return array<string, array{table: string, language: string, convert_latlng_to_address: bool}>
+	 * @return array<string, array<string, mixed>>
 	 */
 	public static function get(): array
 	{
@@ -54,35 +46,35 @@ class GeocodingQueue
 	 *
 	 * @param bool $paidGeocoding When true the daily limit is bypassed and geocoding
 	 *                            runs as fast as the API allows (user accepts charges).
+	 * @param bool $convertAddressToLatLng Forward (address → lat/lng) when true.
 	 */
-	public static function add(string $tableName, string $language, bool $convertLatlngToAddress, bool $paidGeocoding = false): void
-	{
+	public static function add(
+		string $tableName,
+		string $language,
+		bool $convertLatlngToAddress,
+		bool $paidGeocoding = false,
+		bool $convertAddressToLatLng = true
+	): void {
 		$queue = self::get();
 		$queue[$tableName] = [
-			'table'                     => $tableName,
-			'language'                  => $language,
-			'convert_latlng_to_address' => $convertLatlngToAddress,
-			'paid_geocoding'            => $paidGeocoding,
+			'table'                        => $tableName,
+			'language'                     => $language,
+			'convert_latlng_to_address'    => $convertLatlngToAddress,
+			'convert_address_to_lat_lng'    => $convertAddressToLatLng,
+			'paid_geocoding'               => $paidGeocoding,
 		];
 		self::save($queue);
-		self::schedule();
+
+		self::process();
 	}
 
-	/**
-	 * Schedule the next cron run (no-op if one is already pending).
-	 */
 	public static function schedule(): void
 	{
-		if (!wp_next_scheduled(self::CRON_HOOK)) {
+		if (! wp_next_scheduled(self::CRON_HOOK)) {
 			wp_schedule_single_event(time(), self::CRON_HOOK);
 		}
 	}
 
-	/**
-	 * Returns the number of rows still pending per queued table.
-	 *
-	 * @return array<string, array{pending: int}>
-	 */
 	public static function getStatus(): \stdClass
 	{
 		$queue = self::get();
@@ -94,23 +86,35 @@ class GeocodingQueue
 		$status = new \stdClass();
 
 		foreach ($queue as $tableName => $config) {
-			$fullTable              = esc_sql($db->mapsvg_prefix . $tableName);
-			$convertLatlngToAddress = !empty($config['convert_latlng_to_address']);
-			$where                  = self::buildWhereClause($convertLatlngToAddress);
-
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$count                    = (int) $db->get_var("SELECT COUNT(*) FROM `{$fullTable}` WHERE {$where}");
-			$status->$tableName = ['pending' => $count];
+			$convertLatlngToAddress  = ! empty($config['convert_latlng_to_address']);
+			$convertAddressToLatLng = array_key_exists('convert_address_to_lat_lng', $config)
+				? ! empty($config['convert_address_to_lat_lng'])
+				: true;
+			$count                   = self::countPending($tableName, $convertLatlngToAddress, $convertAddressToLatLng);
+			$status->$tableName      = ['pending' => $count];
 		}
 
 		return $status;
 	}
 
+	/**
+	 * @param string $tableName Schema / repository table basename (no mapsvg_ prefix).
+	 */
+	public static function countPending(
+		string $tableName,
+		bool $convertLatlngToAddress,
+		bool $convertAddressToLatLng = true
+	): int {
+		$db        = Database::get();
+		$fullTable = esc_sql($db->mapsvg_prefix . $tableName);
+		$where     = self::buildWhereClause($convertAddressToLatLng, $convertLatlngToAddress);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $db->get_var("SELECT COUNT(*) FROM `{$fullTable}` WHERE {$where}");
+	}
+
 	// ─── Cron handler ───────────────────────────────────────────────────────
 
-	/**
-	 * Process one batch per queued table. Called by WP Cron.
-	 */
 	public static function process(): void
 	{
 		$queue = self::get();
@@ -118,10 +122,7 @@ class GeocodingQueue
 			return;
 		}
 
-		// ── Daily budget check ───────────────────────────────────────────────
-		// Skip when any queued table has paid_geocoding enabled — the user accepted
-		// charges and wants no daily cap. Geocoding::get() still tracks usage.
-		$anyPaid = array_filter($queue, fn($c) => !empty($c['paid_geocoding']));
+		$anyPaid = array_filter($queue, fn ($c) => ! empty($c['paid_geocoding']));
 
 		if (empty($anyPaid)) {
 			$today      = gmdate('Y-m-d');
@@ -130,7 +131,6 @@ class GeocodingQueue
 			$dailyLimit = (int) (Options::get('google_geocoding_daily_limit') ?: 1300);
 
 			if ($dailyDate === $today && $dailyCount >= $dailyLimit) {
-				// Schedule next run 5 minutes after UTC midnight
 				wp_schedule_single_event(strtotime('tomorrow') + 300, self::CRON_HOOK);
 				return;
 			}
@@ -140,16 +140,19 @@ class GeocodingQueue
 		$geo = new Geocoding();
 
 		foreach ($queue as $tableName => $config) {
-			$convertLatlngToAddress = !empty($config['convert_latlng_to_address']);
+			$convertLatlngToAddress  = ! empty($config['convert_latlng_to_address']);
+			$convertAddressToLatLng = array_key_exists('convert_address_to_lat_lng', $config)
+				? ! empty($config['convert_address_to_lat_lng'])
+				: true;
 			$language               = $config['language'] ?? 'en';
 			$fullTable              = esc_sql($db->mapsvg_prefix . $tableName);
-			$where                  = self::buildWhereClause($convertLatlngToAddress);
+			$where                  = self::buildWhereClause($convertAddressToLatLng, $convertLatlngToAddress);
 
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$rows = $db->get_results(
 				$db->prepare(
 					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-					"SELECT id, location_lat, location_lng, location_address FROM `{$fullTable}` WHERE {$where} LIMIT %d",
+					"SELECT id, location_lat, location_lng, location_address, location_geocoding_status FROM `{$fullTable}` WHERE {$where} LIMIT %d",
 					self::BATCH_SIZE
 				),
 				ARRAY_A
@@ -161,8 +164,14 @@ class GeocodingQueue
 			}
 
 			foreach ($rows as $row) {
-				$update = self::geocodeRow($row, $convertLatlngToAddress, $language, $geo);
-				if (!empty($update)) {
+				$update = self::geocodeRow(
+					$row,
+					$convertLatlngToAddress,
+					$convertAddressToLatLng,
+					$language,
+					$geo
+				);
+				if (! empty($update)) {
 					$db->update($db->mapsvg_prefix . $tableName, $update, ['id' => $row['id']]);
 				}
 			}
@@ -170,102 +179,144 @@ class GeocodingQueue
 
 		self::save($queue);
 
-		if (!empty($queue)) {
+		if (! empty($queue)) {
 			wp_schedule_single_event(time() + 1, self::CRON_HOOK);
 		}
 	}
 
 	// ─── Helpers ────────────────────────────────────────────────────────────
 
-	/**
-	 * Builds the SQL WHERE clause to find rows that need geocoding.
-	 */
-	private static function buildWhereClause(bool $convertLatlngToAddress): string
+	private static function buildWhereClause(bool $convertAddressToLatLng, bool $convertLatlngToAddress): string
 	{
-		$forwardGeocode = "location_address LIKE '{\"raw\":%'";
-
+		$parts = [];
+		if ($convertAddressToLatLng) {
+			$parts[] = 'location_geocoding_status = ' . LocationGeocodingStatus::FORWARD_CANDIDATE;
+		}
 		if ($convertLatlngToAddress) {
-			$reverseGeocode = "(location_lat IS NOT NULL AND location_lat != 0 AND (location_address IS NULL OR location_address = ''))";
-			return "({$forwardGeocode} OR {$reverseGeocode})";
+			$parts[] = 'location_geocoding_status = ' . LocationGeocodingStatus::REVERSE_CANDIDATE;
 		}
 
-		return $forwardGeocode;
+		if (empty($parts)) {
+			return '0=1';
+		}
+
+		return '(' . implode(' OR ', $parts) . ')';
 	}
 
 	/**
-	 * Geocodes a single row and returns the DB update array (empty on failure).
+	 * @return array<string, mixed>  Empty = no row change (retry later).
 	 */
 	private static function geocodeRow(
 		array $row,
 		bool $convertLatlngToAddress,
+		bool $convertAddressToLatLng,
 		string $language,
 		Geocoding $geo
 	): array {
 		$addressJson = $row['location_address'] ?? '';
 		$lat         = $row['location_lat'] ?? null;
 		$lng         = $row['location_lng'] ?? null;
+		$status      = isset($row['location_geocoding_status']) ? (int) $row['location_geocoding_status'] : LocationGeocodingStatus::SKIPPED;
 
-		$hasRawAddress  = !empty($addressJson) && strpos($addressJson, '"raw"') !== false;
-		$hasCoordsOnly  = !empty($lat) && (float) $lat !== 0.0 && (empty($addressJson) || $addressJson === '');
-
-		if ($hasRawAddress) {
-			// Forward geocode: raw address string → lat/lng + full address
-			$decoded    = json_decode($addressJson, true);
-			$rawAddress = $decoded['raw'] ?? '';
-			if (!$rawAddress) {
-				return [];
-			}
-
-			$response = $geo->get($rawAddress, true, true);
-
-			if (isset($response['status']) && $response['status'] === 'OK') {
-				$result = $response['results'][0];
-				return [
-					'location_lat'     => $result['geometry']['location']['lat'],
-					'location_lng'     => $result['geometry']['location']['lng'],
-					'location_address' => self::buildAddressJson($result),
-				];
-			}
-
-			// Permanent error (quota etc.) — mark processed to avoid infinite retries
-			if (isset($response['status']) && in_array($response['status'], ['OVER_DAILY_LIMIT', 'OVER_QUERY_LIMIT', 'REQUEST_DENIED'], true)) {
-				return ['location_address' => ''];
-			}
-
-			return [];
+		if ($status === LocationGeocodingStatus::FORWARD_CANDIDATE && $convertAddressToLatLng) {
+			return self::geocodeForward($addressJson, $language, $geo);
 		}
 
-		if ($hasCoordsOnly && $convertLatlngToAddress) {
-			// Reverse geocode: lat/lng → full address
-			$response = $geo->get("{$lat},{$lng}", true, true);
-
-			if (isset($response['status']) && $response['status'] === 'OK') {
-				$result = $response['results'][1] ?? $response['results'][0];
-				return ['location_address' => self::buildAddressJson($result)];
-			}
-
-			// Mark as processed on permanent error
-			if (isset($response['status']) && in_array($response['status'], ['OVER_DAILY_LIMIT', 'OVER_QUERY_LIMIT', 'REQUEST_DENIED'], true)) {
-				return ['location_address' => ''];
-			}
-
-			return [];
+		if ($status === LocationGeocodingStatus::REVERSE_CANDIDATE && $convertLatlngToAddress) {
+			return self::geocodeReverse($lat, $lng, $addressJson, $language, $geo);
 		}
 
 		return [];
 	}
 
 	/**
-	 * Builds the location_address JSON from a Google Geocoding API result item.
+	 * @return array<string, mixed>
 	 */
+	private static function geocodeForward(string $addressJson, string $language, Geocoding $geo): array
+	{
+		$decoded  = json_decode($addressJson, true);
+		$rawInput = is_array($decoded) ? (string) ($decoded['address_formatted'] ?? '') : '';
+		if ($rawInput === '') {
+			return [
+				'location_geocoding_status' => LocationGeocodingStatus::FAILED_NO_RETRY,
+			];
+		}
+
+		$response = $geo->get($rawInput, true, true, $language);
+
+		if (isset($response['status']) && $response['status'] === 'OK') {
+			$result = $response['results'][0];
+
+			return [
+				'location_lat'                => $result['geometry']['location']['lat'],
+				'location_lng'                => $result['geometry']['location']['lng'],
+				'location_address'            => self::buildAddressJson($result),
+				'location_geocoding_status'  => LocationGeocodingStatus::DONE,
+			];
+		}
+
+		if (isset($response['status']) && in_array(
+			$response['status'],
+			['OVER_DAILY_LIMIT', 'OVER_QUERY_LIMIT', 'REQUEST_DENIED'],
+			true
+		)) {
+			return [
+				'location_geocoding_status' => LocationGeocodingStatus::FAILED_NO_RETRY,
+			];
+		}
+
+		return [];
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private static function geocodeReverse($lat, $lng, string $addressJson, string $language, Geocoding $geo): array
+	{
+		$hasCoordsOnly = ! empty($lat) && (float) $lat !== 0.0 && (empty($addressJson) || $addressJson === '');
+
+		if (! $hasCoordsOnly) {
+			return [];
+		}
+
+		$response = $geo->get("{$lat},{$lng}", true, true, $language);
+
+		if (isset($response['status']) && $response['status'] === 'OK') {
+			$result = $response['results'][1] ?? $response['results'][0];
+
+			return [
+				'location_address'            => self::buildAddressJson($result),
+				'location_geocoding_status' => LocationGeocodingStatus::DONE,
+			];
+		}
+
+		if (isset($response['status']) && in_array(
+			$response['status'],
+			['OVER_DAILY_LIMIT', 'OVER_QUERY_LIMIT', 'REQUEST_DENIED'],
+			true
+		)) {
+			return [
+				'location_geocoding_status' => LocationGeocodingStatus::FAILED_NO_RETRY,
+			];
+		}
+
+		return [];
+	}
+
 	private static function buildAddressJson(array $result): string
 	{
-		$address = ['formatted' => $result['formatted_address']];
-		foreach ($result['address_components'] as $component) {
-			$type            = $component['types'][0];
-			$address[$type]  = $component['long_name'];
-			if ($component['short_name'] !== $component['long_name']) {
-				$address[$type . '_short'] = $component['short_name'];
+		$formatted = $result['formatted_address'];
+		$address   = [
+			'address_formatted' => $formatted,
+			'formatted'        => $formatted,
+		];
+		if (! empty($result['address_components']) && is_array($result['address_components'])) {
+			foreach ($result['address_components'] as $component) {
+				$type               = $component['types'][0];
+				$address[ $type ]   = $component['long_name'];
+				if ($component['short_name'] !== $component['long_name']) {
+					$address[ $type . '_short' ] = $component['short_name'];
+				}
 			}
 		}
 		return wp_json_encode($address, JSON_UNESCAPED_UNICODE);

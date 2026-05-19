@@ -17,10 +17,10 @@
           .done(function () {
             $.growl.notice({ title: "", message: "Database is cleared" })
           })
-          .fail(function () {
+          .fail(function (e) {
             $.growl.error({
               title: "Server error",
-              message: "Can't clear the database",
+              message: e.responseJSON.error || "Can't clear the database",
             })
           })
       }

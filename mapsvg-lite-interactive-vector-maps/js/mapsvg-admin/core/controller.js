@@ -208,13 +208,18 @@
           }
         })
         .on("change", ".mapsvg-toggle-visibility", function () {
-          var parent = $(this).closest(".btn-group")
           var on = $(this).is(":checkbox") ? MapSVG.parseBoolean($(this).prop("checked")) : true
           var selector = $(this).data("toggle-visibility")
           var selectorReverse = $(this).data("toggle-visibility-reverse")
-          if (selector) on ? $(selector).show() : $(selector).hide()
-          if (selectorReverse) on ? $(selectorReverse).hide() : $(selectorReverse).show()
-          if (_this.scrollable) _this.updateScroll()
+          if (_this.view.find(selector).length) {
+            on ? _this.view.find(selector).show() : _this.view.find(selector).hide()
+          }
+          if (selectorReverse && _this.view.find(selectorReverse).length) {
+            on ? _this.view.find(selectorReverse).hide() : _this.view.find(selectorReverse).show()
+          }
+          if (_this.scrollable) {
+            _this.updateScroll()
+          }
         })
         .on("click", "button.mapsvg-toggle-visibility", function (e) {
           e.preventDefault()

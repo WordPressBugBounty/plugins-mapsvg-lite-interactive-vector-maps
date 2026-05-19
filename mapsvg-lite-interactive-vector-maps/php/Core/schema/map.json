@@ -1,5 +1,6 @@
 {
   "name": "maps",
+  "primaryKeyField": "id",
   "objectNameSingular": "map",
   "objectNamePlural": "maps",
   "apiEndpoints": [
@@ -19,7 +20,8 @@
       "type": "ID",
       "db_type": "int(11)",
       "visible": true,
-      "protected": true
+      "protected": true,
+      "auto_increment": true
     },
     {
       "name": "title",

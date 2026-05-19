@@ -60,11 +60,11 @@ class SelectFieldParser implements FieldParserInterface {
 	 * @return array<string, mixed>
 	 */
 	private function parseMulti( string $rawValue, object $field, array $fieldOptions ): array {
-		$tokens = str_getcsv( $rawValue ); // re-parse to handle inner quoting
+		$tokens = str_getcsv( $rawValue, ',', '"', '' ); // explicit $escape='' avoids PHP 8.4 deprecation
 		$items  = [];
 
 		foreach ( $tokens as $token ) {
-			$token = trim( $token );
+			$token = trim( (string) $token );
 			if ( $token === '' ) {
 				continue;
 			}

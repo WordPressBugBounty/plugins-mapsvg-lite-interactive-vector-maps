@@ -13,6 +13,13 @@ export class SaveFormElement extends FormElement {
     this.readonly = true
   }
 
+  getDataForTemplate(): { [p: string]: any } {
+    const data = super.getDataForTemplate()
+    data.readOnly = this.formBuilder.readOnly
+    data.readOnlyMessage = this.formBuilder.readOnlyMessage
+    return data
+  }
+
   setDomElements() {
     super.setDomElements()
     this.inputs.btnSave = <HTMLButtonElement>$(this.domElements.main).find(".btn-save")[0]
@@ -23,7 +30,9 @@ export class SaveFormElement extends FormElement {
     super.setEventHandlers()
     $(this.inputs.btnSave).on("click", (e) => {
       e.preventDefault()
-      this.events.trigger("click.btn.save")
+      if (!this.formBuilder.readOnly) {
+        this.events.trigger("click.btn.save")
+      }
     })
     $(this.inputs.btnClose).on("click", (e) => {
       e.preventDefault()

@@ -303,7 +303,7 @@ export class LocationFormElement extends FormElement {
                 return
               }
 
-              geocode({ address: query }, async)
+              geocode({ address: query, language: this.language || undefined }, async)
             },
           },
         )

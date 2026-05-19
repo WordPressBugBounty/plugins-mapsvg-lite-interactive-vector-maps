@@ -130,6 +130,7 @@ class ObjectsRepository extends Repository
 		$db       = Database::get();
 		$table    = esc_sql($db->mapsvg_prefix . $this->id);
 		$r2oTable = $db->mapsvg_prefix . 'r2o';
+		$pkField  = $this->schema->getPrimaryKeyFieldName();
 
 		$this->deleteAllRelations();
 
@@ -140,7 +141,7 @@ class ObjectsRepository extends Repository
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$rows = $db->get_results(
 				$db->prepare(
-					"SELECT `id`, `regions` FROM `{$table}` WHERE `regions` IS NOT NULL AND `regions` != '' AND `regions` != '[]' LIMIT %d OFFSET %d",
+					"SELECT `{$pkField}`, `regions` FROM `{$table}` WHERE `regions` IS NOT NULL AND `regions` != '' AND `regions` != '[]' LIMIT %d OFFSET %d",
 					[ $chunkSize, $offset ]
 				),
 				ARRAY_A
@@ -163,7 +164,7 @@ class ObjectsRepository extends Repository
 					$r2oValues[] = "('"
 						. esc_sql( $this->id ) . "','"
 						. esc_sql( $region->tableName ) . "','"
-						. esc_sql( $row['id'] ) . "','"
+						. esc_sql( $row[$pkField] ) . "','"
 						. esc_sql( $region->id ) . "')";
 				}
 			}

@@ -21,7 +21,7 @@ class Geocoding
 		$this->permanent_error = '';
 	}
 
-	public function get($address, $return_as_array = true, $convert_latlng_to_address = true)
+	public function get($address, $return_as_array = true, $convert_latlng_to_address = true, $lang = 'en', $country = '')
 	{
 
 		if (empty($address)) {
@@ -58,49 +58,59 @@ class Geocoding
 		}
 
 		if ((!$address_is_coordinates || $convert_latlng_to_address === true) && $this->apiKey) {
+			$countryParam = $country !== '' ? '&components=country:' . $country : '';
+
+			// ── Cache lookup ────────────────────────────────────────────────────────
+			$cache    = new GeocodingCacheRepository();
+			$cacheKey = md5(trim($address) . '|' . $lang);
+			$cached   = $cache->find($cacheKey);
+
+			if ($cached !== null) {
+				return $return_as_array ? $cached : wp_json_encode($cached, JSON_UNESCAPED_UNICODE);
+			}
+
 			if ($this->geocoding_quota_per_second > 49) {
 				sleep(1);
 				$this->geocoding_quota_per_second = 1;
 			}
 			$this->geocoding_quota_per_second++;
 
-		// ── Daily budget guard (shared across imports + live map searches) ──
-		$today      = gmdate('Y-m-d');
-		$dailyDate  = Options::get('geocoding_daily_date');
-		$dailyCount = (int) Options::get('geocoding_daily_count');
+			// ── Daily budget guard (shared across imports + live map searches) ──
+			$today      = gmdate('Y-m-d');
+			$dailyDate  = Options::get('geocoding_daily_date');
+			$dailyCount = (int) Options::get('geocoding_daily_count');
 
-		if ($dailyDate !== $today) {
-			$dailyCount = 0;
-			Options::set('geocoding_daily_date', $today);
-			Options::set('geocoding_daily_count', 0);
-		}
+			if ($dailyDate !== $today) {
+				$dailyCount = 0;
+				Options::set('geocoding_daily_date', $today);
+				Options::set('geocoding_daily_count', 0);
+			}
 
-		$dailyLimit = (int) (Options::get('google_geocoding_daily_limit') ?: 1300);
+			$dailyLimit = (int) (Options::get('google_geocoding_daily_limit') ?: 1300);
 
-		if ($dailyCount >= $dailyLimit) {
-			return $return_as_array
-				? ['status' => 'OVER_DAILY_LIMIT', 'error_message' => 'MapSVG daily geocoding budget of ' . $dailyLimit . ' requests reached. Resets tomorrow (UTC).']
-				: wp_json_encode(['status' => 'OVER_DAILY_LIMIT']);
-		}
+			if ($dailyCount >= $dailyLimit) {
+				return $return_as_array
+					? ['status' => 'OVER_DAILY_LIMIT', 'error_message' => 'MapSVG daily geocoding budget of ' . $dailyLimit . ' requests reached. Resets tomorrow (UTC).']
+					: wp_json_encode(['status' => 'OVER_DAILY_LIMIT']);
+			}
 
-		Options::set('geocoding_daily_count', $dailyCount + 1);
+			Options::set('geocoding_daily_count', $dailyCount + 1);
 
 			$address = urlencode($address);
 
-			// if (!isset($_REQUEST['_wpnonce']) || !wp_verify_nonce($_REQUEST['_wpnonce'], 'mapsvg_geocoding')) {
-			// 	return new \WP_Error('invalid_nonce', 'Nonce verification failed');
-			// }
-			$lang = isset($_REQUEST['language']) ? sanitize_text_field(wp_unslash($_REQUEST['language'])) : 'en';  // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
-			$country = isset($_REQUEST['country']) ? '&components=country:' . sanitize_text_field(wp_unslash($_REQUEST['country'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
-
-			$data    = Remote::get('https://maps.googleapis.com/maps/api/geocode/json?key=' . $this->apiKey . '&address=' . $address . '&sensor=true&language=' . $lang . $country);
+			$data    = Remote::get('https://maps.googleapis.com/maps/api/geocode/json?key=' . $this->apiKey . '&address=' . $address . '&sensor=true&language=' . $lang . $countryParam);
 			if ($data && !isset($data['error_message'])) {
 				$response = json_decode($data['body'], true);
 				if ($response['status'] === 'OVER_DAILY_LIMIT' || $response['status'] === 'OVER_QUERY_LIMIT') {
 					$this->permanent_error = $data;
 				} else {
-					if ($address_is_coordinates) {
-						array_unshift($response['results'], $coords_item);
+					// 
+					// if ($address_is_coordinates) {
+					// 	array_unshift($response['results'], $coords_item);
+					// }
+					// ── Cache successful responses only ──────────────────────────────
+					if ($response['status'] === 'OK') {
+						$cache->store($cacheKey, $response);
 					}
 				}
 			} else {

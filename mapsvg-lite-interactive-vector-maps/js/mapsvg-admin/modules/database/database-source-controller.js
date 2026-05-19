@@ -14,9 +14,9 @@
     this.schemaRepo.events.on("afterUpdate", () => {
       this.schemaRepo.find()
     })
-    this.schemaRepo.events.on("afterLoad", () => {
-      this.redraw()
-    })
+    // this.schemaRepo.events.on("afterLoad", () => {
+    //   this.redraw()
+    // })
 
     this.schemas = []
 
@@ -34,18 +34,22 @@
       return false
     })
 
+    this.contentView.on("click", function (e) {
+      console.log(e.target)
+    })
+
     _this.view.on("click", "#mapsvg-btn-add-datasource", function (e) {
       _this.showDataSourceModal()
     })
 
-    this.view.on("click", '[data-action="edit-data-source"]', function () {
+    this.contentView.on("click", '[data-action="edit-data-source"]', function () {
       let id = parseInt($(this).attr("data-schema-id"))
       _this.schemaRepo.findById(id).done((schema) => {
         _this.showDataSourceModal(schema)
       })
     })
 
-    this.view.on("click", '[data-action="set-data-source"]', function () {
+    this.contentView.on("click", '[data-action="set-data-source"]', function () {
       var id = $(this).attr("data-schema-id")
       if (!id) {
         return
@@ -303,11 +307,11 @@
     schemaData.apiEndpoints = JSON.stringify(schema.apiEndpoints, null, 2)
 
     const setFormElementsByType = (type) => {
-      const elems = ["apiEndpoints", "apiBaseUrl", "apiAuthorization"]
+      const apiElems = ["apiEndpoints", "apiBaseUrl", "apiAuthorization"]
 
-      const toggleElemes = (val) => {
-        for (const elem of elems) {
-          $(_this.formBuilder.getFormElementByName(elem).domElements.main).toggle(val)
+      const toggleElems = (names, val) => {
+        for (const name of names) {
+          $(_this.formBuilder.getFormElementByName(name).domElements.main).toggle(val)
         }
       }
       const toggleName = (val) => {
@@ -316,19 +320,19 @@
 
       switch (type) {
         case "api": {
-          toggleElemes(true)
+          toggleElems(apiElems, true)
           toggleName(true)
           $(_this.formBuilder.getFormElementByName("postType").domElements.main).hide()
           break
         }
         case "post": {
-          toggleElemes(false)
+          toggleElems(apiElems, false)
           toggleName(false)
           $(_this.formBuilder.getFormElementByName("postType").domElements.main).show()
           break
         }
         case "object": {
-          toggleElemes(false)
+          toggleElems(apiElems, false)
           toggleName(true)
           $(_this.formBuilder.getFormElementByName("postType").domElements.main).hide()
           break
@@ -336,6 +340,10 @@
         default:
           null
       }
+    }
+
+    if (schemaData.name && schemaData.type === "post") {
+      schemaData.postType = schemaData.name.split("_").slice(1).join("_")
     }
 
     _this.formBuilder = new mapsvg.formBuilder({
@@ -365,12 +373,7 @@
             data.apiAuthorization = ""
           }
           if (data.type === "post") {
-            data.name =
-              "posts_" +
-              data.postType
-                .toLowerCase()
-                .replace(/[-\s]+/g, "_") // Replace dashes and spaces with underscores
-                .replace(/[^a-z0-9_]/g, "")
+            data.name = "posts_" + data.postType
           }
 
           if (data.type === "object") {
@@ -453,6 +456,7 @@
           _this.formContainer.on("change", 'input[name="type"]', function () {
             postTypeField.toggle($(this).val() === "posts")
           })
+
           setTimeout(() => {
             $(".tooltip").remove()
           }, 200)

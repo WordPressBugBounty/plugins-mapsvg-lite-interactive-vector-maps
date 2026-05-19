@@ -4,7 +4,15 @@
       <thead>
       <tr>{{#each fields}}
           <th>{{name}}</th>{{/each}}
-          <th style="width: 40px;"></th>
+          <th style="width: 40px;">
+            <div class="btn-group dropdown toggle-tooltip" title="Show/hide columns">
+                <i class="bi bi-eye dropdown-toggle"
+                    data-bs-toggle="dropdown"
+                    style="cursor:pointer; list-style:none;">
+                </i>
+                <ul class="dropdown-menu dropdown-menu-end mapsvg-data-cols"></ul>
+              </div>
+          </th>
       </tr>
       </thead>
       <tbody>{{#each data}} {{>regionsListItemPartial fields=../fields region=this}}

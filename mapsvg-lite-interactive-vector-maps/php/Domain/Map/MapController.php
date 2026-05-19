@@ -188,12 +188,16 @@ class MapController extends Controller
 	 */
 	private static function validate(array $map)
 	{
-		if (isset($map['options']['source']) || isset($map['options']['svgFilePath'])) {
-			$svgPaths = [$map['options']['source'], $map['options']['svgFilePath']];
-			foreach ($svgPaths as $svgPath) {
-				if (strpos($svgPath, '../') !== false || strpos($svgPath, '..\\') !== false) {
-					throw new \Exception("Invalid SVG file path: path traversal detected.", 400);
-				}
+		$svgPaths = [];
+		if (isset($map['options']['source']) && $map['options']['source'] !== '') {
+			$svgPaths[] = $map['options']['source'];
+		}
+		if (isset($map['svgFilePath']) && $map['svgFilePath'] !== '') {
+			$svgPaths[] = $map['svgFilePath'];
+		}
+		foreach ($svgPaths as $svgPath) {
+			if (strpos($svgPath, '../') !== false || strpos($svgPath, '..\\') !== false) {
+				throw new \Exception("Invalid SVG file path: path traversal detected.", 400);
 			}
 		}
 		// Add more validation checks here as needed

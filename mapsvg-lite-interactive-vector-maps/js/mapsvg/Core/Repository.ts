@@ -31,6 +31,7 @@ export enum RepositoryEvent {
   BEFORE_DELETE = "beforeDelete",
   AFTER_DELETE = "afterDelete",
   AFTER_UPDATE_SCHEMA = "afterUpdateSchema",
+  AFTER_UPDATE_IMPORT_SETTTINGS = "afterUpdateImportSettings",
 }
 
 export type MapsvgRequest = {
@@ -90,6 +91,9 @@ export interface RepositoryInterface<T extends Model = Model> {
 
   onFirstPage(): boolean
   onLastPage(): boolean
+
+  getImportSettings(force?: boolean): JQueryDeferred<any>
+  updateImportSettings(fields: Record<string, any>): JQueryDeferred<any>
 }
 
 export class Repository<T extends Model = Model> implements RepositoryInterface<T> {
@@ -111,6 +115,9 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
 
   events: Events
   middlewares: MiddlewareList
+  importSettings: Record<string, any> | null
+  importSettingsLoaded: boolean
+  importSettingsPromise: JQueryDeferred<any> | null
 
   constructor(schema: Schema, map?: MapSVGMap) {
     this.classType = Model
@@ -121,6 +128,9 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     this.completeChunks = 0
     this.setSchema(schema)
     this.middlewares = new MiddlewareList()
+    this.importSettings = null
+    this.importSettingsLoaded = false
+    this.importSettingsPromise = null
   }
 
   // TODO:
@@ -532,6 +542,73 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     return dataRaw
   }
 
+  getImportSettings(force = false): JQueryDeferred<any> {
+    const defer = jQuery.Deferred()
+    defer.promise()
+
+    if (!this.schema || !this.schema.id) {
+      defer.resolve({})
+      return defer
+    }
+
+    if (!force && this.importSettingsLoaded && this.importSettings !== null) {
+      defer.resolve(this.importSettings)
+      return defer
+    }
+
+    if (!force && this.importSettingsPromise) {
+      return this.importSettingsPromise
+    }
+
+    const route = `schemas/${this.schema.id}/import-settings`
+    this.importSettingsPromise = defer
+    this.server
+      .get(route)
+      .done((body: any) => {
+        this.importSettings = (body && body.importSettings) || {}
+        this.importSettingsLoaded = true
+        defer.resolve(this.importSettings)
+      })
+      .fail(() => {
+        this.importSettings = {}
+        this.importSettingsLoaded = false
+        defer.reject()
+      })
+      .always(() => {
+        this.importSettingsPromise = null
+      })
+
+    return defer
+  }
+
+  updateImportSettings(fields: Record<string, any>): JQueryDeferred<any> {
+    const defer = jQuery.Deferred()
+    defer.promise()
+
+    if (!this.schema || !this.schema.id) {
+      defer.reject()
+      return defer
+    }
+
+    const route = `schemas/${this.schema.id}/import-settings`
+    this.server
+      .put(route, fields)
+      .done((body: any) => {
+        this.importSettings = (body && body.importSettings) || {}
+        this.importSettingsLoaded = true
+        this.events?.trigger(RepositoryEvent.AFTER_UPDATE_IMPORT_SETTTINGS, {
+          repository: this,
+          importSettings: this.importSettings,
+        })
+        defer.resolve(this.importSettings)
+      })
+      .fail((response: any) => {
+        defer.reject(response)
+      })
+
+    return defer
+  }
+
   /**
    * Sends one batch of CSV rows to the server.
    * Chunking and sequencing are handled by the controller (pause/resume on PapaParse parser).
@@ -545,8 +622,33 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     const postData: { [key: string]: any } = { language, convertLatlngToAddress }
     postData[this.schema.objectNamePlural] = JSON.stringify(formatted)
 
-    const objectNamePlural = this.schema.type === "region" ? "regions" : "objects"
-    return this.server.post(`${objectNamePlural}/${this.schema.name}/import`, postData)
+    return this.server.post(`collection/${this.schema.name}/import`, postData)
+  }
+
+  /**
+   * Tells the server to download a remote CSV and enqueue it as an import job.
+   * Returns a jQuery Promise resolving to { token, total } (async job) or { count } (legacy sync).
+   */
+  importFromUrl(
+    csvUrl: string,
+    options?: {
+      convertLatlngToAddress?: number
+      convertAddressToLatLng?: number
+      paidGeocoding?: number
+    },
+  ): JQueryPromise<any> {
+    return this.server.post(`collection/${this.schema.name}/import-csv-url`, {
+      csvUrl,
+      ...options,
+    })
+  }
+
+  /**
+   * Processes one chunk of an in-progress import job.
+   * Returns a jQuery Promise resolving to { status, processed, total, errors?, error_count?, geocoding_queued? }.
+   */
+  importCsvProcess(token: string): JQueryPromise<any> {
+    return this.server.post(`collection/${this.schema.name}/import-csv/process`, { token })
   }
 
   formatCSV(data: { [key: string]: any }, map: MapSVGMap) {

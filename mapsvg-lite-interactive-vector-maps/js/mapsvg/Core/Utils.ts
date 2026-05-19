@@ -271,7 +271,9 @@ export const debounce = (func: (...args: any[]) => void, wait: number) => {
 let geocoder: google.maps.Geocoder
 export const geocode = (query, callback) => {
   if (!window.google) {
-    console.error("[CLIENT-020] MapSVG: Google Maps API is not loaded. Read more: https://mapsvg.com/docs/errors#CLIENT-020")
+    console.error(
+      "[CLIENT-020] MapSVG: Google Maps API is not loaded. Read more: https://mapsvg.com/docs/errors#CLIENT-020",
+    )
     jQuery.growl.error({
       title: "Error",
       message: "Google Maps API is not loaded",
@@ -342,7 +344,10 @@ export const handleFailedRequest = (response) => {
   let message = ""
 
   if (response.status === 403) {
-    if (response.responseText.indexOf("Wordfence") !== -1) {
+    const data = JSON.parse(response.responseText)
+    if (data && data.error) {
+      message = data.error
+    } else if (response.responseText.indexOf("Wordfence") !== -1) {
       message +=
         "The request has been blocked by Wordfence. " +
         'Switch Wordfence to "Learning mode", and save the map settings again. ' +

@@ -23,14 +23,6 @@ class Router
 
 	public function run()
 	{
-
-		// This should be called before "rest_api_init"
-		add_action('init', array($this, 'setupGutenberg'));
-		add_action('init', array($this, 'addShortcodePostType'));
-
-		// Add query vars for custom endpoints
-		add_filter('query_vars', array($this, 'addCustomQueryVars'));
-
 		// Legacy shortcode support
 		add_action('parse_request', function ($wp) {
 			if ($wp->request === 'mapsvg_sc') { // phpcs:ignore
@@ -66,8 +58,9 @@ class Router
 
 			$this->registerSchemaRoutes();
 
-			$this->registerRegionRoutes();
-			$this->registerObjectRoutes();
+			$this->registerCollectionRoutes();
+			$this->registerRegionRoutes();  // kept as backwards-compat aliases
+			$this->registerObjectRoutes();  // kept as backwards-compat aliases
 
 			$this->registerPostRoutes();
 
@@ -87,6 +80,7 @@ class Router
 			
 
 			$this->registerPostTypesRoutes();
+			$this->registerImportLogsRoutes();
 		});
 
 		add_filter('rest_pre_serve_request', array($this, 'add_nocache_headers'), 11, 4);
@@ -189,15 +183,6 @@ class Router
 	}
 
 	/**
-	 * Add custom query variables for our endpoints
-	 */
-	public function addCustomQueryVars($vars)
-	{
-		$vars[] = '_mapsvg';
-		return $vars;
-	}
-
-	/**
 	 * Handle shortcode requests for /_mapsvg/shortcode/...
 	 */
 	private function handleShortcodeRequest($wp, $parts)
@@ -263,23 +248,6 @@ class Router
 	
 
 	
-
-	function setupGutenberg()
-	{
-		$postEditorMapLoader = new PostEditorMapLoader();
-		$postEditorMapLoader->init();
-	}
-	function addShortcodePostType()
-	{
-		register_post_type('mapsvg_shortcode', [
-			'label' => 'MapSVG Embeddable Shortcode Blank Page',
-			'public' => false,
-			'show_ui' => false,
-			'exclude_from_search' => true,
-			'supports' => ['title', 'editor'],
-		]);
-	}
-
 
 	
 	public function registerOptionsRoutes()
@@ -400,6 +368,85 @@ class Router
 		));
 	}
 
+	/**
+	 * Unified collection routes — the canonical API for both objects and regions.
+	 * Old /objects/ and /regions/ paths are kept below as backwards-compat aliases.
+	 */
+	public function registerCollectionRoutes()
+	{
+		$baseRoute = '/collection/(?P<_collection_name>[a-zA-Z0-9-_]+)';
+
+		register_rest_route('mapsvg/v1', $baseRoute, array(
+			array('methods' => 'GET', 'callback' => '\\MapSVG\\CollectionController::index', 'permission_callback' => '__return_true')
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/(?P<id>[^/]+)', array(
+			array('methods' => 'GET', 'callback' => '\\MapSVG\\CollectionController::get', 'permission_callback' => '__return_true')
+		));
+		register_rest_route('mapsvg/v1', $baseRoute, array(
+			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::create', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/(?P<id>[^/]+)', array(
+			array('methods' => 'PUT', 'callback' => '\\MapSVG\\CollectionController::update', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/(?P<id>[^/]+)', array(
+			array('methods' => 'DELETE', 'callback' => '\\MapSVG\\CollectionController::delete', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute, array(
+			array('methods' => 'DELETE', 'callback' => '\\MapSVG\\CollectionController::clear', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import', array(
+			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::import', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv', array(
+			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::importCsv', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv/preflight', array(
+			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::preflightCsv', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv/process', array(
+			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::importCsvProcess', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv-url', array(
+			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::importCsvFromUrl', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/distinct/(?P<_field_name>.+)', array(
+			array('methods' => 'GET', 'callback' => '\\MapSVG\\CollectionController::getDistinctValues', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/sync', array(
+			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::sync', 'permission_callback' => '__return_true') // HMAC-verified inside
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/setup-appscript', array(
+			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::setupAppScript', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/reset-appscript', array(
+			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::resetAppScript', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
+	}
+
 	public function registerRegionRoutes()
 	{
 		$baseRoute = '/regions/(?P<_collection_name>[a-zA-Z0-9-_]+)';
@@ -448,6 +495,15 @@ class Router
 				}
 			)
 		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv-url', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\RegionsController::importCsvFromUrl',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
+				}
+			)
+		));
 		register_rest_route('mapsvg/v1', $baseRoute . '/distinct/(?P<_field_name>.+)', array(
 			array(
 				'methods' => 'GET',
@@ -472,6 +528,31 @@ class Router
 				'callback' => '\MapSVG\RegionsController::get',
 				'permission_callback' => function () {
 					return true;
+				}
+			)
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/sync', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\RegionsController::sync',
+				'permission_callback' => '__return_true', // HMAC-verified inside the controller
+			)
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/setup-appscript', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\RegionsController::setupAppScript',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
+				}
+			)
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/reset-appscript', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\RegionsController::resetAppScript',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
 				}
 			)
 		));
@@ -552,6 +633,15 @@ class Router
 				}
 			)
 		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv-url', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\ObjectsController::importCsvFromUrl',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
+				}
+			)
+		));
 		register_rest_route('mapsvg/v1', $baseRoute . '/import-csv/process', array(
 			array(
 				'methods' => 'POST',
@@ -565,6 +655,31 @@ class Router
 			array(
 				'methods' => 'GET',
 				'callback' => '\MapSVG\ObjectsController::getDistinctValues',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
+				}
+			)
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/sync', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\ObjectsController::sync',
+				'permission_callback' => '__return_true', // HMAC-verified inside the controller
+			)
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/setup-appscript', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\ObjectsController::setupAppScript',
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
+				}
+			)
+		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/reset-appscript', array(
+			array(
+				'methods' => 'POST',
+				'callback' => '\MapSVG\ObjectsController::resetAppScript',
 				'permission_callback' => function () {
 					return current_user_can('edit_posts');
 				}
@@ -607,7 +722,8 @@ class Router
 				}
 			)
 		));
-		register_rest_route('mapsvg/v1', $baseRoute . '/(?P<id>.+)', array(
+		
+		register_rest_route('mapsvg/v1', $baseRoute . '/(?P<id>\d+)', array(
 			array(
 				'methods' => 'GET',
 				'callback' => '\MapSVG\SchemaController::get',
@@ -616,7 +732,7 @@ class Router
 				}
 			)
 		));
-		register_rest_route('mapsvg/v1', $baseRoute . '/(?P<id>.+)', array(
+		register_rest_route('mapsvg/v1', $baseRoute . '/(?P<id>\d+)', array(
 			array(
 				'methods' => 'PUT',
 				'callback' => '\MapSVG\SchemaController::update',
@@ -625,7 +741,7 @@ class Router
 				}
 			)
 		));
-		register_rest_route('mapsvg/v1', $baseRoute . '/(?P<id>.+)', array(
+		register_rest_route('mapsvg/v1', $baseRoute . '/(?P<id>\d+)', array(
 			array(
 				'methods' => 'DELETE',
 				'callback' => '\MapSVG\SchemaController::delete',
@@ -782,5 +898,16 @@ class Router
 				}
 			)
 		));
+	}
+
+	public function registerImportLogsRoutes(): void
+	{
+		register_rest_route('mapsvg/v1', '/import-logs', [
+			[
+				'methods'             => 'GET',
+				'callback'            => '\MapSVG\ImportLogController::index',
+				'permission_callback' => static fn() => current_user_can('manage_options'),
+			],
+		]);
 	}
 }

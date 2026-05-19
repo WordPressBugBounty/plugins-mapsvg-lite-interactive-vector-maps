@@ -18,14 +18,16 @@ namespace MapSVG;
  * Third-party code can extend behaviour by calling register() with additional
  * parsers (or via the 'mapsvg_csv_field_parsers' filter in CsvImporter).
  */
-class CsvRowParser {
+class CsvRowParser
+{
 
 	/** @var FieldParserInterface[] */
 	private array $parsers = [];
 
-	public function __construct( private Schema $schema ) {}
+	public function __construct(private Schema $schema) {}
 
-	public function register( FieldParserInterface $parser ): void {
+	public function register(FieldParserInterface $parser): void
+	{
 		$this->parsers[] = $parser;
 	}
 
@@ -34,41 +36,43 @@ class CsvRowParser {
 	 *
 	 * @param array<string, string> $rawRow   header => raw-string map.
 	 * @param array                 $context  Shared context passed through to each parser
-	 *                                        (convertLatlngToAddress, convertAddressToLatlng,
+	 *                                        (convertLatlngToAddress, convertAddressToLatLng,
 	 *                                         regionsTableName, needsGeocoding, …).
 	 *                                        Parsers may write back into $context (e.g. needsGeocoding).
 	 * @return array<string, mixed>           DB-ready column => value map.
 	 */
-	public function parseRow( array $rawRow, array &$context = [] ): array {
+	public function parseRow(array $rawRow, array &$context = []): array
+	{
 		$dbRow  = [];
 		$fields = $this->schema->getFields();
 
-		if ( empty( $fields ) ) {
+		if (empty($fields)) {
 			// No schema fields — store everything as-is
-			foreach ( $rawRow as $key => $value ) {
-				$dbRow[ $key ] = $value;
+			foreach ($rawRow as $key => $value) {
+				$dbRow[$key] = $value;
 			}
 			return $dbRow;
 		}
 
-		foreach ( $fields as $field ) {
-			if ( ! array_key_exists( $field->name, $rawRow ) ) {
+		foreach ($fields as $field) {
+			if (! array_key_exists($field->name, $rawRow)) {
 				continue;
 			}
 
-			$rawValue = (string) $rawRow[ $field->name ];
-			$parser   = $this->resolveParser( $field->type );
-			$columns  = $parser->parse( $rawValue, $field, $context );
+			$rawValue = (string) $rawRow[$field->name];
+			$parser   = $this->resolveParser($field->type);
+			$columns  = $parser->parse($rawValue, $field, $context);
 
-			$dbRow = array_merge( $dbRow, $columns );
+			$dbRow = array_merge($dbRow, $columns);
 		}
 
 		return $dbRow;
 	}
 
-	private function resolveParser( string $fieldType ): FieldParserInterface {
-		foreach ( $this->parsers as $parser ) {
-			if ( $parser->supports( $fieldType ) ) {
+	private function resolveParser(string $fieldType): FieldParserInterface
+	{
+		foreach ($this->parsers as $parser) {
+			if ($parser->supports($fieldType)) {
 				return $parser;
 			}
 		}

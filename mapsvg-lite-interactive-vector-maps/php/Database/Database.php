@@ -127,9 +127,9 @@ class Database
 		return $this->executeQuery('query', ["DELETE FROM " . $table]);
 	}
 
-	public function prepare($data, $values)
+	public function prepare($data, ...$values)
 	{
-		return $this->db->prepare($data, $values);
+		return $this->db->prepare($data, ...$values);
 	}
 	public function esc_like($data)
 	{

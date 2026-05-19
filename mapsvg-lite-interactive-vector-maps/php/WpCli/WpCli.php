@@ -319,5 +319,42 @@ class WpCli
         \WP_CLI::error("mysqli extension not available. Cannot execute SQL import.");
       }
     });
+
+    /**
+     * Run a migration file.
+     *
+     * Defaults to next.php (the in-development migration).
+     * Use --name to target a specific versioned file.
+     *
+     * ## OPTIONS
+     *
+     * [--name=<version>]
+     * : Version name of the migration to run (without .php), e.g. 8.13.0.
+     *   Defaults to "next".
+     *
+     * ## EXAMPLES
+     *
+     *     wp mapsvg migrate
+     *     wp mapsvg migrate --name=8.13.0
+     */
+    \WP_CLI::add_command('mapsvg migrate', function ($args, $assoc_args) {
+      $migrationsDir = __DIR__ . '/../Migrate/Migrations';
+      $name     = isset($assoc_args['name']) ? $assoc_args['name'] : 'next';
+      $filename = basename($name) . '.php'; // prevent path traversal
+      $filePath = $migrationsDir . DIRECTORY_SEPARATOR . $filename;
+
+      if (!file_exists($filePath)) {
+        \WP_CLI::error("Migration file not found: {$filename}");
+      }
+
+      $migration = require $filePath;
+
+      if (!is_callable($migration)) {
+        \WP_CLI::error("Migration file does not return a callable: {$filename}");
+      }
+
+      $migration();
+      \WP_CLI::success("Migration applied: {$filename}");
+    });
   }
 }

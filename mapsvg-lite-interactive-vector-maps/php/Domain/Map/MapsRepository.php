@@ -173,6 +173,14 @@ class MapsRepository extends Repository
 		$mapUpdate = array('id' => $newMap->id, 'options' => $newMapData['options']);
 		$needUpdate = false;
 
+		if (isset($newMapData['options']['templates']) && isset($newMapData['options']['templates']['directory'])) {
+			$dirTemplate = $newMapData['options']['templates']['directory'];
+			$dirTemplate = str_replace('{{>directoryItem-' . $map->id, '{{>directoryItem}}', $dirTemplate);
+			$dirTemplate = str_replace('{{>directoryCategoryItem-' . $map->id, '{{>directoryCategoryItem}}', $dirTemplate);
+			$mapUpdate['options']['templates']['directory'] = $dirTemplate;
+			$needUpdate = true;
+		}
+
 		if (isset($newMapData['options']['css'])) {
 			$mapUpdate['options']['css'] = str_replace('#mapsvg-map-' . $map->id, '#mapsvg-map-' . $newMap->id, $newMapData['options']['css']);
 			$needUpdate = true;
@@ -217,12 +225,14 @@ class MapsRepository extends Repository
 		$this->db->query("REPLACE INTO " . $tableNameRegionsNew . " (" . $regionFieldNames . ") SELECT " . $regionFieldNames . " FROM " . $tableNameRegionsOld);
 
 		// Copy objects table
-		$objectsSchemaData = $fromMap->getObjects()->getSchema()->getData();
+		$fromObjectsSchema = $fromMap->getObjects()->getSchema();
+		$objectsPkField = $fromObjectsSchema->getPrimaryKeyFieldName();
+		$objectsSchemaData = $fromObjectsSchema->getData();
 		unset($objectsSchemaData["id"]);
 		$objectsSchemaData['name'] = 'objects_' . $toMap->id;
 		// Fix missing auto_increment
 		foreach ($objectsSchemaData["fields"] as $key => $field) {
-			if ($field->name === "id" && (!isset($field->auto_increment) || $field->auto_increment !== true)) {
+			if ($field->name === $objectsPkField && (!isset($field->auto_increment) || $field->auto_increment !== true)) {
 				$field->auto_increment = true;
 				$objectsSchemaData["fields"][$key] = $field;
 			}

@@ -37,6 +37,11 @@ class DbDataSource implements DataSourceInterface
     return $this->tablePrefix . $this->source;
   }
 
+  public function setSource(string $source): void
+  {
+    $this->source = $source;
+  }
+
   public function find($query)
   {
     // return $this->db->get_results($this->getTableName(), $criteria);
@@ -170,7 +175,6 @@ class DbDataSource implements DataSourceInterface
 
         $wpQuery = new \WP_Query($args);
         $postIds = $wpQuery->posts;
-        Logger::info($wpQuery);
 
         // In no posts were found, just return emty array - no need to run the query
         if (empty($postIds)) {
@@ -190,7 +194,8 @@ class DbDataSource implements DataSourceInterface
           // There are 2 special parameters in the search query which are not real DB fields.
           // 1. prefix - for filtering objects by prefix in the ID
           if ($fieldName === 'prefix') {
-            $filters_sql[] = '`id` LIKE %s';
+            $pkField = $this->schema->getPrimaryKeyFieldName();
+            $filters_sql[] = '`' . $pkField . '` LIKE %s';
             $filters_sql_fields[] = $fieldValue . '%';
             continue;
           }
@@ -220,7 +225,8 @@ class DbDataSource implements DataSourceInterface
 
             $regions_sql = "r2o.region_id IN (" . implode(',', $regions_placeholders) . ")";
 
-            $filter_regions = "INNER JOIN {$this->db->mapsvg_prefix}r2o r2o ON r2o.objects_table=%s AND r2o.regions_table=%s AND r2o.object_id=id AND {$regions_sql}";
+            $pkField = $this->schema->getPrimaryKeyFieldName();
+            $filter_regions = "INNER JOIN {$this->db->mapsvg_prefix}r2o r2o ON r2o.objects_table=%s AND r2o.regions_table=%s AND r2o.object_id=`{$pkField}` AND {$regions_sql}";
 
             $filter_regions_fields = array_merge([$this->source, $regions_table], $regions_array);
           } else if ($field->type === 'location') {
@@ -442,7 +448,8 @@ class DbDataSource implements DataSourceInterface
       }
       $sort = implode(',', $sortArray);
     } else {
-      $sortBy  = 'id';
+      $pkField = $this->schema->getPrimaryKeyFieldName();
+      $sortBy  = '`' . $pkField . '`';
       $sortDir = 'DESC';
       if (isset($query->sortBy) && !empty($query->sortBy) && $this->schema->getField($query->sortBy)) {
         // $query->sortBy is checked for valid field in schema
@@ -534,7 +541,19 @@ class DbDataSource implements DataSourceInterface
   public function create($data)
   {
     $this->db->insert($this->getTableName(), $data);
-    return $this->findOne(["id" => $this->db->insert_id]);
+    $pkField = $this->schema->getPrimaryKeyFieldName();
+    $pkFieldObj = $this->schema->getField($pkField);
+    $isAutoIncrement = $pkFieldObj && isset($pkFieldObj->auto_increment) && $pkFieldObj->auto_increment;
+    Logger::info('DbDataSource::create - auto increment: ' . $pkField);
+    Logger::info('DbDataSource::create - pkFieldObj: ' . print_r($pkFieldObj, true));
+    Logger::info('DbDataSource::create - isAutoIncrement: ' . $isAutoIncrement);
+
+    if ($isAutoIncrement) {
+      Logger::info('DbDataSource::create - auto increment: ' . $this->db->insert_id);
+      return $this->findOne([$pkField => $this->db->insert_id]);
+    }
+    Logger::info('DbDataSource::create - auto increment: ' . $data[$pkField]);
+    return $this->findOne([$pkField => $data[$pkField]]);
   }
 
   public function update($data, $criteria)
@@ -554,45 +573,51 @@ class DbDataSource implements DataSourceInterface
     return $this->db->rows_affected;
   }
 
-  public function import($data)
+  public function import($data, bool $upsert = true)
   {
     $values = array();
-    $keys = array();
     $placeholders_sql_array = array();
 
     $keys = array_keys($data[0]);
 
-    $placeholders = array_map(function ($key) {
-      return '%s';
-    }, $keys);
-
     foreach ($data as $object) {
-      // Filter $keys to only include valid field names from the schema
+      $row_parts = array();
       foreach ($keys as $key) {
-        $values[] = isset($object[$key]) ? $object[$key] : '';
+        $cell = $object[$key] ?? null;
+        if ($cell === null) {
+          $row_parts[] = 'NULL';
+        } else {
+          $row_parts[] = '%s';
+          $values[] = $cell;
+        }
       }
-      $placeholders_sql_array[] = "(" . implode(',', $placeholders) . ")";
+      $placeholders_sql_array[] = '(' . implode(',', $row_parts) . ')';
     }
 
-    $placeholders_sql = implode(", ", $placeholders_sql_array);
-
-    $update_sql_array = array();
-    foreach ($keys as $key) {
-      $update_sql_array[] .= '`' . $key . '`=VALUES(`' . $key . '`)';
-    }
-    $update_sql = implode(', ', $update_sql_array);
+    $placeholders_sql = implode(', ', $placeholders_sql_array);
 
     /**
      * Params in the query:
      * $this->getTableName(): sanitized
      * $keys: sanitized
-     * $values_placeholders: contains only placeholders
-     * $update_sql: sanitized
+     * VALUES: literal NULL or %s placeholders; $values matches %s count only
      */
-    $query = $this->db->prepare(
-      "INSERT INTO {$this->getTableName()} (`" . implode('`,`', $keys) . "`) VALUES {$placeholders_sql} ON DUPLICATE KEY UPDATE {$update_sql}",
-      $values,
-    );
+    if ($upsert) {
+      $update_sql_array = array();
+      foreach ($keys as $key) {
+        $update_sql_array[] = '`' . $key . '`=VALUES(`' . $key . '`)';
+      }
+      $update_sql = implode(', ', $update_sql_array);
+      $query = $this->db->prepare(
+        "INSERT INTO {$this->getTableName()} (`" . implode('`,`', $keys) . "`) VALUES {$placeholders_sql} ON DUPLICATE KEY UPDATE {$update_sql}",
+        $values,
+      );
+    } else {
+      $query = $this->db->prepare(
+        "INSERT INTO {$this->getTableName()} (`" . implode('`,`', $keys) . "`) VALUES {$placeholders_sql}",
+        $values,
+      );
+    }
 
     $this->db->query($query);
 

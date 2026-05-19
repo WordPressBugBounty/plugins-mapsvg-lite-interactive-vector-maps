@@ -10,6 +10,30 @@ class Controller
 {
 
 	/**
+	 * Returns a 403 response if the schema has Google Sheets read-only sync enabled.
+	 * Returns null when the operation is allowed.
+	 *
+	 * @param \WP_REST_Request $request
+	 * @return \WP_REST_Response|null
+	 */
+	protected static function rejectIfGsReadOnly(\WP_REST_Request $request): ?\WP_REST_Response
+	{
+		$repo = RepositoryFactory::get($request['_collection_name']);
+		if ($repo && $repo->schema) {
+			$schema = $repo->schema;
+			$settings = ImportSettingsService::getForSchema($schema);
+			// Block writes when remote CSV auto-refetch is active (one-way pull, source of truth is remote).
+			$isRemoteReadOnly = ($settings['gsImportSource'] ?? 'upload') === 'remote'
+				&& !empty($settings['gsAutoRefetch'])
+				&& ($settings['gsSyncMode'] ?? 'r') !== 'w';
+			if ($isRemoteReadOnly) {
+				return self::render(['error' => 'This data source is managed by Google Sheets auto-refetch and is read-only.'], 403);
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Renders a response.
 	 *
 	 * @param mixed $data

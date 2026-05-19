@@ -33,34 +33,35 @@ export class Server {
   fetch(path: string, data?: any): Promise<any> {
     return fetch(path.indexOf("http:") === 0 ? path : this.apiUrl + path)
   }
-  post(path: string, data?: any): JQueryPromise<any> {
-    const ajaxParams = {
+  post(path: string, data?: any, format: "form" | "json" = "form"): JQueryPromise<any> {
+    const ajaxParams: any = {
       url: this.getUrl(path),
       type: "POST",
-      data: data,
       beforeSend: (xhr) => {
         this.addNonceHeader(xhr)
       },
     }
 
     if (data instanceof FormData) {
-      ajaxParams["processData"] = false
-      ajaxParams["contentType"] = false
-    }
-
-    if (ajaxParams["processData"] !== false) {
+      ajaxParams.data = data
+      ajaxParams.processData = false
+      ajaxParams.contentType = false
+    } else if (format === "json") {
+      ajaxParams.data = JSON.stringify(data)
+      ajaxParams.contentType = "application/json"
+    } else {
+      ajaxParams.data = data
       this.processObjectData(data)
     }
 
     return $.ajax(ajaxParams)
   }
-  put(path: string, data?: any): JQueryPromise<any> {
+  put(path: string, data?: any, format: "form" | "json" = "form"): JQueryPromise<any> {
     return $.Deferred((deferred) => {
       this.ensureMethodAvailability("PUT").then((putAvailable) => {
         const ajaxParams: any = {
           url: this.getUrl(path),
           type: putAvailable ? "PUT" : "POST",
-          data: data,
           beforeSend: (xhr) => {
             this.addNonceHeader(xhr)
             if (!putAvailable) {
@@ -70,11 +71,14 @@ export class Server {
         }
 
         if (data instanceof FormData) {
+          ajaxParams.data = data
           ajaxParams.processData = false
           ajaxParams.contentType = false
-        }
-
-        if (ajaxParams["processData"] !== false) {
+        } else if (format === "json") {
+          ajaxParams.data = JSON.stringify(data)
+          ajaxParams.contentType = "application/json"
+        } else {
+          ajaxParams.data = data
           this.processObjectData(data)
         }
 

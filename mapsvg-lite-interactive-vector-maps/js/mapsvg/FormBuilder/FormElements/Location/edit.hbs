@@ -38,6 +38,15 @@
       </table>
   </div>
 
+  <div class="form-group mb-3">
+      <label class="form-label">Language</label>
+      <select class="mapsvg-select2 form-control" name="language">
+          <option value="">— same as map (Google Maps URL) —</option>
+          {{#each languages}}<option value="{{value}}" {{#ifeq value ../language}}selected{{/ifeq}}>{{label}}</option>{{/each}}
+      </select>
+      <p class="form-text">Address language used when geocoding (converting addresses ↔ coordinates) in the background. Leave blank to inherit the language set in the Google Maps settings.</p>
+  </div>
+
   <div class="form-group mb-3 ">
       <label class="col-form-label">Searchable</label>
       <div class="form-switch form-switch-md">

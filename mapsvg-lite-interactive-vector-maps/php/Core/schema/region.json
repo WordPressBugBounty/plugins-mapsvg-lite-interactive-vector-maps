@@ -1,5 +1,6 @@
 {
   "name": "regions_%MAP_ID%",
+  "primaryKeyField": "id",
   "objectNameSingular": "region",
   "objectNamePlural": "regions",
   "apiEndpoints": [
@@ -18,7 +19,8 @@
       "db_type": "varchar(255)",
       "visible": true,
       "protected": true,
-      "searchable": true
+      "searchable": true,
+      "auto_increment": false
     },
     {
       "name": "title",

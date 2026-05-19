@@ -25,15 +25,7 @@ export type ApiEndpointName =
 
 export type ApiEndpoints = ArrayIndexed<ApiEndpoint>
 
-export type SchemaType =
-  | "object"
-  | "post"
-  | "api"
-  | "schema"
-  | "region"
-  | "map"
-  | "token"
-  | "postType"
+export type SchemaType = "object" | "post" | "api" | "schema" | "region" | "map"
 export interface SchemaOptions {
   id?: number
   type?: SchemaType
@@ -44,10 +36,10 @@ export interface SchemaOptions {
   apiBaseUrl?: string
   authorization?: AuthorizationCredentials
   objectNameSingular: string
-  objectNamePlural?: string
+  objectNamePlural: string
   strict?: boolean
   remote?: boolean
-  postType?: string
+  primaryKeyField?: string
 }
 
 export enum SchemaEventType {
@@ -69,7 +61,6 @@ function getDefaultApiEndpoints(type: SchemaType): ApiEndpoint[] {
       { url: "/objects/%name%/[:id]", method: "DELETE", name: "delete" },
       { url: "/objects/%name%/[:id]/import", method: "POST", name: "import" },
       { url: "/objects/%name%", method: "DELETE", name: "clear" },
-      { url: "/objects/%name%/[:id]/distinct/[:fieldName]", method: "GET", name: "distinct" },
     ]
   } else if (type === "region") {
     return [
@@ -79,7 +70,6 @@ function getDefaultApiEndpoints(type: SchemaType): ApiEndpoint[] {
       { url: "/regions/%name%/[:id]", method: "PUT", name: "update" },
       { url: "/regions/%name%/[:id]/import", method: "POST", name: "import" },
       { url: "/regions/%name%/[:id]", method: "DELETE", name: "delete" },
-      { url: "/regions/%name%/[:id]/distinct/[:fieldName]", method: "GET", name: "distinct" },
     ]
   }
   return []
@@ -95,7 +85,6 @@ export class Schema {
   type: SchemaType
   name: string
   title?: string
-  postType?: string
   fields?: ArrayIndexed<SchemaField>
   lastChangeTime: number
   events: Events
@@ -107,7 +96,7 @@ export class Schema {
   strict: boolean
   remote: boolean
   model: SchemaModel
-
+  primaryKeyField?: string
   constructor(options: SchemaOptions) {
     this.fields = new ArrayIndexed("name")
     this.apiEndpoints = new ArrayIndexed("name")
@@ -152,13 +141,14 @@ export class Schema {
     this.objectNamePlural = namePlural
   }
 
-  build(options) {
-    for (const paramName in options) {
-      const setter = "set" + ucfirst(paramName)
-      if (typeof options[paramName] !== "undefined" && typeof this[setter] == "function") {
-        this[setter](options[paramName])
+  build(options: Partial<SchemaOptions> & { [key: string]: any }) {
+    if (!options) return
+    Object.keys(options).forEach((key) => {
+      const setter = `set${ucfirst(key)}`
+      if (typeof this[setter] === "function") {
+        this[setter](options[key])
       }
-    }
+    })
   }
 
   setType(val: SchemaType) {
@@ -176,10 +166,6 @@ export class Schema {
     }
   }
 
-  setPostType(postType: string) {
-    this.postType = postType
-  }
-
   update(options) {
     this.build(options)
   }
@@ -190,6 +176,20 @@ export class Schema {
 
   setStrict(value: boolean) {
     this.strict = value
+  }
+
+  setPrimaryKeyField(name: string) {
+    this.primaryKeyField = name
+  }
+
+  getPrimaryKeyFieldName(): string {
+    if (this.fields && this.fields.length > 0) {
+      const idField = this.fields.find((f) => f.type && f.type.toLowerCase() === 'id')
+      if (idField) {
+        return idField.name
+      }
+    }
+    return this.primaryKeyField || 'id'
   }
 
   setId(id: number) {
@@ -276,7 +276,7 @@ export class Schema {
       objectNamePlural: this.objectNamePlural,
       objectNameSingular: this.objectNameSingular,
       remote: this.remote,
-      postType: this.postType,
+      primaryKeyField: this.primaryKeyField,
     }
     return data
   }

@@ -19,7 +19,7 @@ class RepositoryFactory
   public static function get($schemaName)
   {
     $schema = null;
-    if ($schemaName === "map" || $schemaName === "schema" || $schemaName === "token" || $schemaName === "log" || $schemaName === "postType") {
+    if ($schemaName === "map" || $schemaName === "schema" || $schemaName === "token" || $schemaName === "log" || $schemaName === "postType" || $schemaName === "import_settings") {
       $schema = static::getDefaultSchema($schemaName);
     } else {
       $schema = static::loadSchema($schemaName);
@@ -83,6 +83,9 @@ class RepositoryFactory
         case "postType":
 
           $repo = new PostTypesRepository($schema);
+          break;
+        case "importSetting":
+          $repo = new ImportSettingsRepository($schema);
           break;
         case "object":
         default:

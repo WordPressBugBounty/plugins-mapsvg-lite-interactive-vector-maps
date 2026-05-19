@@ -50,6 +50,7 @@ class Schema extends Model
 	 * @var string | null
 	 */
 	public $apiBaseUrl;
+
 	/**
 	 * @var string
 	 */
@@ -58,6 +59,9 @@ class Schema extends Model
 
 	/** @var string | null */
 	public $postType;
+
+	/** @var string Primary key column name, defaults to 'id' */
+	public $primaryKeyField = 'id';
 
 	private $prevFields = array();
 
@@ -87,6 +91,8 @@ class Schema extends Model
 			$schemaType = "map";
 		} elseif (strpos($name, "token") === 0) {
 			$schemaType = "token";
+		} elseif (strpos($name, "import_settings") === 0) {
+			$schemaType = "importSettings";
 		} elseif (strpos($name, "logs") === 0) {
 			$schemaType = "logs";
 		} else {
@@ -104,7 +110,7 @@ class Schema extends Model
 
 	function isLocal()
 	{
-		return $this->type !== "api";
+		return !in_array($this->type, ["api"]);
 	}
 
 	function setType($val)
@@ -164,7 +170,6 @@ class Schema extends Model
 		}
 		$this->apiBaseUrl = rtrim($url, "/");
 	}
-
 
 	function setObjectNameSingular($name)
 	{
@@ -228,6 +233,30 @@ class Schema extends Model
 	public function getPostType()
 	{
 		return $this->postType;
+	}
+
+	/**
+	 * Returns the primary key column name.
+	 * Derives it from the id-type field in the schema, or falls back to the
+	 * explicitly stored primaryKeyField property (default 'id').
+	 *
+	 * @return string
+	 */
+	public function getPrimaryKeyFieldName()
+	{
+		if (!empty($this->fields)) {
+			foreach ($this->fields as $field) {
+				if (isset($field->type) && strtolower($field->type) === 'id') {
+					return $field->name;
+				}
+			}
+		}
+		return $this->primaryKeyField ?: 'id';
+	}
+
+	public function setPrimaryKeyField($name)
+	{
+		$this->primaryKeyField = $name;
 	}
 	public function setTitle($title)
 	{
@@ -339,6 +368,48 @@ class Schema extends Model
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Returns the geocoding language for this schema.
+	 *
+	 * Priority:
+	 *  1. location field's own `language` property
+	 *  2. googleMaps.language from any map that references this schema
+	 *  3. 'en' as the final default
+	 */
+	public function getLocationLanguage(): string
+	{
+		$locationField = $this->getFieldByType('location');
+		if ($locationField && !empty($locationField->language)) {
+			return $locationField->language;
+		}
+
+		// Fallback: check maps that use this schema for their Google Maps language setting.
+		$db         = Database::get();
+		$mapsTable  = $db->mapsvg_prefix . 'maps';
+
+		if (!$db->get_var("SHOW TABLES LIKE '{$mapsTable}'")) {
+			return 'en';
+		}
+
+		$rows = $db->get_results("SELECT `options` FROM `{$mapsTable}`", ARRAY_A);
+		foreach ((array) $rows as $row) {
+			$opts = is_string($row['options']) ? json_decode($row['options'], true) : (array) $row['options'];
+			if (!is_array($opts)) {
+				continue;
+			}
+			$objName = $opts['database']['schemas']['objects']['name'] ?? '';
+			$regName = $opts['database']['schemas']['regions']['name'] ?? '';
+			if ($objName === $this->name || $regName === $this->name) {
+				$lang = $opts['googleMaps']['language'] ?? '';
+				if (!empty($lang)) {
+					return $lang;
+				}
+			}
+		}
+
+		return 'en';
 	}
 
 	public function renameField($currentName, $newName)

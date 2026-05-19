@@ -60,6 +60,20 @@ class SchemaRepository extends Repository
 					}
 				}
 			}
+
+			// Validate: ensure exactly one id-type primary key field
+			$idFields = array();
+			foreach ($schema->fields as $field) {
+				if (isset($field->type) && $field->type === 'id') {
+					$idFields[] = $field->name;
+				}
+			}
+			if (empty($idFields)) {
+				throw new \Exception('Schema must have exactly one id-type field (primary key).');
+			}
+			if (count($idFields) > 1) {
+				throw new \Exception('Schema must have exactly one id-type field, found: ' . implode(', ', $idFields));
+			}
 		}
 
 		$dataForDB = $this->encodeParams($schema->getData());
@@ -92,7 +106,7 @@ class SchemaRepository extends Repository
 		}
 
 		$params = $this->encodeParams($schema->getData());
-		parent::update($schema, array('id' => $params['id']));
+		parent::update($schema);
 
 		if (!$skip_db_update) {
 			if ($schema->type === "region" || $schema->type === "object" || $schema->type === "post") {
@@ -117,9 +131,10 @@ class SchemaRepository extends Repository
 
 		$tableNameSanitized = $this->db->mapsvg_prefix . preg_replace('/[^a-zA-Z0-9_]/', '', $schema->name);
 
+		$pkField              = $schema->getPrimaryKeyFieldName();
 		$old_searchable_fields  = $schema->getSearchableFields($schema->getPrevFields(), ['onlyNames' => true, 'onlyFulltext' => true]);
 		$searchable_fields      = $schema->getSearchableFields(null, ['onlyNames' => true, 'onlyFulltext' => true]);
-		$new_field_names        = array('id');
+		$new_field_names        = array($pkField);
 		$primary_key            = '';
 		$update_options         = array();
 		$new_options            = array();
@@ -130,10 +145,36 @@ class SchemaRepository extends Repository
 
 			$field = (array)$field;
 
-			if ($field['type'] == 'id' && $field['db_type'] == 'varchar(255)') {
-				$primary_key = 'PRIMARY KEY  (id(40))';
-			} else {
-				$primary_key = 'PRIMARY KEY  (id)';
+			// Resolve db_type from field type when not explicitly provided
+			if (empty($field['db_type'])) {
+				static $typeToDbType = [
+					'id'          => 'int(11)',
+					'text'        => 'varchar(255)',
+					'title'       => 'varchar(255)',
+					'textarea'    => 'text',
+					'number'      => 'varchar(255)',
+					'select'      => 'varchar(255)',
+					'checkbox'    => 'tinyint(1)',
+					'checkboxes'  => 'text',
+					'radio'       => 'varchar(255)',
+					'status'      => 'varchar(255)',
+					'image'       => 'text',
+					'images'      => 'text',
+					'location'    => 'text',
+					'date'        => 'varchar(50)',
+					'datetime'    => 'varchar(50)',
+					'post'        => 'int(11)',
+					'region'      => 'text',
+					'regions'     => 'text',
+					'colorpicker' => 'varchar(255)',
+				];
+				$field['db_type'] = $typeToDbType[$field['type']] ?? 'varchar(255)';
+			}
+
+			if ($field['type'] == 'id' && ($field['db_type'] === 'varchar(255)' || strpos($field['db_type'], 'varchar') === 0)) {
+				$primary_key = 'PRIMARY KEY  (`' . $field['name'] . '`(40))';
+			} elseif ($field['type'] == 'id') {
+				$primary_key = 'PRIMARY KEY  (`' . $field['name'] . '`)';
 			}
 
 			if ($field['type'] == 'select') {
@@ -178,12 +219,14 @@ class SchemaRepository extends Repository
 				$fields[] = 'location_y FLOAT';
 				$fields[] = 'location_address TEXT';
 				$fields[] = 'location_img varchar(255)';
+				$fields[] = 'location_geocoding_status TINYINT UNSIGNED NOT NULL DEFAULT 6';
 				$new_field_names[] = 'location_lat';
 				$new_field_names[] = 'location_lng';
 				$new_field_names[] = 'location_x';
 				$new_field_names[] = 'location_y';
 				$new_field_names[] = 'location_address';
 				$new_field_names[] = 'location_img';
+				$new_field_names[] = 'location_geocoding_status';
 			}
 
 			if (isset($field['options']) && $field['type'] != 'region') {

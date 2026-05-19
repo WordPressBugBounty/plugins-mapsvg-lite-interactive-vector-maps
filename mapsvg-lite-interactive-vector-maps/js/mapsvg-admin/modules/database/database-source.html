@@ -3,12 +3,16 @@
     <div class="row">
       <div class="col-sm-5">
         <ul class="nav nav-pills" id="mapsvg-source-menu-left">
-          <li role="presentation" class="nav-item"><a
+          <li role="presentation" class="nav-item">
+            <a
               id="mapsvg-btn-add-datasource"
               href="#"
               class="nav-link toggle-tooltip"
               title="Add source"
-            ><i class="bi bi-plus-lg"></i></a></li>
+            >
+              <i class="bi bi-plus-lg"></i>
+            </a>
+          </li>
         </ul>
       </div>
       <div class="mapsvg-toolbar-title col-sm-3">
@@ -17,12 +21,11 @@
 
       <div class="mapsvg-toolbar-buttons col-sm-4">
         <ul class="nav nav-pills pull-right" id="mapsvg-source-menu-right" class="pull-right">
-          <li role="presentation"><a
-              href="#"
-              id="mapsvg-go-to-table"
-              class="nav-link toggle-tooltip"
-              title="Table"
-            ><i class="bi bi-chevron-right"></i></a></li>
+          <li role="presentation">
+            <a href="#" id="mapsvg-go-to-table" class="nav-link toggle-tooltip" title="Table">
+              <i class="bi bi-chevron-right"></i>
+            </a>
+          </li>
         </ul>
       </div>
     </div>
@@ -61,16 +64,16 @@
           {{#if params.title}}{{params.title}}{{else}}{{params.name}}{{/if}}
       </td>
       <td>
-        <button class="btn btn-sm btn-outline-secondary" data-action="edit-data-source" data-table-name="{{params.name}}" data-schema-id="{{params.id}}">
+        <div class="btn btn-sm btn-outline-secondary" data-action="edit-data-source" data-table-name="{{params.name}}" data-schema-id="{{params.id}}">
           Edit
-        </button>
+        </div>
           {{#ifeq defaultTable params.name}}
               <span class="badge bg-secondary">Connected</span>
           {{/ifeq}}
           {{#ifnoteq defaultTable params.name}}
-              <button class="btn btn-sm btn-outline-secondary" data-action="set-data-source" data-table-name="{{params.name}}" data-schema-id="{{params.id}}">
+              <div class="btn btn-sm btn-outline-secondary" data-action="set-data-source" data-table-name="{{params.name}}" data-schema-id="{{params.id}}">
                   Connect
-              </button>
+              </div>
           {{/ifnoteq}}
       </td>
   </tr>
