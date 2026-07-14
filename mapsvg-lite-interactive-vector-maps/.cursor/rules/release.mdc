@@ -9,15 +9,26 @@ Triggered when the user types `/release X.Y.Z`.
 
 ## Step 0 — Guards (run before anything else)
 
-### 0a — Must be on `dev` branch
+### 0a — Must be on `dev` (or `master`, which is synced into `dev`)
 
 ```bash
 cd /Users/roma/WebstormProjects/mapsvg-wp/wp-content/plugins/mapsvg && git branch --show-current
 ```
 
-If the result is NOT `dev`, stop and tell the user:
+- If on `dev` — continue.
+- If on `master` — switch to `dev` and merge `master` into `dev`, then continue:
 
-> ❌ You are on branch `<branch>`. Please switch to `dev` before releasing.
+```bash
+cd /Users/roma/WebstormProjects/mapsvg-wp/wp-content/plugins/mapsvg
+git checkout dev
+git merge master --no-edit
+```
+
+If the merge has conflicts, stop and tell the user to resolve them before releasing.
+
+- If on any other branch, stop and tell the user:
+
+> ❌ You are on branch `<branch>`. Please switch to `dev` (or `master`) before releasing.
 
 ### 0b — Validate version format
 

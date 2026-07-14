@@ -108,10 +108,11 @@ class PostTypesRepository
    * @param string $fieldName The name of the field to retrieve distinct values for.
    * @return array An array of distinct values for the specified field.
    */
-  public function getFieldValues($fieldName)
+  public function getFieldValues($fieldName, $post_type)
   {
     $db = Database::get();
-    $results = $db->get_col("SELECT DISTINCT " . esc_sql($fieldName) . " FROM " . $db->posts() . " WHERE post_status='publish'", 0);
+    $post_type = esc_sql($post_type);
+    $results = $db->get_col("SELECT DISTINCT " . esc_sql($fieldName) . " FROM " . $db->posts() . " WHERE post_status='publish' AND post_type='$post_type'", 0);
     return $results;
   }
 

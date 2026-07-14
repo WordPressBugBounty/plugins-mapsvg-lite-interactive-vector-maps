@@ -51,7 +51,6 @@ class SchemaRepository extends Repository
 		if ($schema->type === "object" || $schema->type === "region" || $schema->type === "post" || $schema->type === "api") {
 			if (empty($schema->fields)) {
 				$defSchema = RepositoryFactory::getDefaultSchema($schema->name, $schema->type);
-				$schema->fields = $defSchema->fields;
 				if ($schema->type === "post") {
 					foreach ($defSchema->fields as $field) {
 						if (isset($field->type) && $field->type === 'post') {
@@ -59,6 +58,7 @@ class SchemaRepository extends Repository
 						}
 					}
 				}
+				$schema->fields = $defSchema->fields;
 			}
 
 			// Validate: ensure exactly one id-type primary key field
@@ -78,6 +78,7 @@ class SchemaRepository extends Repository
 
 		$dataForDB = $this->encodeParams($schema->getData());
 
+
 		$data = $this->source->create($dataForDB);
 		$schema->setId($data["id"]);
 
@@ -90,8 +91,10 @@ class SchemaRepository extends Repository
 	}
 
 	/**
-	 * @param $schema array options
-	 * @param $skip_db_update bool If true, table will not be altered (only the schema is saved)
+	 * Updates a schema and optionally alters its database table.
+	 *
+	 * @param array|Schema $data Schema instance or array of schema options.
+	 * @param bool         $skip_db_update If true, table will not be altered (only the schema is saved).
 	 * @return Schema
 	 */
 	public function update($data, $skip_db_update = false)
@@ -105,9 +108,7 @@ class SchemaRepository extends Repository
 			$schema = $data;
 		}
 
-		$params = $this->encodeParams($schema->getData());
 		parent::update($schema);
-
 		if (!$skip_db_update) {
 			if ($schema->type === "region" || $schema->type === "object" || $schema->type === "post") {
 				$this->tableSet($schema);
@@ -115,6 +116,109 @@ class SchemaRepository extends Repository
 		}
 
 		return $schema;
+	}
+
+	/**
+	 * Deletes a schema row and drops its physical data table (if any).
+	 *
+	 * @param int $id Schema id.
+	 * @return mixed
+	 */
+	public function delete($id)
+	{
+		if (!$this->db) {
+			$this->db = Database::get();
+		}
+
+		$schema = $this->findById($id);
+		if (!$schema) {
+			return false;
+		}
+
+		if ($schema->type === 'region') {
+			throw new \Exception('Region data sources cannot be deleted.');
+		}
+
+		if (
+			!empty($schema->name)
+			&& in_array($schema->type, ['object', 'post'], true)
+		) {
+			$this->dropSchemaTable($schema->name);
+
+			$this->db->delete($this->db->mapsvg_prefix . 'r2o', [
+				'objects_table' => $schema->name,
+			]);
+		}
+
+		return parent::delete($id);
+	}
+
+	/**
+	 * Drop the physical MySQL table for a schema name.
+	 *
+	 * @param string $schemaName Short schema name (without mapsvg prefix).
+	 */
+	private function dropSchemaTable(string $schemaName): void
+	{
+		if (!$this->db) {
+			$this->db = Database::get();
+		}
+
+		$safeName = preg_replace('/[^a-zA-Z0-9_]/', '', $schemaName);
+		if ($safeName === '') {
+			return;
+		}
+
+		$table = $this->db->mapsvg_prefix . $safeName;
+		$tableExists = (bool) $this->db->get_var($this->db->prepare('SHOW TABLES LIKE %s', $table));
+		if (!$tableExists) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is sanitized
+		$this->db->query('DROP TABLE IF EXISTS `' . esc_sql($table) . '`');
+	}
+
+	/**
+	 * Rename a schema table when the schema name changes (e.g. post data source rename).
+	 *
+	 * @param string $oldSchemaName Previous schema name.
+	 * @param string $newSchemaName New schema name.
+	 * @throws \Exception When the target table already exists or rename fails.
+	 */
+	private function renamePostsTable(string $oldSchemaName, string $newSchemaName): void
+	{
+		if (!$this->db) {
+			$this->db = Database::get();
+		}
+
+		$oldTable = $this->db->mapsvg_prefix . preg_replace('/[^a-zA-Z0-9_]/', '', $oldSchemaName);
+		$newTable = $this->db->mapsvg_prefix . preg_replace('/[^a-zA-Z0-9_]/', '', $newSchemaName);
+
+		if ($oldTable === $newTable) {
+			return;
+		}
+
+		$oldTableExists = (bool) $this->db->get_var($this->db->prepare('SHOW TABLES LIKE %s', $oldTable));
+		if (!$oldTableExists) {
+			return;
+		}
+
+		$newTableExists = (bool) $this->db->get_var($this->db->prepare('SHOW TABLES LIKE %s', $newTable));
+		if ($newTableExists) {
+			throw new \Exception("Cannot rename table: target table '{$newTable}' already exists.");
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table names are sanitized
+		$this->db->query(
+			'RENAME TABLE `' . esc_sql($oldTable) . '` TO `' . esc_sql($newTable) . '`'
+		);
+
+		if ($this->db->last_error) {
+			throw new \Exception(
+				"Failed to rename table from '{$oldTable}' to '{$newTable}': " . $this->db->last_error
+			);
+		}
 	}
 
 	/**

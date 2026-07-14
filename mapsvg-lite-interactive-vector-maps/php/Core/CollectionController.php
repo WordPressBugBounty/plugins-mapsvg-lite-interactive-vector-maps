@@ -13,7 +13,7 @@ namespace MapSVG;
  * for backwards compatibility with third-party add-ons that may reference those
  * class names.  All logic lives here.
  *
- * The "posts_" meta-sync branch in update/delete is a cheap strpos guard that
+ * The "post" type meta-sync branch in update/delete is a cheap type guard that
  * is a no-op for regions, so there is no need for a separate subclass.
  */
 class CollectionController extends Controller
@@ -106,7 +106,7 @@ class CollectionController extends Controller
         $repo->update($object);
 
         // WP Post CPT: sync the location meta field (objects only via posts_ naming convention).
-        if (strpos($schema->name, 'posts_') !== false) {
+        if ($schema->type === "post") {
             $objectData = $object->getData();
             if (!empty($objectData['post'])) {
                 if ($request[$name]['location']) {
@@ -135,7 +135,7 @@ class CollectionController extends Controller
         $object = $repo->findById($request['id']);
 
         // WP Post CPT: remove the location meta field when the object is deleted.
-        if (strpos($schema->name, 'posts_') !== false) {
+        if ($schema->type === "post") {
             $objectData = $object ? $object->getData() : [];
             if (!empty($objectData['post'])) {
                 if (!empty($request[$name]['location'])) {

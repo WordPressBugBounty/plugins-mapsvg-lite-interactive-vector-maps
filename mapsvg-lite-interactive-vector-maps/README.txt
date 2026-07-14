@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.9
-Stable tag: 8.13.2
+Stable tag: 8.14.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -420,6 +420,13 @@ Examples:
 
 = 8.13.2 =
 * Fixed: data table was not getting created for new or duplicated maps
+
+= 8.14.0 =
+* Improved: **Data sources** — you can delete unused data sources from the admin (connected sources and region tables stay protected).
+* Improved: **WP Posts** — clearer Connect / Edit / Connected controls for data sources, and more reliable linking of maps to WordPress post types.
+* Improved: **Admin UI** — cleaner data source actions (icon buttons) and form layout tweaks.
+* Fixed: **WP Posts / post types** — fixed empty or missing `postType` on legacy `posts_*` schemas so post filters and sync work correctly.
+* Fixed: **Google Maps** — removed an incorrect viewport restriction that could block map interaction.
 
 
 == Upgrade Notice ==

@@ -1,5 +1,8 @@
 @import url("../js/vendor/bootstrap-icons/font/bootstrap-icons.min.css");
 
+.mapsvg-data-form-view {
+  flex-direction: column;
+}
 .mapsvg-form-builder .btn {
   display: inline-block;
   font-weight: 400;

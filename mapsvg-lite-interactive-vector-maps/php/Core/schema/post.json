@@ -1,5 +1,7 @@
 {
-  "name": "posts_",
+  "name": "post",
+  "type": "post",
+  "postType": "post",
   "primaryKeyField": "id",
   "objectNameSingular": "post",
   "objectNamePlural": "posts",

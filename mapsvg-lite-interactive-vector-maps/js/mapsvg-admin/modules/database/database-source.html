@@ -41,7 +41,7 @@
       <!--<th>id</th>-->
       <!--<th>Title</th>-->
       <th>Table name</th>
-      <th style="width: 20px;"></th>
+      <th style="width: 128px;"></th>
     </tr>
     </thead>
     <tbody>
@@ -63,18 +63,73 @@
       <td>
           {{#if params.title}}{{params.title}}{{else}}{{params.name}}{{/if}}
       </td>
-      <td>
-        <div class="btn btn-sm btn-outline-secondary" data-action="edit-data-source" data-table-name="{{params.name}}" data-schema-id="{{params.id}}">
-          Edit
-        </div>
+      <td class="text-nowrap text-end">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary toggle-tooltip"
+          title="Edit"
+          data-action="edit-data-source"
+          data-table-name="{{params.name}}"
+          data-schema-id="{{params.id}}"
+        >
+          <i class="bi bi-pencil"></i>
+        </button>
+        {{#ifeq defaultTable params.name}}
+          <button
+            type="button"
+            class="btn btn-sm btn-secondary toggle-tooltip"
+            title="Connected"
+            disabled
+          >
+            <i class="bi bi-check-lg"></i>
+          </button>
+        {{/ifeq}}
+        {{#ifnoteq defaultTable params.name}}
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary toggle-tooltip"
+            title="Connect"
+            data-action="set-data-source"
+            data-table-name="{{params.name}}"
+            data-schema-id="{{params.id}}"
+          >
+            <i class="bi bi-plug"></i>
+          </button>
+        {{/ifnoteq}}
+        {{#ifeq params.type "region"}}
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary toggle-tooltip"
+            title="Region data sources cannot be deleted"
+            disabled
+          >
+            <i class="bi bi-trash"></i>
+          </button>
+        {{/ifeq}}
+        {{#ifnoteq params.type "region"}}
           {{#ifeq defaultTable params.name}}
-              <span class="badge bg-secondary">Connected</span>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary toggle-tooltip"
+              title="Disconnect the data source before deleting"
+              disabled
+            >
+              <i class="bi bi-trash"></i>
+            </button>
           {{/ifeq}}
           {{#ifnoteq defaultTable params.name}}
-              <div class="btn btn-sm btn-outline-secondary" data-action="set-data-source" data-table-name="{{params.name}}" data-schema-id="{{params.id}}">
-                  Connect
-              </div>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary toggle-tooltip"
+              title="Delete"
+              data-action="delete-data-source"
+              data-table-name="{{params.name}}"
+              data-schema-id="{{params.id}}"
+            >
+              <i class="bi bi-trash"></i>
+            </button>
           {{/ifnoteq}}
+        {{/ifnoteq}}
       </td>
   </tr>
 </script>

@@ -172,8 +172,21 @@ class DbDataSource implements DataSourceInterface
           }
           $args['post_status'] = $status;
         }
+        // Add post_title filter
+        if (isset($postFilter['post_title'])) {
+          // $exact_title = $postFilter['post_title'];
+          // add_filter('posts_where', function ($where) use ($exact_title) {
+          //   global $wpdb;
+          //   $where .= $wpdb->prepare(" AND post_title = %s ", $exact_title);
+          //   return $where;
+          // });
+          $args['s'] = $postFilter['post_title'];
+        }
+
+        error_log(print_r($args, true));
 
         $wpQuery = new \WP_Query($args);
+
         $postIds = $wpQuery->posts;
 
         // In no posts were found, just return emty array - no need to run the query

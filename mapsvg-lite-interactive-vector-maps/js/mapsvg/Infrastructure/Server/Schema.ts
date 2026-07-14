@@ -40,6 +40,7 @@ export interface SchemaOptions {
   strict?: boolean
   remote?: boolean
   primaryKeyField?: string
+  postType?: string
 }
 
 export enum SchemaEventType {
@@ -97,6 +98,7 @@ export class Schema {
   remote: boolean
   model: SchemaModel
   primaryKeyField?: string
+  postType?: string
   constructor(options: SchemaOptions) {
     this.fields = new ArrayIndexed("name")
     this.apiEndpoints = new ArrayIndexed("name")
@@ -151,6 +153,10 @@ export class Schema {
     })
   }
 
+  setPostType(postType: string) {
+    this.postType = postType
+  }
+
   setType(val: SchemaType) {
     this.type = val
 
@@ -184,12 +190,12 @@ export class Schema {
 
   getPrimaryKeyFieldName(): string {
     if (this.fields && this.fields.length > 0) {
-      const idField = this.fields.find((f) => f.type && f.type.toLowerCase() === 'id')
+      const idField = this.fields.find((f) => f.type && f.type.toLowerCase() === "id")
       if (idField) {
         return idField.name
       }
     }
-    return this.primaryKeyField || 'id'
+    return this.primaryKeyField || "id"
   }
 
   setId(id: number) {
@@ -277,6 +283,7 @@ export class Schema {
       objectNameSingular: this.objectNameSingular,
       remote: this.remote,
       primaryKeyField: this.primaryKeyField,
+      postType: this.postType,
     }
     return data
   }

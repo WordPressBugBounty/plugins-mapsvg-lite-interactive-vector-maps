@@ -14,9 +14,9 @@
     this.schemaRepo.events.on("afterUpdate", () => {
       this.schemaRepo.find()
     })
-    // this.schemaRepo.events.on("afterLoad", () => {
-    //   this.redraw()
-    // })
+    this.schemaRepo.events.on("afterLoad", () => {
+      this.redraw()
+    })
 
     this.schemas = []
 
@@ -54,22 +54,15 @@
       if (!id) {
         return
       }
-      id = parseInt(id.trim())
+      _this.setDataSource(parseInt(id.trim(), 10))
+    })
 
-      _this.schemaRepo.findById(id).done(function (schema) {
-        // TODO check the line below and adapt it
-        _this.mapsvg.update({
-          database: { objectsTableName: schema.name, schemas: { objects: schema.getData() } },
-        })
-        _this.mapsvg.objectsRepository.setSchema(schema)
-
-        _this.mapsvg.objectsRepository.find().done(function (data) {
-          _this.redraw()
-          var jsp = _this.contentWrap.data("jsp")
-          jsp.scrollToY(0)
-          _this.admin.slideToController(_this, "database", "forward")
-        })
-      })
+    this.contentView.on("click", '[data-action="delete-data-source"]', function () {
+      var id = $(this).attr("data-schema-id")
+      if (!id) {
+        return
+      }
+      _this.deleteDataSource(parseInt(id.trim(), 10))
     })
     $(window).on("keydown.form.database-source", (e) => {
       // @ts-ignore
@@ -90,6 +83,81 @@
       this.redraw()
     })
     this.btnAdd = $("#mapsvg-btn-add-datasource")
+  }
+
+  /**
+   * Connects the map to a schema (objects data source) by id and reloads data.
+   * @param {number} id Schema id
+   */
+  MapSVGAdminDatabaseSourceController.prototype.setDataSource = function (id) {
+    var _this = this
+
+    if (!id) {
+      return
+    }
+
+    _this.schemaRepo.findById(id).done(function (schema) {
+      _this.mapsvg.update({
+        database: { objectsTableName: schema.name, schemas: { objects: schema.getData() } },
+      })
+      _this.mapsvg.objectsRepository.setSchema(schema)
+
+      _this.mapsvg.objectsRepository.find().done(function () {
+        _this.redraw()
+        var jsp = _this.contentWrap.data("jsp")
+        if (jsp) {
+          jsp.scrollToY(0)
+        }
+        _this.admin.slideToController(_this, "database", "forward")
+      })
+    })
+  }
+
+  /**
+   * Deletes a data source by schema id.
+   * Not allowed for the connected source or for region schemas.
+   * @param {number} id Schema id
+   */
+  MapSVGAdminDatabaseSourceController.prototype.deleteDataSource = function (id) {
+    var _this = this
+
+    if (!id) {
+      return
+    }
+
+    var currentSchema = _this.mapsvg.objectsRepository.getSchema()
+    if (currentSchema && String(currentSchema.id) === String(id)) {
+      $.growl.error({
+        title: "",
+        message: "Disconnect the data source before deleting",
+        duration: 2000,
+      })
+      return
+    }
+
+    var loaded = _this.schemaRepo.getLoadedObject(id)
+    if (loaded && loaded.type === "region") {
+      $.growl.error({
+        title: "",
+        message: "Region data sources cannot be deleted",
+        duration: 2000,
+      })
+      return
+    }
+
+    if (!confirm("Delete this data source and its database table? This cannot be undone.")) {
+      return
+    }
+
+    _this.schemaRepo
+      .delete(id)
+      .done(function () {
+        $.growl.notice({ title: "", message: "Data source deleted", duration: 700 })
+        _this.redraw()
+      })
+      .fail(function (response) {
+        mapsvg.utils.http.handleFailedRequest(response)
+      })
   }
 
   MapSVGAdminDatabaseSourceController.prototype.getTemplateData = function () {
@@ -154,14 +222,11 @@
   }
 
   MapSVGAdminDatabaseSourceController.prototype.deleteDataRow = function (row) {
-    var _this = this
     var id = row.data("id")
-    var object = this.schemaRepo.getLoadedObject(id)
-    if (object.location && object.location.marker) object.location.marker.delete()
-    this.schemaRepo.delete(id)
-    row.fadeOut(300, function () {
-      row.remove()
-    })
+    if (!id) {
+      return
+    }
+    this.deleteDataSource(parseInt(id, 10))
   }
 
   MapSVGAdminDatabaseSourceController.prototype.showDataSourceModal = function (schema) {
@@ -219,13 +284,13 @@
         type: "text",
         help: `Example: "Sales representatives"`,
       },
-      {
-        name: "name",
-        label: "Name",
-        type: "text",
-        help: `Must be unique, without spaces. Example: "sales_reps"`,
-        readonly: !newRecord,
-      },
+      // {
+      //   name: "name",
+      //   label: "Name",
+      //   type: "text",
+      //   help: `Unique, without spaces. Example: "sales_reps". Can't be changed after creation!`,
+      //   readonly: !newRecord,
+      // },
       {
         name: "objectNameSingular",
         label: "Object name singular",
@@ -314,26 +379,28 @@
           $(_this.formBuilder.getFormElementByName(name).domElements.main).toggle(val)
         }
       }
-      const toggleName = (val) => {
-        $(_this.formBuilder.getFormElementByName("name").domElements.main).toggle(val)
-      }
+      // var postTypeField = _this.formContainer.find('[name="postType"]').closest(".form-group")
+      // // postTypeField.hide()
+      // _this.formContainer.on("change", 'input[name="type"]', function () {
+      //   postTypeField.toggle($(this).val() === "posts")
+      // })
 
       switch (type) {
         case "api": {
           toggleElems(apiElems, true)
-          toggleName(true)
+          toggleElems(["postType"], false)
           $(_this.formBuilder.getFormElementByName("postType").domElements.main).hide()
           break
         }
         case "post": {
           toggleElems(apiElems, false)
-          toggleName(false)
+          toggleElems(["postType"], true)
           $(_this.formBuilder.getFormElementByName("postType").domElements.main).show()
           break
         }
         case "object": {
           toggleElems(apiElems, false)
-          toggleName(true)
+          toggleElems(["postType"], false)
           $(_this.formBuilder.getFormElementByName("postType").domElements.main).hide()
           break
         }
@@ -342,14 +409,15 @@
       }
     }
 
-    if (schemaData.name && schemaData.type === "post") {
-      schemaData.postType = schemaData.name.split("_").slice(1).join("_")
-    }
+    // if (schemaData.name && schemaData.type === "post") {
+    //   schemaData.postType = schemaData.name.split("_").slice(1).join("_")
+    // }
 
     _this.formBuilder = new mapsvg.formBuilder({
       container: _this.formContainer,
       schema: schemaForModal,
       editMode: false,
+      showNames: false,
       mapsvg: _this.mapsvg,
       mediaUploader: _this.admin.mediaUploader,
       data: schemaData,
@@ -372,9 +440,9 @@
             data.apiEndpoints = null
             data.apiAuthorization = ""
           }
-          if (data.type === "post") {
-            data.name = "posts_" + data.postType
-          }
+          // if (data.type === "post") {
+          //   data.name = "posts_" + data.postType
+          // }
 
           if (data.type === "object") {
             data.postType = null
@@ -405,10 +473,10 @@
             }
           }
 
-          if (!data.name) {
-            $.growl.error({ title: "", message: "Enter the name", duration: 700 })
-            return
-          }
+          // if (data.type !== "post" && !data.name) {
+          //   $.growl.error({ title: "", message: "Enter the name", duration: 700 })
+          //   return
+          // }
           if (!data.title) {
             $.growl.error({ title: "", message: "Enter the title", duration: 700 })
             return
@@ -422,14 +490,18 @@
             return
           }
 
+          const prevObjectNamePlural = schema.objectNamePlural
+          const pluralChanged = prevObjectNamePlural !== data.objectNamePlural
+
           schema.update(data)
 
           if (newRecord) {
             _this.schemaRepo
               .create(schema)
-              .done(function () {
+              .done(function (createdSchema) {
                 formBuilder.close()
                 $.growl.notice({ title: "", message: "Data source created", duration: 700 })
+                // _this.setDataSource(createdSchema.id)
               })
               .fail((response) => {
                 mapsvg.utils.http.handleFailedRequest(response)
@@ -451,12 +523,6 @@
         },
         init: function (event) {
           setFormElementsByType(schema.type)
-          var postTypeField = _this.formContainer.find('[name="post_type"]').closest(".form-group")
-          postTypeField.hide()
-          _this.formContainer.on("change", 'input[name="type"]', function () {
-            postTypeField.toggle($(this).val() === "posts")
-          })
-
           setTimeout(() => {
             $(".tooltip").remove()
           }, 200)

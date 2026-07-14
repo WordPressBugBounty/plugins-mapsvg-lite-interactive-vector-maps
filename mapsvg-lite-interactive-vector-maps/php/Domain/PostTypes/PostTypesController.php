@@ -57,7 +57,7 @@ class PostTypesController extends Controller
 		}
 		/** @var \MapSVG\PostTypesRepository $repo */
 		$repo = RepositoryFactory::get('postType');
-		$values = $repo->getFieldValues($field);
+		$values = $repo->getFieldValues($field, $post_type);
 		return self::render(['items' => $values]);
 	}
 

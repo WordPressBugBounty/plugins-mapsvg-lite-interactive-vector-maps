@@ -125,13 +125,20 @@ class SchemaController extends Controller
 		$data = static::formatReceivedData($request['schema']);
 		$schemaRepository = RepositoryFactory::get("schema");
 
-		$originalName = $data["name"];
-		// Replace dashes with underscores in the table name
-		$data["name"] = str_replace('-', '_', $data["name"]);
+		// Sanitize objectNamePlural into a MySQL-safe table name suffix
+		$name = static::sanitizeSchemaName($data["objectNamePlural"] ?? '');
+		if ($name === null) {
+			return new \WP_REST_Response(["data" => ["error" => "Object name plural must yield a valid table name (letters, numbers, underscores)"]], 400);
+		}
+		$data["name"] = $name;
 
-		$tableExists = $schemaRepository->findByName($data["name"]);
-		if ($tableExists) {
+		$schemaExists = $schemaRepository->findByName($data["name"]);
+		if ($schemaExists) {
 			return new \WP_REST_Response(["data" => ["error" => "Data source with the name '" . $data["name"] . "' already exists"]], 400);
+		}
+
+		if (SchemaRepository::tableExists($data["name"])) {
+			return new \WP_REST_Response(["data" => ["error" => "Database table for '" . $data["name"] . "' already exists"]], 400);
 		}
 
 		$response = array();
@@ -153,6 +160,28 @@ class SchemaController extends Controller
 	}
 
 	/**
+	 * Sanitize a string for use as a MapSVG table name suffix (after mapsvg prefix).
+	 * Allows only [a-z0-9_], collapses underscores, and rejects empty results.
+	 *
+	 * @param mixed $raw
+	 * @return string|null
+	 */
+	private static function sanitizeSchemaName($raw): ?string
+	{
+		if ($raw === null || $raw === '') {
+			return null;
+		}
+
+		$name = strtolower((string) $raw);
+		$name = preg_replace('/[\s\-\.]+/', '_', $name);
+		$name = preg_replace('/[^a-z0-9_]/', '', $name);
+		$name = preg_replace('/_+/', '_', $name);
+		$name = trim($name, '_');
+
+		return $name !== '' ? $name : null;
+	}
+
+	/**
 	 * Updates schema
 	 * @param \WP_REST_Request $request
 	 * @return \WP_REST_Response
@@ -162,34 +191,64 @@ class SchemaController extends Controller
 		$schemaRepository = RepositoryFactory::get("schema");
 		$data = static::formatReceivedData($request['schema']);
 
-		if (isset($data['name'])) {
-			if ($data["type"] === "post") {
-				// Prohibit changing the name for the schema for posts
-				unset($data['name']);
-			} else {
-				// Replace dashes with underscores in the table name
-				$data["name"] = str_replace('-', '_', $data["name"]);
-			}
-		}
+		// if (isset($data['objectNamePlural'])) {
+		// 	// Replace dashes with underscores in the table name
+		// 	$data["name"] = str_replace('-', '_', $data["objectNamePlural"]);
+		// }
+
+		// don't allow changing the name during update
+		unset($data['name']);
+
 		$schemaRepository->update($data);
 
 		return self::render([], 200);
 	}
 
 	/**
-	 * Deletes a schema and clears any associated Google Sheets cron event.
+	 * Deletes a schema, its data table, and clears related Google Sheets cron / post-type options.
+	 *
 	 * @param \WP_REST_Request $request
 	 * @return \WP_REST_Response
 	 */
 	public static function delete($request)
 	{
 		$schemaRepository = RepositoryFactory::get("schema");
-		$schema = $schemaRepository->findById((int)$request['id']);
+		$schemaId = (int) $request['id'];
+		$schema = $schemaRepository->findById($schemaId);
 
-		if ($schema) {
-			GoogleSheetSync::clearForSchema($schema->name);
-			$schemaRepository->delete((int)$request['id']);
+		if (!$schema) {
+			return new \WP_REST_Response(["data" => ["error" => "Schema not found"]], 404);
 		}
+
+		if ($schema->type === "region") {
+			return new \WP_REST_Response(["data" => ["error" => "Region data sources cannot be deleted"]], 403);
+		}
+
+		if ($schema->type === "post" && !empty($schema->postType)) {
+			$db = Database::get();
+			$schemaTable = $db->mapsvg_prefix . 'schema';
+			$stillUsed = (int) $db->get_var(
+				$db->prepare(
+					"SELECT COUNT(*) FROM `{$schemaTable}` WHERE `postType` = %s AND `id` != %d",
+					$schema->postType,
+					$schemaId
+				)
+			);
+			if ($stillUsed === 0) {
+				$postTypes = Options::get("mappable_post_types") ?? [];
+				$postType = $schema->postType;
+				$postTypes = array_values(array_filter($postTypes, function ($type) use ($postType) {
+					return $type !== $postType;
+				}));
+				Options::set("mappable_post_types", $postTypes);
+			}
+		}
+
+		if (!empty($schema->name)) {
+			GoogleSheetSync::clearForSchema($schema->name);
+		}
+
+		$schemaRepository->delete($schemaId);
 
 		return self::render([], 200);
 	}

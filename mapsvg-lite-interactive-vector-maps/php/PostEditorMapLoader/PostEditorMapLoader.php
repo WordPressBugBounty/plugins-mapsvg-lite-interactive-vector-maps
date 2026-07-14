@@ -11,7 +11,12 @@ class PostEditorMapLoader
 
     public static function getTableName($postType)
     {
-        return 'posts_' . str_replace('-', '_', $postType);
+        $schemaRepo = RepositoryFactory::get("schema");
+        $schema = $schemaRepo->findOne(["postType" => $postType]);
+        if ($schema) {
+            return $schema->name;
+        }
+        return null;
     }
 
 
@@ -91,7 +96,6 @@ class PostEditorMapLoader
         }
 
         $id = $post->ID;
-
 
         $table = static::getTableName($post->post_type);
 

@@ -48,6 +48,34 @@
       "type": "text",
       "db_type": "varchar(50)",
       "visible": false
+    },
+    {
+      "name": "postType",
+      "label": "Post Type",
+      "type": "text",
+      "db_type": "varchar(50)",
+      "visible": false
+    },
+    {
+      "name": "objectNameSingular",
+      "label": "Object Name Singular",
+      "type": "text",
+      "db_type": "varchar(50)",
+      "visible": false
+    },
+    {
+      "name": "objectNamePlural",
+      "label": "Object Name Plural",
+      "type": "text",
+      "db_type": "varchar(50)",
+      "visible": false
+    },
+    {
+      "name": "apiEndpoints",
+      "label": "API Endpoints",
+      "type": "text",
+      "db_type": "longtext",
+      "visible": false
     }
   ]
 }

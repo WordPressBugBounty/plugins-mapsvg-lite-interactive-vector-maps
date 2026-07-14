@@ -64,17 +64,29 @@ export class PostTypesRepository extends Repository {
         resolve(options)
       })
     } else {
-      const request = this.getRequest("getFieldValues", { fieldName })
+      const request = this.getRequest("getFieldValues", {
+        fieldName,
+        name: this.schema.postType,
+      })
       return new Promise((resolve, reject) => {
         this.server
           .get(request.url)
           .done((response) => {
-            const data = response.items.map((item) => {
-              return {
-                label: item.label,
-                value: item.value,
-              }
-            })
+            const data = response.items
+              .filter((item) => item !== null && typeof item !== "undefined")
+              .map((item) => {
+                if (typeof item === "object") {
+                  return {
+                    label: item.label,
+                    value: item.value,
+                  }
+                } else {
+                  return {
+                    label: item,
+                    value: item,
+                  }
+                }
+              })
             resolve(data)
           })
           .fail(reject)
@@ -86,7 +98,7 @@ export class PostTypesRepository extends Repository {
    * Fetch taxonomy values for a post type
    */
   getTaxonomyValues(fieldName: string): Promise<any> {
-    const request = this.getRequest("getTaxonomyValues", { fieldName })
+    const request = this.getRequest("getTaxonomyValues", { fieldName, name: this.schema.postType })
     return new Promise((resolve, reject) => {
       this.server.get(request.url).done(resolve).fail(reject)
     })
@@ -96,7 +108,7 @@ export class PostTypesRepository extends Repository {
    * Fetch meta values for a post type
    */
   getMetaValues(fieldName: string): Promise<any> {
-    const request = this.getRequest("getMetaValues", { fieldName })
+    const request = this.getRequest("getMetaValues", { fieldName, name: this.schema.postType })
     return new Promise((resolve, reject) => {
       this.server.get(request.url).done(resolve).fail(reject)
     })

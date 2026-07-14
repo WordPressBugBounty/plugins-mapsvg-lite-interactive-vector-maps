@@ -4355,10 +4355,10 @@ export class MapSVGMap {
             // Keep the viewport anchored to the primary world copy so markers
             // are never hidden behind a longitudinally-wrapped duplicate.
             // strictBounds:false still allows zooming out to see world copies.
-            restriction: {
-              latLngBounds: { north: 85, south: -85, west: -180, east: 180 },
-              strictBounds: false,
-            },
+            // restriction: {
+            //   latLngBounds: { north: 85, south: -85, west: -180, east: 180 },
+            //   strictBounds: false,
+            // },
           })
           let overlay
 
