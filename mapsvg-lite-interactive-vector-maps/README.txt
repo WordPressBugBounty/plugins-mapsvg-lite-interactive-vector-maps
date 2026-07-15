@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 6.9
-Stable tag: 8.14.0
+Stable tag: 8.14.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -428,6 +428,11 @@ Examples:
 * Fixed: **WP Posts / post types** — fixed empty or missing `postType` on legacy `posts_*` schemas so post filters and sync work correctly.
 * Fixed: **Google Maps** — removed an incorrect viewport restriction that could block map interaction.
 
+= 8.14.1 =
+* Fixed: **SVG uploads** — strengthened upload checks so only valid SVG files are accepted.
+* Fixed: **Security / REST API** — hardened post-type and distinct-value endpoints against SQL injection.
+* Fixed: **Security / loading text** — sanitized and safely rendered map loading text to prevent stored XSS.
+* Fixed: **Security / Handlebars** — updated Handlebars to the latest version with security fixes.
 
 == Upgrade Notice ==
 

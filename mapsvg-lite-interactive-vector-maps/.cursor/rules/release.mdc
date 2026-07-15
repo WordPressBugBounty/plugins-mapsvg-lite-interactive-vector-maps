@@ -5,7 +5,7 @@ alwaysApply: false
 
 # MapSVG Release Workflow
 
-Triggered when the user types `/release X.Y.Z`.
+Triggered when the user types `/release X.Y.Z` || `/release patch` || `/release minor` || `/release major`.
 
 ## Step 0 — Guards (run before anything else)
 
@@ -32,7 +32,7 @@ If the merge has conflicts, stop and tell the user to resolve them before releas
 
 ### 0b — Validate version format
 
-The requested version must match exactly `X.Y.Z` where X, Y, Z are non-negative integers.
+If exact version number is provided, the requested version must match exactly `X.Y.Z` where X, Y, Z are non-negative integers.
 
 If the format is wrong, stop and tell the user:
 
@@ -48,7 +48,16 @@ If it is equal or lower, stop and tell the user:
 
 > ❌ Requested version `X.Y.Z` is not greater than current version `A.B.C`. Please provide a higher version number.
 
-### 0d — Confirm if major version is changing
+### 0d - Confirm version keyword
+
+If, instead of exact version number, a keyword was provided after "/release" when it must be one of: "patch", "minor", "major".
+Increase the version number automatically depending on the provided keyword:
+
+- major: increase X
+- minor: increase Y
+- patch: increase Z
+
+### 0f — Confirm if major version is changing
 
 If the major part (X) is different from the current major, **stop and ask the user to confirm** before proceeding:
 

@@ -232,7 +232,7 @@ class Admin
                 "svgFileLastChanged" => $map->svgFileLastChanged,
                 "options" => array(
                     "regionPrefix" => isset($map->options["regionPrefix"]) ? $map->options["regionPrefix"] : "",
-                    "loadingText" => isset($map->options["loadingText"]) ? $map->options["loadingText"] : "Loading map..."
+                    "loadingText" => isset($map->options["loadingText"]) ? Map::sanitizeLoadingTextForOutput($map->options["loadingText"]) : "Loading map..."
                 )
             ),
             'user' => array(

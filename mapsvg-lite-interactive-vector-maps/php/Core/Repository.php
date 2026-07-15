@@ -920,11 +920,14 @@ class Repository implements JsonSerializable
 	 */
 	public function getDistinctValues($fieldName)
 	{
-		$db = Database::get();
 		$table = $this->getTableName();
-		// Escape field name for safety
-		$field = esc_sql($fieldName);
-		$sql = "SELECT DISTINCT `$field` FROM `$table` WHERE `$field` IS NOT NULL AND `$field` != ''";
+		if (!Utils::isTableColumn($table, $fieldName)) {
+			return [];
+		}
+
+		$db = Database::get();
+		// Column/table names verified via DESCRIBE + identifier checks.
+		$sql = "SELECT DISTINCT `{$fieldName}` FROM `{$table}` WHERE `{$fieldName}` IS NOT NULL AND `{$fieldName}` != ''";
 		$results = $db->get_col($sql, 0);
 		return $results ? $results : [];
 	}

@@ -15,7 +15,7 @@ class DOMElement {
   public function render() {
       $attributesString = '';
       foreach ($this->attributes as $key => $value) {
-          $attributesString .= " $key=\"$value\"";
+          $attributesString .= ' ' . $key . '="' . esc_attr((string)$value) . '"';
       }
       return "<{$this->tag}{$attributesString}>{$this->content}</{$this->tag}>";
   }

@@ -2077,8 +2077,10 @@ export class MapSVGMap {
   setLoadingText(message: string): void {
     this.options.loadingText = message
     if (this.containers.loading) {
-      $(this.containers.loading).find(".mapsvg-loading-text")[0].innerHTML =
-        this.options.loadingText
+      const el = $(this.containers.loading).find(".mapsvg-loading-text")[0] as HTMLElement
+      if (el) {
+        this.applyLoadingText(el, this.options.loadingText)
+      }
     }
   }
   /**
@@ -8395,13 +8397,42 @@ export class MapSVGMap {
     }
   }
 
+  /**
+   * Renders loading text safely.
+   * Plain text uses textContent; limited HTML (from unfiltered_html + wp_kses_post) is
+   * inserted after stripping scripts, embeds, and event-handler attributes.
+   */
+  private applyLoadingText(el: HTMLElement, message: string): void {
+    const text = message || ""
+    if (!/<[a-z]/i.test(text)) {
+      el.textContent = text
+      return
+    }
+    el.textContent = ""
+    const template = document.createElement("template")
+    template.innerHTML = text
+    template.content
+      .querySelectorAll("script, iframe, object, embed, link, meta")
+      .forEach((node) => node.remove())
+    template.content.querySelectorAll("*").forEach((node) => {
+      for (const attr of Array.from(node.attributes)) {
+        const name = attr.name.toLowerCase()
+        const value = attr.value.trim().toLowerCase()
+        if (name.startsWith("on") || value.startsWith("javascript:")) {
+          node.removeAttribute(attr.name)
+        }
+      }
+    })
+    el.appendChild(template.content)
+  }
+
   private addLoadingMessage(): void {
     this.containers.loading = document.createElement("div")
     this.containers.loading.className = "mapsvg-loading"
 
     const loadingTextBlock = document.createElement("div")
     loadingTextBlock.className = "mapsvg-loading-text"
-    loadingTextBlock.innerHTML = this.options.loadingText
+    this.applyLoadingText(loadingTextBlock, this.options.loadingText)
 
     const spinner = document.createElement("div")
     spinner.className = "spinner-border spinner-border-sm"

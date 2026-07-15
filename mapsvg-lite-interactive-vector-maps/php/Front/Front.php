@@ -50,7 +50,7 @@ class Front
 		wp_register_script('bloodhound', MAPSVG_PLUGIN_URL . 'js/vendor/typeahead/bloodhound.js', null, '0.11.1', true);
 		wp_enqueue_script('bloodhound');
 
-		wp_register_script('handlebars', MAPSVG_PLUGIN_URL . 'js/vendor/handlebars/handlebars.min.js', null, '4.7.7', true);
+		wp_register_script('handlebars', MAPSVG_PLUGIN_URL . 'js/vendor/handlebars/handlebars.min.js', null, '4.7.9', true);
 		wp_enqueue_script('handlebars');
 		wp_enqueue_script('handlebars-helpers', MAPSVG_PLUGIN_URL . 'js/vendor/handlebars/handlebars-helpers.js', null, MAPSVG_ASSET_VERSION, true);
 
@@ -188,7 +188,7 @@ class Front
 			'class' => 'mapsvg',
 			'data-autoload' => 'true',
 			'data-load-db' => isset($map->options["database"]) && isset($map->options["database"]["loadOnStart"]) && $map->options["database"]["loadOnStart"] === true ? "true" : "false",
-			'data-loading-text' => isset($map->options["loadingText"])  ? $map->options["loadingText"] : "",
+			'data-loading-text' => isset($map->options["loadingText"]) ? Map::sanitizeLoadingTextForOutput($map->options["loadingText"]) : "",
 			'style' => 'width: 100%; height: 0; padding-bottom: ' . $mapPadding . '%'
 		];
 		if (isset($atts['selected']) && !empty($atts['selected'])) {

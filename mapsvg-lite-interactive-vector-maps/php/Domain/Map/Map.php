@@ -308,6 +308,52 @@ class Map extends Model implements \JsonSerializable
 		$this->optionsBroken = $value;
 	}
 	/**
+	 * Sanitize loadingText on write.
+	 * Users with unfiltered_html may store limited HTML (no JS); others get plain text.
+	 *
+	 * @param mixed $text
+	 * @return string
+	 */
+	public static function sanitizeLoadingText($text)
+	{
+		if (!is_string($text)) {
+			return '';
+		}
+		if (current_user_can('unfiltered_html')) {
+			return wp_kses_post($text);
+		}
+		return sanitize_text_field($text);
+	}
+
+	/**
+	 * Sanitize loadingText for output / in-memory use (safe HTML, no JS).
+	 *
+	 * @param mixed $text
+	 * @return string
+	 */
+	public static function sanitizeLoadingTextForOutput($text)
+	{
+		if (!is_string($text)) {
+			return '';
+		}
+		return wp_kses_post($text);
+	}
+
+	/**
+	 * Apply write-time sanitization to map options that can contain HTML.
+	 *
+	 * @param array $options
+	 * @return array
+	 */
+	public static function sanitizeOptionsForWrite(array $options)
+	{
+		if (isset($options['loadingText'])) {
+			$options['loadingText'] = self::sanitizeLoadingText($options['loadingText']);
+		}
+		return $options;
+	}
+
+	/**
 	 * Sets map options
 	 * @param $options
 	 */
@@ -325,6 +371,10 @@ class Map extends Model implements \JsonSerializable
 				$this->setOptionsBroken(true);
 				return;
 			}
+		}
+
+		if (is_array($options) && isset($options['loadingText'])) {
+			$options['loadingText'] = self::sanitizeLoadingTextForOutput($options['loadingText']);
 		}
 
 		$this->options = $options;

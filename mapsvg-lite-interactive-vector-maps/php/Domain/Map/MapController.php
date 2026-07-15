@@ -220,6 +220,9 @@ class MapController extends Controller
 		$mapsRepository = RepositoryFactory::get("map");
 
 		$map["options"] = json_decode($map["options"], true);
+		if (is_array($map["options"])) {
+			$map["options"] = Map::sanitizeOptionsForWrite($map["options"]);
+		}
 
 		// Validate map data
 		try {
@@ -581,6 +584,16 @@ class MapController extends Controller
 			$mapData['options'] = str_replace("!mapsvg-encoded-db", "database", $mapData['options']);
 			$mapData['options'] = str_replace("!mapsvg-encoded-vc", "varchar", $mapData['options']);
 			$mapData['options'] = str_replace("!mapsvg-encoded-int", "int(11)", $mapData['options']);
+		}
+
+		if (isset($mapData['options']) && is_string($mapData['options'])) {
+			$decodedOptions = json_decode($mapData['options'], true);
+			if (is_array($decodedOptions)) {
+				$mapData['options'] = $decodedOptions;
+			}
+		}
+		if (isset($mapData['options']) && is_array($mapData['options'])) {
+			$mapData['options'] = Map::sanitizeOptionsForWrite($mapData['options']);
 		}
 
 		// Validate map data

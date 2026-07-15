@@ -104,16 +104,26 @@ class PostTypesRepository
 
   /**
    * Retrieves distinct values for a given field name from published posts.
-   * 
+   *
    * @param string $fieldName The name of the field to retrieve distinct values for.
+   * @param string $post_type
    * @return array An array of distinct values for the specified field.
    */
   public function getFieldValues($fieldName, $post_type)
   {
     $db = Database::get();
-    $post_type = esc_sql($post_type);
-    $results = $db->get_col("SELECT DISTINCT " . esc_sql($fieldName) . " FROM " . $db->posts() . " WHERE post_status='publish' AND post_type='$post_type'", 0);
-    return $results;
+    $postsTable = $db->posts();
+    if (!Utils::isSafeSlug($post_type) || !Utils::isTableColumn($postsTable, $fieldName)) {
+      return [];
+    }
+
+    // Column name is verified against DESCRIBE; post_type is bound via prepare.
+    $sql = $db->prepare(
+      "SELECT DISTINCT `{$fieldName}` FROM `{$postsTable}` WHERE post_status = 'publish' AND post_type = %s",
+      $post_type
+    );
+    $results = $db->get_col($sql, 0);
+    return $results ? $results : [];
   }
 
   /**
@@ -124,13 +134,19 @@ class PostTypesRepository
    */
   public function getTaxonomyValues($name)
   {
+    if (!Utils::isSafeSlug($name)) {
+      return [];
+    }
+
     $db = Database::get();
-    $taxonomy = esc_sql($name);
-    $sql = "SELECT DISTINCT t.name FROM {$db->prefix}terms t
+    $sql = $db->prepare(
+      "SELECT DISTINCT t.name FROM {$db->prefix}terms t
                 INNER JOIN {$db->prefix}term_taxonomy tt ON t.term_id = tt.term_id
                 INNER JOIN {$db->prefix}term_relationships tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
-                INNER JOIN {$db->posts()} p ON tr.object_id = p.ID
-                WHERE tt.taxonomy = '$taxonomy' AND p.post_status = 'publish'";
+                INNER JOIN {$db->posts} p ON tr.object_id = p.ID
+                WHERE tt.taxonomy = %s AND p.post_status = 'publish'",
+      $name
+    );
     $results = $db->get_col($sql, 0);
     return $results ? $results : [];
   }
@@ -143,11 +159,17 @@ class PostTypesRepository
    */
   public function getMetaValues($name)
   {
+    if (!Utils::isSafeSlug($name)) {
+      return [];
+    }
+
     $db = Database::get();
-    $meta_key = esc_sql($name);
-    $sql = "SELECT DISTINCT pm.meta_value FROM {$db->postmeta} pm
-                INNER JOIN {$db->posts()} p ON pm.post_id = p.ID
-                WHERE pm.meta_key = '$meta_key' AND p.post_status = 'publish' AND pm.meta_value IS NOT NULL AND pm.meta_value != ''";
+    $sql = $db->prepare(
+      "SELECT DISTINCT pm.meta_value FROM {$db->postmeta} pm
+                INNER JOIN {$db->posts} p ON pm.post_id = p.ID
+                WHERE pm.meta_key = %s AND p.post_status = 'publish' AND pm.meta_value IS NOT NULL AND pm.meta_value != ''",
+      $name
+    );
     $results = $db->get_col($sql, 0);
 
     // Unserialize meta values if needed and flatten arrays to scalars
