@@ -90,6 +90,11 @@ class ApiDataSource implements DataSourceInterface
     return $this->apiClient->delete($endpoint["url"]);
   }
 
+  public function isUnique(array $criteria): bool
+  {
+    return true;
+  }
+
   public function clear()
   {
     $endpoint = $this->getApiEndpoint("clear");

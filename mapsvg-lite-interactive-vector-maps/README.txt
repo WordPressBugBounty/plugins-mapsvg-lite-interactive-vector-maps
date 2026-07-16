@@ -2,8 +2,8 @@
 Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
-Tested up to: 6.9
-Stable tag: 8.14.1
+Tested up to: 7.0.1
+Stable tag: 8.14.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -139,287 +139,17 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 
 == Changelog ==
 
-= 8.5.17 =
-* Fixed: show popover on directory item click
-
-= 8.5.15 =
-* Fixed: filters not working properlywhen "search" button is added to the form
-
-= 8.5.14 =
-* Fix filters
-
-= 8.5.11 = 
-* Fix tables creation on plugin activation
-
-= 8.5.10 = 
-* Fix tables creation on plugin activation
-* Fix viewBox reset to initial value
-
-= 8.5.9 =
-* Fix pagination
-
-= 8.5.8 =
-* Limit zoom levels to 1-22 (same as Google Maps)
-
-= 8.5.7 =
-* Fix reloading filters state on directory redraw
-
-= 8.5.6 =
-* Adjust Australia SVG map for better region label placement
-
-= 8.5.29 =
-* Fix mobile buttons list/map 
-
-= 8.5.30 =
-* Fix zero header/footer size, when used with details view
-
-= 8.5.31 =
-* Fix invisible settings tabs in the Map Editor
-* Fix the flush_rewrite_rules() execution issues
-* Defer JS scripts loading
-
-= 8.5.32 =
-* Fix handle click on HTML links in SVG files
-* Fix duplicate map feature
-* Fix on mobile devices, on directory item click - properly fit markers on google maps
-* Fix keep text search field state on database fetch, when filters are located in directory
-
-= 8.5.34 =
-* Change "Upgrade to Pro" links to mapsvg.com/pricing
-
-= 8.5.35 =
-* Add "mapsvg_format_post_data" filter
-* Improve upgrading scripts from old MapSVG versions
-* Fix flush_rewrite_rules issues
-
-= 8.5.36 =
-* Fix shortcode rendering in the templates
-
-= 8.5.37 =
-* Fix plugin activation issues
-
-= 8.5.38 =
-* Fix clicking on links in SVG 
-* Fix broken options in 8.5.37
-
-= 8.5.39 =
-* Fix filter tags (show clickable filter tags when filters are hidden)
-* Fix search by regions
-
-= 8.5.40 =
-* Fix "select" field editing
-* Fix shortcode rending function (for mapsvg templates)
-
-= 8.5.41 =
-* Fix Handlebars WP shortcode rendering
-
-= 8.5.42 =
-* Fix clustering
-
-= 8.6.0 =
-* (Pro only) Filters for WP CPT
-* (Pro only) Dynamic markers by WP CPT field values
-
-= 8.6.3 =
-* Fix map.destroy() method
-
-= 8.6.4 =
-* Fix loading of different kinds of data sources
-
-= 8.6.5 =
-* Fixed XSS vulnerability
-* Fixed SVG file copy vulnerability
-
-= 8.6.6 =
-* Fixed post title being rendered as plain text (in popovers / details)
-
-= 8.6.7 =
-* Added SVG file sanitization for non-admins
-
-= 8.6.8 =
-* Minor bugfix
-
-= 8.6.9 =
-* Minor bugfix for migrations
-
-= 8.6.10 =
-* Fixed security vulnerabilities related to unauthorized shortcode rendering in templates
-
-= 8.6.11 =
-* Fixed unavailable filtering by ACF fields
-* Fixed handling of post type names containing dashes
-
-= 8.6.12 =
-* Fixed a few vulnerabilities
-
-= 8.6.13 =
-* Fixed: Duplicating a map now correctly updates the map ID in the "CSS" tab, preventing conflicts with the original map.
-
-= 8.6.14 =
-* Fixed: saving settings on the main screen
-* Fixed: maps not working with disabled permalinks
-
-= 8.6.15 = 
-* Fixed: filter by region
-
-= 8.7.0 = 
-* Feature: dynamic Region statuses
-* Fixed: incorrect container height issues in the map editor
-
-= 8.7.1 = 
-* Fixed: deleting a post did not delete marker from the map
-* Fixed: scrolling of css/js/templates code editors on Firefox
-* Fixed: map sizing issues with some WP themes
-
-= 8.7.2 = 
-* Fixed: "Show another map" feature functionality
-* Fixed: WP Rocket and LiteSpeed cache plugins were breaking MapSVG code. Added JavaScript files to exclusions in those plugins' settings.
-* Fixed: premature jQuery call that was breaking the map when jQuery wasn't immediately available
-
-= 8.7.3 = 
-* Fixed: directory rendering issues with enabled categories
-
-= 8.7.4 = 
-* Fixed: security issue, checking uploaded file type
-
-= 8.7.5 = 
-* Fixed: fixed issues of the "show another map in the same container" feature
-
-= 8.7.8 = 
-* Fixed: scroll on mobile devices
-* Fixed: null region titles
-
-= 8.7.9 = 
-* Fixed: visibility toggles for SVG groups
-* Fixed: shortcode rendering in templates
-
-= 8.7.10 = 
-* Fixed: lite version fatal error
-
-= 8.7.11 = 
-* Fixed: buttons that control enabled/disabled state of the region status options
-* Fixed: mobile map scroll issues
-* Fixed: WP CPT connection, Gutenberg/Classic Editor scripts loading
-
-= 8.7.12 = 
-* Fixed: marker drag & drop
-
-= 8.7.13 = 
-* Fixed: prevent setting region statuses before the data has loaded from the server
-
-= 8.7.14 = 
-* Fixed: SVG file reload failed when regions had no Title field.
-
-= 8.7.15 = 
-* Fixed: prevent loading of Google Maps API for incompatible (uncalibrated) maps
-* Fixed: user and access token creation (for support)
-* Fixed: Clockwork issues in Laravel environment
-* Fixed: filter tags were not loading when no filterSchema was provided
-* Fixed: passing correct data to custom event handlers on mobile devices
-
-= 8.7.16 = 
-* Fixed: duplicating maps created in older version of mapsvg was triggering an error about auto_increment
-* Fixed: improved world.svg map calibration
-
-= 8.7.17 = 
-* Fixed: unserialized ACF field values in filter options
-
-= 8.7.18 = 
-* Fixed: filtering by ACF select and multiselect fields
-* Fixed: added compatibility with PHP 7.4
-
-= 8.7.19 = 
-* Fixed: filtering by ACF using checkboxes fields
-* Fixed: migration issues
-
-= 8.7.20 = 
-* Fixed: zoom to a cluster did not always reveal its markers
-
-= 8.7.21 = 
-* Fixed: empty directory in duplicated maps
-* Fixed: "deprecated" error in logs
-
-= 8.7.22 = 
-* Feature: Maximum zoom level for clustering
-* Fixed: blurred map on zoom in Safari
-* Fixed: zoom to cluster on Google Maps
-
-= 8.7.23 = 
-* Fixed: XSS vulnerability in shortcode attributes
-
-= 8.8.0 = 
-* Feature: Isolate CSS to shadow root (optional)
-* Fixed: blurred map on zoom in Safari
-
-= 8.8.1 = 
-* Fixed: not working {{distanceTo ...}} Handlebars tag
-
-= 8.8.2 =
-* Fixed: Handlebars templates not loading correctly when multiple maps were on the same page
-* Fixed: location form styles in Gutenberg
-
-= 8.8.3 =
-* Fixed: tooltip flickering during mirroring near map edges
-
-= 8.8.4 =
-* Fixed: map visibility in Classic Post Editor
-
-= 8.9.0 =
-* Feature: map themes: default, rounded
-
-= 8.9.1 =
-* Fixed: styles for multiselect fields
-
-= 8.9.2 =
-* Feature: rounded map buttons
-* Fixed: check if phpinfo() is available
-
-= 8.9.3 =
-* Fixed: Windows OS incompatibility 
-
-= 8.10.0 =
-* Feature: added wp-cli export/import commands.
-
-= 8.10.1 =
-* Fixed: show previous map button functionality
-
-Examples:
-* `wp mapsvg export` - Export all MapSVG database tables to SQL file
-* `wp mapsvg export --toDomain=mapsvg.com` - Export and replace current domain with a new one in the .sql file
-* `wp mapsvg import /path/to/file.sql` - Import MapSVG data from SQL file 
-
-= 8.11.0 =
-* Feature: load 1 post location only, for the currently opened post page
-* Feature: choose AND/OR logic for the multiselect filters
-
-= 8.11.1 =
-* Fixed: map data now updates correctly when connected posts are published, unpublished, trashed, or restored.
-* Fixed: directory item templates rendering issues.
-* Fixed: zoom to a single marker after filtering.
-* Fixed: region status colors not applying correctly.
-* Fixed: Slovenia map calibration.
-
-= 8.12.0 =
-* Improved: CSV import — large files (100K+ rows) are now processed in the background using chunked server-side parsing and WordPress Cron. Progress is tracked live and survives page reloads. Supports all field types including Location (with background geocoding), Image (remote URLs downloaded to WP Media Library with deduplication), Regions, Select, Checkboxes, Post, and Date.
-* Improved: Error handling — all errors now include unique error codes. Extended descriptions are available at [mapsvg.com/docs/errors](https://mapsvg.com/docs/errors).
-
-= 8.12.1 =
-* Improved: categories can now group by text fields
-
-= 8.12.2 =
-* Fixed: zoom to cluster with markers at the same location
-
-= 8.13.0 =
-* Improved: **Google Sheets auto-sync** — added a full Google Sheets/remote CSV data source flow with scheduled auto-refetch support.
-* Improved: **CSV import** — improved import flow with preflight validation, clearer ID-field handling, and smarter append/upsert behavior.
-* Improved: **Admin UX** — improved CSV/database/regions controls, including geocoding options, read-only behavior, and add/edit button state updates.
-
-= 8.13.1 =
-* Fixed: **Forms** — improved multiselect tag layout so tags don’t overlap other elements.
-* Fixed: **Popovers** — fixed popovers closing when clicking inside them.
-
-= 8.13.2 =
-* Fixed: data table was not getting created for new or duplicated maps
+= 8.14.2 =
+* Improved: **Admin UI** — data sources list now shows collection name, type, and linked post type.
+* Improved: **Compatibility** — declared tested with WordPress 7.0.1.
+* Fixed: **WP Posts** — fixed allowing the same WordPress post type to be attached to more than one data source.
+* Fixed: **API** — requests for a missing collection/data source now return a clear bad-request error instead of failing.
+
+= 8.14.1 =
+* Fixed: **SVG uploads** — strengthened upload checks so only valid SVG files are accepted.
+* Fixed: **Security / REST API** — hardened post-type and distinct-value endpoints against SQL injection.
+* Fixed: **Security / loading text** — sanitized and safely rendered map loading text to prevent stored XSS.
+* Fixed: **Security / Handlebars** — updated Handlebars to the latest version with security fixes.
 
 = 8.14.0 =
 * Improved: **Data sources** — you can delete unused data sources from the admin (connected sources and region tables stay protected).
@@ -428,11 +158,287 @@ Examples:
 * Fixed: **WP Posts / post types** — fixed empty or missing `postType` on legacy `posts_*` schemas so post filters and sync work correctly.
 * Fixed: **Google Maps** — removed an incorrect viewport restriction that could block map interaction.
 
-= 8.14.1 =
-* Fixed: **SVG uploads** — strengthened upload checks so only valid SVG files are accepted.
-* Fixed: **Security / REST API** — hardened post-type and distinct-value endpoints against SQL injection.
-* Fixed: **Security / loading text** — sanitized and safely rendered map loading text to prevent stored XSS.
-* Fixed: **Security / Handlebars** — updated Handlebars to the latest version with security fixes.
+= 8.13.2 =
+* Fixed: data table was not getting created for new or duplicated maps
+
+= 8.13.1 =
+* Fixed: **Forms** — improved multiselect tag layout so tags don’t overlap other elements.
+* Fixed: **Popovers** — fixed popovers closing when clicking inside them.
+
+= 8.13.0 =
+* Improved: **Google Sheets auto-sync** — added a full Google Sheets/remote CSV data source flow with scheduled auto-refetch support.
+* Improved: **CSV import** — improved import flow with preflight validation, clearer ID-field handling, and smarter append/upsert behavior.
+* Improved: **Admin UX** — improved CSV/database/regions controls, including geocoding options, read-only behavior, and add/edit button state updates.
+
+= 8.12.2 =
+* Fixed: zoom to cluster with markers at the same location
+
+= 8.12.1 =
+* Improved: categories can now group by text fields
+
+= 8.12.0 =
+* Improved: CSV import — large files (100K+ rows) are now processed in the background using chunked server-side parsing and WordPress Cron. Progress is tracked live and survives page reloads. Supports all field types including Location (with background geocoding), Image (remote URLs downloaded to WP Media Library with deduplication), Regions, Select, Checkboxes, Post, and Date.
+* Improved: Error handling — all errors now include unique error codes. Extended descriptions are available at [mapsvg.com/docs/errors](https://mapsvg.com/docs/errors).
+
+= 8.11.1 =
+* Fixed: map data now updates correctly when connected posts are published, unpublished, trashed, or restored.
+* Fixed: directory item templates rendering issues.
+* Fixed: zoom to a single marker after filtering.
+* Fixed: region status colors not applying correctly.
+* Fixed: Slovenia map calibration.
+
+= 8.11.0 =
+* Feature: load 1 post location only, for the currently opened post page
+* Feature: choose AND/OR logic for the multiselect filters
+
+= 8.10.1 =
+* Fixed: show previous map button functionality
+
+Examples:
+* `wp mapsvg export` - Export all MapSVG database tables to SQL file
+* `wp mapsvg export --toDomain=mapsvg.com` - Export and replace current domain with a new one in the .sql file
+* `wp mapsvg import /path/to/file.sql` - Import MapSVG data from SQL file
+
+= 8.10.0 =
+* Feature: added wp-cli export/import commands.
+
+= 8.9.3 =
+* Fixed: Windows OS incompatibility
+
+= 8.9.2 =
+* Feature: rounded map buttons
+* Fixed: check if phpinfo() is available
+
+= 8.9.1 =
+* Fixed: styles for multiselect fields
+
+= 8.9.0 =
+* Feature: map themes: default, rounded
+
+= 8.8.4 =
+* Fixed: map visibility in Classic Post Editor
+
+= 8.8.3 =
+* Fixed: tooltip flickering during mirroring near map edges
+
+= 8.8.2 =
+* Fixed: Handlebars templates not loading correctly when multiple maps were on the same page
+* Fixed: location form styles in Gutenberg
+
+= 8.8.1 = 
+* Fixed: not working {{distanceTo ...}} Handlebars tag
+
+= 8.8.0 = 
+* Feature: Isolate CSS to shadow root (optional)
+* Fixed: blurred map on zoom in Safari
+
+= 8.7.23 = 
+* Fixed: XSS vulnerability in shortcode attributes
+
+= 8.7.22 = 
+* Feature: Maximum zoom level for clustering
+* Fixed: blurred map on zoom in Safari
+* Fixed: zoom to cluster on Google Maps
+
+= 8.7.21 = 
+* Fixed: empty directory in duplicated maps
+* Fixed: "deprecated" error in logs
+
+= 8.7.20 = 
+* Fixed: zoom to a cluster did not always reveal its markers
+
+= 8.7.19 = 
+* Fixed: filtering by ACF using checkboxes fields
+* Fixed: migration issues
+
+= 8.7.18 = 
+* Fixed: filtering by ACF select and multiselect fields
+* Fixed: added compatibility with PHP 7.4
+
+= 8.7.17 = 
+* Fixed: unserialized ACF field values in filter options
+
+= 8.7.16 = 
+* Fixed: duplicating maps created in older version of mapsvg was triggering an error about auto_increment
+* Fixed: improved world.svg map calibration
+
+= 8.7.15 = 
+* Fixed: prevent loading of Google Maps API for incompatible (uncalibrated) maps
+* Fixed: user and access token creation (for support)
+* Fixed: Clockwork issues in Laravel environment
+* Fixed: filter tags were not loading when no filterSchema was provided
+* Fixed: passing correct data to custom event handlers on mobile devices
+
+= 8.7.14 = 
+* Fixed: SVG file reload failed when regions had no Title field.
+
+= 8.7.13 = 
+* Fixed: prevent setting region statuses before the data has loaded from the server
+
+= 8.7.12 = 
+* Fixed: marker drag & drop
+
+= 8.7.11 = 
+* Fixed: buttons that control enabled/disabled state of the region status options
+* Fixed: mobile map scroll issues
+* Fixed: WP CPT connection, Gutenberg/Classic Editor scripts loading
+
+= 8.7.10 = 
+* Fixed: lite version fatal error
+
+= 8.7.9 = 
+* Fixed: visibility toggles for SVG groups
+* Fixed: shortcode rendering in templates
+
+= 8.7.8 = 
+* Fixed: scroll on mobile devices
+* Fixed: null region titles
+
+= 8.7.5 = 
+* Fixed: fixed issues of the "show another map in the same container" feature
+
+= 8.7.4 = 
+* Fixed: security issue, checking uploaded file type
+
+= 8.7.3 = 
+* Fixed: directory rendering issues with enabled categories
+
+= 8.7.2 = 
+* Fixed: "Show another map" feature functionality
+* Fixed: WP Rocket and LiteSpeed cache plugins were breaking MapSVG code. Added JavaScript files to exclusions in those plugins' settings.
+* Fixed: premature jQuery call that was breaking the map when jQuery wasn't immediately available
+
+= 8.7.1 = 
+* Fixed: deleting a post did not delete marker from the map
+* Fixed: scrolling of css/js/templates code editors on Firefox
+* Fixed: map sizing issues with some WP themes
+
+= 8.7.0 = 
+* Feature: dynamic Region statuses
+* Fixed: incorrect container height issues in the map editor
+
+= 8.6.15 = 
+* Fixed: filter by region
+
+= 8.6.14 =
+* Fixed: saving settings on the main screen
+* Fixed: maps not working with disabled permalinks
+
+= 8.6.13 =
+* Fixed: Duplicating a map now correctly updates the map ID in the "CSS" tab, preventing conflicts with the original map.
+
+= 8.6.12 =
+* Fixed a few vulnerabilities
+
+= 8.6.11 =
+* Fixed unavailable filtering by ACF fields
+* Fixed handling of post type names containing dashes
+
+= 8.6.10 =
+* Fixed security vulnerabilities related to unauthorized shortcode rendering in templates
+
+= 8.6.9 =
+* Minor bugfix for migrations
+
+= 8.6.8 =
+* Minor bugfix
+
+= 8.6.7 =
+* Added SVG file sanitization for non-admins
+
+= 8.6.6 =
+* Fixed post title being rendered as plain text (in popovers / details)
+
+= 8.6.5 =
+* Fixed XSS vulnerability
+* Fixed SVG file copy vulnerability
+
+= 8.6.4 =
+* Fix loading of different kinds of data sources
+
+= 8.6.3 =
+* Fix map.destroy() method
+
+= 8.6.0 =
+* (Pro only) Filters for WP CPT
+* (Pro only) Dynamic markers by WP CPT field values
+
+= 8.5.42 =
+* Fix clustering
+
+= 8.5.41 =
+* Fix Handlebars WP shortcode rendering
+
+= 8.5.40 =
+* Fix "select" field editing
+* Fix shortcode rending function (for mapsvg templates)
+
+= 8.5.39 =
+* Fix filter tags (show clickable filter tags when filters are hidden)
+* Fix search by regions
+
+= 8.5.38 =
+* Fix clicking on links in SVG 
+* Fix broken options in 8.5.37
+
+= 8.5.37 =
+* Fix plugin activation issues
+
+= 8.5.36 =
+* Fix shortcode rendering in the templates
+
+= 8.5.35 =
+* Add "mapsvg_format_post_data" filter
+* Improve upgrading scripts from old MapSVG versions
+* Fix flush_rewrite_rules issues
+
+= 8.5.34 =
+* Change "Upgrade to Pro" links to mapsvg.com/pricing
+
+= 8.5.32 =
+* Fix handle click on HTML links in SVG files
+* Fix duplicate map feature
+* Fix on mobile devices, on directory item click - properly fit markers on google maps
+* Fix keep text search field state on database fetch, when filters are located in directory
+
+= 8.5.31 =
+* Fix invisible settings tabs in the Map Editor
+* Fix the flush_rewrite_rules() execution issues
+* Defer JS scripts loading
+
+= 8.5.30 =
+* Fix zero header/footer size, when used with details view
+
+= 8.5.29 =
+* Fix mobile buttons list/map
+
+= 8.5.6 =
+* Adjust Australia SVG map for better region label placement
+
+= 8.5.7 =
+* Fix reloading filters state on directory redraw
+
+= 8.5.8 =
+* Limit zoom levels to 1-22 (same as Google Maps)
+
+= 8.5.9 =
+* Fix pagination
+
+= 8.5.10 = 
+* Fix tables creation on plugin activation
+* Fix viewBox reset to initial value
+
+= 8.5.11 = 
+* Fix tables creation on plugin activation
+
+= 8.5.14 =
+* Fix filters
+
+= 8.5.15 =
+* Fixed: filters not working properlywhen "search" button is added to the form
+
+= 8.5.17 =
+* Fixed: show popover on directory item click
 
 == Upgrade Notice ==
 

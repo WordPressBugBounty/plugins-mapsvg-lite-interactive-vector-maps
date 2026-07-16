@@ -551,6 +551,46 @@ class DbDataSource implements DataSourceInterface
     return $this->db->get_row($this->db->prepare("SELECT * FROM {$this->getTableName()} WHERE {$whereClause} LIMIT 1", $values), ARRAY_A);
   }
 
+  /**
+   * Returns true if no existing row matches all given field/value pairs
+   * (composite unique-index style check).
+   *
+   * @param array $criteria Column => value pairs, e.g. ['type' => 'post', 'postType' => 'movie']
+   * @return bool
+   */
+  public function isUnique(array $criteria): bool
+  {
+    if (empty($criteria)) {
+      return true;
+    }
+
+    $whereClauses = [];
+    $values = [];
+
+    foreach ($criteria as $key => $value) {
+      $column = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $key);
+      if ($column === '') {
+        continue;
+      }
+      $whereClauses[] = "`{$column}` = %s";
+      $values[] = $value;
+    }
+
+    if (empty($whereClauses)) {
+      return true;
+    }
+
+    $whereClause = implode(' AND ', $whereClauses);
+    $count = (int) $this->db->get_var(
+      $this->db->prepare(
+        "SELECT COUNT(*) FROM {$this->getTableName()} WHERE {$whereClause}",
+        $values
+      )
+    );
+
+    return $count === 0;
+  }
+
   public function create($data)
   {
     $this->db->insert($this->getTableName(), $data);

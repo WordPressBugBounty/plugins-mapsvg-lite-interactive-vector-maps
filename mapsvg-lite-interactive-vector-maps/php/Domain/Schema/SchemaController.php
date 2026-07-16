@@ -137,6 +137,16 @@ class SchemaController extends Controller
 			return new \WP_REST_Response(["data" => ["error" => "Data source with the name '" . $data["name"] . "' already exists"]], 400);
 		}
 
+		if (($data["type"] ?? '') === "post" && !empty($data["postType"])) {
+			if (!$schemaRepository->source->isUnique(['type' => 'post', 'postType' => $data['postType']])) {
+				return new \WP_REST_Response([
+					"data" => [
+						"error" => "A data source for post type '" . $data["postType"] . "' already exists",
+					],
+				], 400);
+			}
+		}
+
 		if (SchemaRepository::tableExists($data["name"])) {
 			return new \WP_REST_Response(["data" => ["error" => "Database table for '" . $data["name"] . "' already exists"]], 400);
 		}

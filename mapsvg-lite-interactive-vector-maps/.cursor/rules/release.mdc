@@ -96,6 +96,8 @@ Group them into categories if applicable (Bug Fixes / Features / Improvements).
 
 Write release notes for humans, not as a commit dump.
 
+**README.txt order:** always newest version first (reverse chronological). New entries go right under `== Changelog ==`.
+
 Rules:
 
 - Lead with the main release story in the first bullet (the biggest user-facing change).
@@ -176,7 +178,7 @@ Before creating the file and proceeding further, output full generated changelog
 
 File: `mapsvg/README.txt`
 
-Insert a new section BEFORE `== Upgrade Notice ==`:
+Changelog order is **newest first** (reverse chronological). Insert the new section immediately after `== Changelog ==` (above all existing version entries), never at the bottom:
 
 ```
 = X.Y.Z =

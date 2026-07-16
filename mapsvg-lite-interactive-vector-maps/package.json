@@ -1,6 +1,6 @@
 {
   "name": "mapsvg",
-  "version": "8.14.1",
+  "version": "8.14.2",
   "type": "module",
   "main": "dist/mapsvg-front.min.js",
   "module": "dist/mapsvg-front.esm.js",

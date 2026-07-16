@@ -40,6 +40,10 @@ class CollectionController extends Controller
     public static function index(\WP_REST_Request $request): \WP_REST_Response
     {
         $repo  = RepositoryFactory::get($request['_collection_name']);
+        if (!$repo) {
+            return static::render(['error' => 'Collection not found.'], 400);
+        }
+
         $query = new Query($request->get_params());
 
         $response = $repo->find($query);

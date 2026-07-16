@@ -47,6 +47,14 @@ class SchemaRepository extends Repository
 			unset($schema->id);
 		}
 
+		if ($schema->type === 'post' && !empty($schema->postType)) {
+			if (!$this->source->isUnique(['type' => 'post', 'postType' => $schema->postType])) {
+				throw new \Exception(
+					"A schema for post type '{$schema->postType}' already exists."
+				);
+			}
+		}
+
 		// Get default fields for schema
 		if ($schema->type === "object" || $schema->type === "region" || $schema->type === "post" || $schema->type === "api") {
 			if (empty($schema->fields)) {

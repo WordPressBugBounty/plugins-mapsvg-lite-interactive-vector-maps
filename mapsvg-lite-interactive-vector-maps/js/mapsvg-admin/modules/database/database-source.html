@@ -38,9 +38,8 @@
   <table class="table mapsvg-data-list-table" id="mapsvg-data-list-table">
     <thead>
     <tr>
-      <!--<th>id</th>-->
-      <!--<th>Title</th>-->
-      <th>Table name</th>
+      <th>Collection</th>
+      <th>Type</th>
       <th style="width: 128px;"></th>
     </tr>
     </thead>
@@ -54,14 +53,11 @@
 
 <script type="text/x-handlebars-template" data-name="item" data-partial="true">
   <tr id="mapsvg-datasource-{{params.id}}" data-id="{{params.id}}" class="mapsvg-data-row">
-      <!--<td>-->
-      <!--{{params.id}}-->
-      <!--</td>-->
-      <!--<td>-->
-      <!--{{#if params.title}}params.title{{else}}{{params.name}}{{/if}}-->
-      <!--</td>-->
       <td>
           {{#if params.title}}{{params.title}}{{else}}{{params.name}}{{/if}}
+      </td>
+      <td>
+        {{params.type}}{{#if params.postType}} <span class="badge bg-secondary">{{params.postType}}</span>{{/if}}
       </td>
       <td class="text-nowrap text-end">
         <button

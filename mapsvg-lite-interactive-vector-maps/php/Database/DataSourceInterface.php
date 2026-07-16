@@ -9,4 +9,5 @@ interface DataSourceInterface
   public function create($data);
   public function update($data, $criteria);
   public function delete($criteria);
+  public function isUnique(array $criteria): bool;
 }
