@@ -65,10 +65,16 @@ class MapController extends Controller
 			$regionsQuery = array(
 				'perpage' => 0,
 				'sortBy'  => (isset($map->options['menu']) && $map->options['menu']['source'] == 'regions' ? (isset($map->options['menu']['sortBy']) ?  $map->options['menu']['sortBy'] : 'id') : (isset($options['menu']) && strpos($map->options['source'], 'geo-cal') !== false ? 'title' : 'id')),
-				"sort" => $sort
+				"sort" => $sort,
+				'filters' => array(),
 			);
 			if (isset($map->options['menu']) && isset($map->options['menu']['filterout']) && $map->options['menu']['source'] == 'regions' && !empty($map->options['menu']['filterout']['field'])) {
 				$regionsQuery['filterout'][$map->options['menu']['filterout']['field']] = $map->options['menu']['filterout']['val'];
+			}
+			// Admin editor passes includeOrphans=1 so orphaned rows stay visible for manual data migration.
+			// Front-end omits it → RegionsRepository excludes orphaned=1 by default.
+			if (!empty($request['includeOrphans'])) {
+				$regionsQuery['filters']['includeOrphans'] = 1;
 			}
 
 			if ($regionsRepo) {

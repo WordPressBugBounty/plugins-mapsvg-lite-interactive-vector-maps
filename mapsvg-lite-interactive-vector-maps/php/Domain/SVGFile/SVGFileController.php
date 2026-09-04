@@ -118,18 +118,34 @@ class SVGFileController extends Controller
 	 * Updates "lastChanged" timestamp for all maps created from the provided SVG file.
 	 * @param SVGFile $file
 	 * @param $updateTitles
+	 * @return array{maps: array<int, array>, orphanedMarked: int, orphanedCount: int}
 	 */
-	private static function updateLastChanged($file, $updateTitles = null)
+	private static function updateLastChanged($file, $updateTitles = null): array
 	{
 		$mapsRepo = RepositoryFactory::get("map");
 		$query = new Query(array('filters' => array('svgFilePath' => $file->relativeUrl)));
 		$maps = $mapsRepo->find($query);
 
+		$syncResults = array();
+		$orphanedMarked = 0;
+		$orphanedCount = 0;
+
 		foreach ($maps["items"] as $map) {
 			/** @var $map Map */
 			$map->update(array('svgFileLastChanged' => $file->lastChanged()));
-			$mapsRepo->updateFromSvg($map, $updateTitles);
+			$result = $mapsRepo->updateFromSvg($map, $updateTitles);
+			if (is_array($result)) {
+				$syncResults[] = array_merge(array('mapId' => $map->id), $result);
+				$orphanedMarked += (int) ($result['orphanedMarked'] ?? 0);
+				$orphanedCount += (int) ($result['orphanedCount'] ?? 0);
+			}
 		}
+
+		return array(
+			'maps'            => $syncResults,
+			'orphanedMarked'  => $orphanedMarked,
+			'orphanedCount'   => $orphanedCount,
+		);
 	}
 
 	/**
@@ -142,7 +158,10 @@ class SVGFileController extends Controller
 	{
 		$file = new SVGFile($request['file']);
 		$updateTitles = $request['updateTitles'] === 'true';
-		static::updateLastChanged($file, $updateTitles);
-		return self::render(array('file' => $file));
+		$regionSync = static::updateLastChanged($file, $updateTitles);
+		return self::render(array(
+			'file' => $file,
+			'regionSync' => $regionSync,
+		));
 	}
 }

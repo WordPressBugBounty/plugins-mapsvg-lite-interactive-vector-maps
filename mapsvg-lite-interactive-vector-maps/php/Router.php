@@ -402,6 +402,11 @@ class Router
 				return current_user_can('edit_posts');
 			})
 		));
+		register_rest_route('mapsvg/v1', $baseRoute . '/orphans', array(
+			array('methods' => 'DELETE', 'callback' => '\\MapSVG\\CollectionController::deleteOrphans', 'permission_callback' => function () {
+				return current_user_can('edit_posts');
+			})
+		));
 		register_rest_route('mapsvg/v1', $baseRoute . '/import', array(
 			array('methods' => 'POST', 'callback' => '\\MapSVG\\CollectionController::import', 'permission_callback' => function () {
 				return current_user_can('edit_posts');

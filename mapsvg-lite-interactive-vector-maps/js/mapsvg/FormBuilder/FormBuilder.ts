@@ -525,6 +525,10 @@ export class FormBuilder {
             field.value = this.data[field.parameterNameShort]
           }
         } else {
+          // Skip internal orphaned flag — not editable in the region form.
+          if (field.name === "orphaned") {
+            return
+          }
           field.value = this.data
             ? this.data[field.name]
             : field.value !== undefined

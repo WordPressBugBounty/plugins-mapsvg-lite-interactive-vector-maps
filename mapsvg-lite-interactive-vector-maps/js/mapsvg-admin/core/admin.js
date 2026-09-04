@@ -144,6 +144,7 @@ function loadDeps() {
     {
       path: "js/mapsvg-admin/core/controller.js",
       children: [
+        { path: "js/mapsvg-admin/modules/csv/googleSheetsCsvUrl.js" },
         { path: "js/mapsvg-admin/modules/csv/csv-controller.js" },
         { path: "js/mapsvg-admin/modules/settings/settings-controller.js" },
         { path: "js/mapsvg-admin/modules/database/database-controller.js" },
@@ -658,25 +659,51 @@ function loadDeps() {
       }
       _data.controllers.database.controllers.list.setFilters(filter)
     }, //.
-    resizeDashboard: function () {
-      // var w = _data.iframeWindow.width();
-      var w = $("#wpbody-content").width()
-      var top = $("#wpadminbar").height()
-      var left = $(window).width() - w
-      var h = $(window).height() - top
-      $("#mapsvg-admin").css({ width: w, height: h, left: left, top: top })
+    resizeDashboard: function (source) {
+      source = source || "unknown"
+      // Ignore self-triggered feedback while our own sizer write is settling
+      // (header wrap / map ResizeSensor / map "resize" event).
       if (
-        $("#mapsvg-sizer").outerWidth() > $("#mapsvg-container").outerWidth() ||
-        $("#mapsvg-sizer").outerHeight() > $("#mapsvg-container").outerHeight() ||
-        ($("#mapsvg-sizer").outerHeight() < $("#mapsvg-container").outerHeight() &&
-          $("#mapsvg-sizer").outerWidth() < $("#mapsvg-container").outerWidth())
+        _data.resizeQuietUntil &&
+        Date.now() < _data.resizeQuietUntil &&
+        (source === "sensor:mapsvg" || source === "map.events.resize")
       ) {
-        _this.resizeSVGCanvas()
+        return
+      }
+      if (_data.resizeLock) {
+        return
+      }
+      _data.resizeLock = true
+      try {
+        // var w = _data.iframeWindow.width();
+        var w = $("#wpbody-content").width()
+        var top = $("#wpadminbar").height()
+        var left = $(window).width() - w
+        var h = $(window).height() - top
+        $("#mapsvg-admin").css({ width: w, height: h, left: left, top: top })
+        if (
+          $("#mapsvg-sizer").outerWidth() > $("#mapsvg-container").outerWidth() ||
+          $("#mapsvg-sizer").outerHeight() > $("#mapsvg-container").outerHeight() ||
+          ($("#mapsvg-sizer").outerHeight() < $("#mapsvg-container").outerHeight() &&
+            $("#mapsvg-sizer").outerWidth() < $("#mapsvg-container").outerWidth())
+        ) {
+          _this.resizeSVGCanvas(source || "resizeDashboard")
+        }
+      } finally {
+        _data.resizeLock = false
       }
       // _this.updateScroll();
     },
-    resizeSVGCanvas: function () {
+    resizeSVGCanvas: function (source) {
       if (!editingMap) {
+        return
+      }
+      source = source || "unknown"
+      if (
+        _data.resizeQuietUntil &&
+        Date.now() < _data.resizeQuietUntil &&
+        (source === "sensor:mapsvg" || source === "map.events.resize")
+      ) {
         return
       }
 
@@ -694,19 +721,48 @@ function loadDeps() {
 
       var availWidth = containerWidth - (s + s2)
       var availHeight = containerHeight - h
+      if (!(availWidth > 0) || !(availHeight > 0) || !v || !(v.height > 0)) {
+        return
+      }
 
       var mapRatio = v.width / v.height
       var containerRatio = availWidth / availHeight
-
-      if (mapRatio < containerRatio) {
-        var newWidth = mapRatio * availHeight
-        var per = Math.round((newWidth * 100) / availWidth)
-        // var totalWidth = containerWidth * (per / 100) + s + s2;
-        var totalWidth = newWidth + s + s2
-        $("#mapsvg-sizer").css({ width: totalWidth + "px" })
+      var prevSizerWidth = $("#mapsvg-sizer")[0] && $("#mapsvg-sizer")[0].style.width
+      // Hysteresis: avoid flip-flop when mapRatio ≈ containerRatio (float / header wrap).
+      var ratioEpsilon = 0.02
+      var preferFitHeight
+      if (_data.resizeFitMode === "height") {
+        preferFitHeight = mapRatio < containerRatio + ratioEpsilon
+      } else if (_data.resizeFitMode === "width") {
+        preferFitHeight = mapRatio < containerRatio - ratioEpsilon
       } else {
-        $("#mapsvg-sizer").css({ width: "auto" })
+        preferFitHeight = mapRatio < containerRatio
       }
+
+      var nextSizerWidth
+      if (preferFitHeight) {
+        var newWidth = mapRatio * availHeight
+        var totalWidth = newWidth + s + s2
+        nextSizerWidth = Math.round(totalWidth) + "px"
+        _data.resizeFitMode = "height"
+      } else {
+        nextSizerWidth = "auto"
+        _data.resizeFitMode = "width"
+      }
+
+      // Skip no-op writes (same CSS / within 1px) — prevents ResizeSensor feedback storms.
+      var prevRounded =
+        prevSizerWidth && prevSizerWidth !== "auto"
+          ? Math.round(parseFloat(prevSizerWidth)) + "px"
+          : prevSizerWidth
+      if (nextSizerWidth === prevRounded || nextSizerWidth === _data.lastSizerWidthCss) {
+        return
+      }
+
+      $("#mapsvg-sizer").css({ width: nextSizerWidth })
+      _data.lastSizerWidthCss = nextSizerWidth
+      // Suppress echo from our own layout change (header wrap ↔ sizer width).
+      _data.resizeQuietUntil = Date.now() + 150
     },
     setPreviousMode: function () {
       if (_data.previousMode) _this.setMode(_data.previousMode)
@@ -934,41 +990,6 @@ function loadDeps() {
       })
 
       
-      $("#mapsvg-alert-activate").on("click", ".close", function () {
-        $("#mapsvg-alert-activate").hide()
-      })
-
-      $("#mapsvg-purchase-code-form").on("submit", function (e) {
-        e.preventDetault()
-      })
-
-      $("#mapsvg-admin").on("click", "#mapsvg-btn-activate", function (e) {
-        e.preventDefault()
-        $(this).buttonLoading(true)
-        var code = $('input[name="purchase_code"]').val()
-        var server = new mapsvg.server(mapsvg.routes.api)
-        server
-          .put("purchasecode", { purchase_code: code })
-          .done(function (data) {
-            if (typeof data === "string") {
-              data = JSON.parse(data)
-            }
-            $("#mapsvg-alert-activate").hide()
-            alert(
-              'MapSVG is activated. Now you can do plugin updates on the "WP Admin Menu > Plugins" page.',
-            )
-            $("#mapsvg-btn-activate").buttonLoading(false)
-          })
-          .fail(function (data) {
-            if (data.responseJSON.error) {
-              $.growl.error({ title: "", message: data.responseJSON.error })
-            }
-            $("#mapsvg-btn-activate").buttonLoading(false)
-          })
-          .always(function () {
-            $("#mapsvg-btn-activate").buttonLoading(false)
-          })
-      })
       $("#mapsvg-table").on("click", ".mapsvg-copy-shortcode", function () {
         var str = $(this).data("shortcode")
         var el = document.createElement("textarea")
@@ -1942,16 +1963,16 @@ function loadDeps() {
         // Position control panel in WordPress
         if (WP && onEditMapScreen) {
           new ResizeSensor($("#adminmenuwrap")[0], function () {
-            _this.resizeDashboard()
+            _this.resizeDashboard("sensor:adminmenuwrap")
           })
           new ResizeSensor($("#wpwrap")[0], function () {
-            _this.resizeDashboard()
+            _this.resizeDashboard("sensor:wpwrap")
           })
-          new ResizeSensor($("#mapsvg")[0], function () {
-            _this.resizeDashboard()
-          })
+          // Do not attach ResizeSensor to #mapsvg: changing #mapsvg-sizer width
+          // retriggers it and can oscillate with header wrap. External resizes
+          // are handled by #wpwrap / #adminmenuwrap sensors above.
 
-          _this.resizeDashboard()
+          _this.resizeDashboard("init")
         }
 
         setTimeout(function () {
@@ -1985,7 +2006,7 @@ function loadDeps() {
 
           editingMap.events.on("resize", () => {
             setTimeout(function () {
-              _this.resizeSVGCanvas()
+              _this.resizeSVGCanvas("map.events.resize")
             }, 1)
           })
 
@@ -1995,6 +2016,25 @@ function loadDeps() {
 
             if (!window.m) {
               window.m = editingMap
+            }
+
+            try {
+              var orphanNotice = sessionStorage.getItem("mapsvg_orphaned_regions_notice")
+              if (orphanNotice) {
+                sessionStorage.removeItem("mapsvg_orphaned_regions_notice")
+                var marked = parseInt(orphanNotice, 10) || 0
+                if (marked > 0) {
+                  $.growl.notice({
+                    title: "Orphaned regions",
+                    message:
+                      marked +
+                      " region(s) missing from SVG — kept as orphans. Copy their data to new regions, then use Regions → Settings → Clean orphan region records.",
+                    duration: 8000,
+                  })
+                }
+              }
+            } catch (e) {
+              // ignore
             }
 
             // new ResizeSensor($(".mapsvg-header")[0], function () {

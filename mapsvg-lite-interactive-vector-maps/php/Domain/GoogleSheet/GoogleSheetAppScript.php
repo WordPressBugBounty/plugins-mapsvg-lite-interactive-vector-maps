@@ -49,10 +49,9 @@ class GoogleSheetAppScript
         $settings = ImportSettingsService::getForSchema($schema);
         $secret = wp_generate_password(32, false);
 
-        $response = wp_remote_post($appScriptUrl, [
+        $response = SafeRemoteUrl::post($appScriptUrl, [
             'timeout'     => 15,
             'redirection' => 0,
-            'user-agent'  => 'MapSVG/' . \MAPSVG_VERSION,
             'headers'     => ['Content-Type' => 'application/json'],
             'body'        => wp_json_encode([
                 'setupKey'  => $setupKey,
@@ -65,7 +64,7 @@ class GoogleSheetAppScript
         ]);
 
         if (is_wp_error($response)) {
-            return ['error' => 'Could not reach AppScript: ' . $response->get_error_message()];
+            return ['error' => SafeRemoteUrl::publicErrorMessage($response, 'Could not reach AppScript.')];
         }
 
         $code = wp_remote_retrieve_response_code($response);
@@ -77,12 +76,11 @@ class GoogleSheetAppScript
             if (empty($location)) {
                 return ['error' => 'AppScript redirect had no Location header.'];
             }
-            $response = wp_remote_get($location, [
-                'timeout'    => 15,
-                'user-agent' => 'MapSVG/' . \MAPSVG_VERSION,
+            $response = SafeRemoteUrl::get($location, [
+                'timeout' => 15,
             ]);
             if (is_wp_error($response)) {
-                return ['error' => 'Could not retrieve AppScript response: ' . $response->get_error_message()];
+                return ['error' => SafeRemoteUrl::publicErrorMessage($response, 'Could not retrieve AppScript response.')];
             }
             $code = wp_remote_retrieve_response_code($response);
         }
@@ -132,10 +130,9 @@ class GoogleSheetAppScript
         $action    = 'reset';
         $signature = self::sign($timestamp, $action, $secret);
 
-        $response = wp_remote_post($settings['gsAppScriptUrl'], [
+        $response = SafeRemoteUrl::post($settings['gsAppScriptUrl'], [
             'timeout'     => 15,
             'redirection' => 0,
-            'user-agent'  => 'MapSVG/' . \MAPSVG_VERSION,
             'headers'     => ['Content-Type' => 'application/json'],
             'body'        => wp_json_encode([
                 'timestamp' => $timestamp,
@@ -145,7 +142,7 @@ class GoogleSheetAppScript
         ]);
 
         if (is_wp_error($response)) {
-            return ['error' => 'Could not reach AppScript: ' . $response->get_error_message()];
+            return ['error' => SafeRemoteUrl::publicErrorMessage($response, 'Could not reach AppScript.')];
         }
 
         $code = wp_remote_retrieve_response_code($response);
@@ -153,12 +150,11 @@ class GoogleSheetAppScript
         if ($code === 302) {
             $location = wp_remote_retrieve_header($response, 'location');
             if (!empty($location)) {
-                $response = wp_remote_get($location, [
-                    'timeout'    => 15,
-                    'user-agent' => 'MapSVG/' . \MAPSVG_VERSION,
+                $response = SafeRemoteUrl::get($location, [
+                    'timeout' => 15,
                 ]);
                 if (is_wp_error($response)) {
-                    return ['error' => 'Could not retrieve AppScript response: ' . $response->get_error_message()];
+                    return ['error' => SafeRemoteUrl::publicErrorMessage($response, 'Could not retrieve AppScript response.')];
                 }
                 $code = wp_remote_retrieve_response_code($response);
             }
@@ -332,10 +328,15 @@ class GoogleSheetAppScript
             'signature' => $signature,
         ];
 
-        wp_remote_post($settings['gsAppScriptUrl'], [
+        // Validate before fire-and-forget so a poisoned gsAppScriptUrl cannot SSRF.
+        $validated = SafeRemoteUrl::validate((string) $settings['gsAppScriptUrl']);
+        if (is_wp_error($validated)) {
+            return;
+        }
+
+        SafeRemoteUrl::post($validated, [
             'timeout'     => 3,
             'blocking'    => false,
-            'user-agent'  => 'MapSVG/' . \MAPSVG_VERSION,
             'headers'     => ['Content-Type' => 'application/json'],
             'body'        => wp_json_encode($payload),
         ]);

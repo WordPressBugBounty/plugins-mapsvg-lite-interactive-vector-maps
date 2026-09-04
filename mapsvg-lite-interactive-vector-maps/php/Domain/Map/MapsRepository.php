@@ -117,8 +117,8 @@ class MapsRepository extends Repository
 		parent::update($map);
 		$prefix = isset($map->options['regionPrefix']) ? $map->options['regionPrefix'] : '';
 
-		/** @var Map */
-		$map->setRegionsTable($prefix, $updateTitles);
+		/** @var Map $map */
+		return $map->setRegionsTable($prefix, $updateTitles);
 	}
 
 	/**

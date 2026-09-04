@@ -9,7 +9,8 @@
     { "url": "regions/%name%", "method": "POST", "name": "create" },
     { "url": "regions/%name%/[:id]", "method": "PUT", "name": "update" },
     { "url": "regions/%name%/[:id]", "method": "DELETE", "name": "delete" },
-    { "url": "regions/%name%", "method": "DELETE", "name": "clear" }
+    { "url": "regions/%name%", "method": "DELETE", "name": "clear" },
+    { "url": "collection/%name%/orphans", "method": "DELETE", "name": "deleteOrphans" }
   ],
   "fields": [
     {
@@ -61,6 +62,15 @@
         }
       ],
       "db_default": 1
+    },
+    {
+      "name": "orphaned",
+      "label": "Orphaned",
+      "type": "checkbox",
+      "db_type": "tinyint(1)",
+      "visible": false,
+      "protected": true,
+      "db_default": 0
     },
     {
       "name": "images",

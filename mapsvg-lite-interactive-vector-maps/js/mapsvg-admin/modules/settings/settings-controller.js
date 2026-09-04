@@ -31,7 +31,18 @@
         file: { relativeUrl: this.mapsvg.options.source },
         updateTitles: updateTitles,
       })
-      .done(function () {
+      .done(function (response) {
+        var marked =
+          response && response.regionSync && response.regionSync.orphanedMarked
+            ? parseInt(response.regionSync.orphanedMarked, 10)
+            : 0
+        if (marked > 0) {
+          try {
+            sessionStorage.setItem("mapsvg_orphaned_regions_notice", String(marked))
+          } catch (e) {
+            // ignore quota / private mode
+          }
+        }
         window.location.reload()
       })
   }
@@ -222,7 +233,7 @@
       })
 
     this.mapsvg.events.on("sizeChange", function () {
-      _this.admin.resizeDashboard()
+      _this.admin.resizeDashboard("sizeChange")
     })
 
     var thContainer = _this.view.find("#mapsvg-search-address")
@@ -279,7 +290,7 @@
       $("#mapsvg-controls-width").val(w)
     }
     _this.mapsvg.viewBoxSetBySize(w, h)
-    _this.admin.resizeDashboard()
+    _this.admin.resizeDashboard("setWidth")
   }
   MapSVGAdminSettingsController.prototype.setHeight = function () {
     var _this = this
@@ -292,7 +303,7 @@
       $("#mapsvg-controls-height").val(h)
     }
     _this.mapsvg.viewBoxSetBySize(w, h)
-    _this.admin.resizeDashboard()
+    _this.admin.resizeDashboard("setHeight")
   }
   MapSVGAdminSettingsController.prototype.keepRatioClickHandler = function () {
     var _this = this

@@ -15,9 +15,8 @@
 }
 .mapsvg-region-label {
   font-size: 11px;
-  padding: 3px 5px;
-  border-radius: 15px;
   padding: 2px 12px;
+  border-radius: 15px;
   background: #ffffffbb;
   position: absolute;
   top: 0;

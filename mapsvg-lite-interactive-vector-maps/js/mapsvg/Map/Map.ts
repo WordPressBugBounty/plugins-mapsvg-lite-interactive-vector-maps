@@ -756,7 +756,8 @@ export class MapSVGMap {
       // Build the base URL for the map data endpoint
       const baseUrl = mapsvgCore.routes.api + `maps/${this.id}`
       const separator = baseUrl.includes("?") ? "&" : "?"
-      const url = `${baseUrl}${separator}withData=${withData}`
+      const orphanParam = this.inBackend ? "&includeOrphans=1" : ""
+      const url = `${baseUrl}${separator}withData=${withData}${orphanParam}`
       this.mapDataPromise = fetch(url)
         .then(async (response) => {
           if (!response.ok) {
@@ -919,6 +920,10 @@ export class MapSVGMap {
     this.regionsRepository.init()
     // Turn off pagination for Regions:
     this.regionsRepository.query.update({ perpage: 0 })
+    // Admin editor: keep orphaned region rows so users can copy data to new SVG IDs.
+    if (this.inBackend) {
+      this.regionsRepository.query.update({ filters: { includeOrphans: 1 } })
+    }
 
     this.objectsRepository = useRepository(options.database.schemas.objects, this)
     this.objectsRepository.init()
@@ -1920,6 +1925,10 @@ export class MapSVGMap {
     this.templates = this.templates || {}
     for (const name in templates) {
       if (name !== undefined) {
+        // Skip already-compiled functions / non-strings (re-entrant update paths).
+        if (typeof templates[name] !== "string") {
+          continue
+        }
         this.options.templates[name] = templates[name]
         if (name == "directoryItem" || name == "directoryCategoryItem") {
           Handlebars.unregisterPartial(name + "-" + this.id)
@@ -3897,6 +3906,39 @@ export class MapSVGMap {
     )
   }
 
+  /**
+   * Inline critical region-label CSS before mapsvg-bundle.css finishes loading,
+   * so label size/position are correct on first paint (esp. in Shadow DOM).
+   */
+  injectCriticalRegionLabelCss(target: ParentNode): void {
+    if (
+      target === document.head &&
+      document.head.querySelector('style[data-mapsvg-critical="region-labels"]')
+    ) {
+      return
+    }
+
+    const style = document.createElement("style")
+    style.setAttribute("data-mapsvg-critical", "region-labels")
+    style.textContent = `
+.mapsvg-region-label {
+  font-size: 11px;
+  padding: 2px 12px;
+  border-radius: 15px;
+  background: #ffffffbb;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  font-family: Helvetica, sans-serif;
+}
+.mapsvg-region-label:empty {
+  display: none;
+}
+`.trim()
+    target.appendChild(style)
+  }
+
   createContainers() {
     this.containers = {
       ...this.containers,
@@ -3981,6 +4023,9 @@ export class MapSVGMap {
       this.containers.wrapAll.parentNode.insertBefore(this.containers.root, this.containers.wrapAll)
       this.containers.shadowRoot.appendChild(this.containers.wrapAll)
 
+      // Critical label CSS first (sync), then async bundle/theme links
+      this.injectCriticalRegionLabelCss(this.containers.shadowRoot)
+
       // 6. Добавляем стили внутрь Shadow
       for (const style of mapsvgCore.styles) {
         const link = document.createElement("link")
@@ -3996,6 +4041,9 @@ export class MapSVGMap {
         mapsvgCore.routes.root + "themes/" + this.options.theme.name + "/assets/css/styles.css"
       this.containers.shadowRoot.appendChild(link)
     } else {
+      // Critical label CSS first (sync), then async bundle/theme links
+      this.injectCriticalRegionLabelCss(document.head)
+
       // 6. Добавляем стили внутрь Shadow
       if (!mapsvgCore.stylesAddedToBody) {
         for (const style of mapsvgCore.styles) {

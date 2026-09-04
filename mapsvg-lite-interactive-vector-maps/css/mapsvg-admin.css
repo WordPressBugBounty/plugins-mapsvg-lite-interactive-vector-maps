@@ -23,6 +23,10 @@ a:hover,
   text-decoration: underline;
 }
 
+#mapsvg-admin .alert {
+  font-size: 14px;
+}
+
 #mapsvg-admin input::placeholder {
   color: #ccc;
 }
@@ -558,6 +562,27 @@ label.label-secondary {
 .mapsvg-data-row:hover {
   background-color: #fafafa;
   cursor: pointer;
+}
+
+.mapsvg-data-row.mapsvg-region-orphaned,
+.mapsvg-data-row.mapsvg-region-orphaned:hover {
+  background-color: #fde8e8;
+  color: #a94442;
+}
+
+.mapsvg-orphan-badge {
+  display: block;
+  margin-top: 4px;
+  margin-left: 0;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #a94442;
+  background: #f8d7da;
+  border-radius: 3px;
+  width: fit-content;
+  white-space: nowrap;
 }
 
 .mapsvg-data-row.active:hover {

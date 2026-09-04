@@ -79,6 +79,8 @@
 </defs>
 <path
    id="campeche"
+     data-label-x="782"
+     data-label-y="468"
    sodipodi:nodetypes="cssssssccsscccsssssscccccccsssssccscccccccccccccccccsssscssssssssssccsssssssscssssscsssssscccccsccsscccsssssscccssccc"
    fill="#CDDAE0"
    stroke="#FFFFFF"
@@ -87,6 +89,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="chiapas"
+     data-label-x="722"
+     data-label-y="535"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -94,6 +98,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="tabasco"
+     data-label-x="722"
+     data-label-y="488"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -101,6 +107,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="oaxaca"
+     data-label-x="619"
+     data-label-y="526"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -108,6 +116,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="guerrero"
+     data-label-x="545"
+     data-label-y="508"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -115,6 +125,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="veracruz"
+     data-label-x="674"
+     data-label-y="503"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -122,6 +134,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="puebla"
+     data-label-x="582"
+     data-label-y="480"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -129,6 +143,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="tlaxcala"
+     data-label-x="582"
+     data-label-y="457"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -136,6 +152,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="morelos"
+     data-label-x="560"
+     data-label-y="477"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -143,6 +161,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="df"
+     data-label-x="558"
+     data-label-y="463"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -150,6 +170,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="hidalgo"
+     data-label-x="559"
+     data-label-y="427"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -157,6 +179,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="estadodemexico"
+     data-label-x="540"
+     data-label-y="465"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -164,6 +188,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="bcsur"
+     data-label-x="218"
+     data-label-y="224"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -171,6 +197,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="bcnorte"
+     data-label-x="173"
+     data-label-y="93"
    sodipodi:nodetypes="csssscccccssssccscccccsssssssssssssccccssssssssssssccccssssscssssccsscssssscccccssssssssssssccccsscccsssscccccccscsssssscssssssccsccsccsssssssssscssssssscccccccccccccccccssssscscccccccccccsccccsscscsssssssssssssssscccccsccccccccccccscccccccccscccccscccccccccccc"
    fill="#CDDAE0"
    stroke="#FFFFFF"
@@ -179,6 +207,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="sonora"
+     data-label-x="290"
+     data-label-y="165"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -186,6 +216,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="chihuahua"
+     data-label-x="388"
+     data-label-y="202"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -193,6 +225,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="coahuila"
+     data-label-x="480"
+     data-label-y="228"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -200,6 +234,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="tamaulipas"
+     data-label-x="565"
+     data-label-y="350"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -207,6 +243,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="nuevoleon"
+     data-label-x="535"
+     data-label-y="278"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -214,6 +252,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="sinaloa"
+     data-label-x="347"
+     data-label-y="285"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -221,6 +261,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="durango"
+     data-label-x="416"
+     data-label-y="300"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -228,6 +270,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="nayarit"
+     data-label-x="420"
+     data-label-y="399"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -235,6 +279,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="sanluispotosi"
+     data-label-x="520"
+     data-label-y="378"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -242,6 +288,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="queretaro"
+     data-label-x="532"
+     data-label-y="425"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -249,6 +297,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="zacatecas"
+     data-label-x="458"
+     data-label-y="354"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -256,6 +306,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="aguascalientes"
+     data-label-x="478"
+     data-label-y="386"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -263,6 +315,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="guanajuato"
+     data-label-x="505"
+     data-label-y="419"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -270,6 +324,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="jalisco"
+     data-label-x="423"
+     data-label-y="443"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -277,6 +333,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="michoacan"
+     data-label-x="493"
+     data-label-y="461"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -284,6 +342,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="colima"
+     data-label-x="440"
+     data-label-y="467"
    fill="#CDDAE0"
    stroke="#FFFFFF"
    stroke-width="0.3631"
@@ -291,6 +351,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="quintanaroo"
+     data-label-x="824"
+     data-label-y="442"
    sodipodi:nodetypes="cccssssscssssssccsssssssssssssssssssssscccccccccccccccccccccccccccccccssssssssssccccssssssssssccccsssssccsssccccsccsc"
    fill="#CDDAE0"
    stroke="#FFFFFF"
@@ -299,6 +361,8 @@
    style="fill:#d7d7d7;fill-opacity:1;stroke:#323232;stroke-opacity:1;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none" />
 <path
    id="yucatan"
+     data-label-x="804"
+     data-label-y="408"
    sodipodi:nodetypes="ccsssccccccccccccccccccccccccccccssccccccccccccccccscsccssssssscssssssssssccccccsssccscc"
    fill="#CDDAE0"
    stroke="#FFFFFF"

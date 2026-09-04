@@ -140,6 +140,20 @@
           </div>{{/each}} {{else}} <em>"Status" field is missing in Regions.</em>
           {{/if}}</div>
   </div>
+        {{#if orphanedCount}}
+        <div class="form-group row mb-3" id="mapsvg-orphan-regions-row">
+            <label class="col-md-3 col-form-label">Orphaned regions</label>
+            <div class="col-md-9">
+                <p class="form-text mb-2">
+                    {{orphanedCount}} region record(s) are missing from the current SVG file.
+                    Copy custom field data to the new region IDs, then clean these records.
+                </p>
+                <button type="button" id="mapsvg-clean-orphan-regions-btn" class="btn btn-outline-danger">
+                    <i class="bi bi-trash"></i> Clean orphan region records
+                </button>
+            </div>
+        </div>
+        {{/if}}
         <!--<div class="form-group row mb-3">-->
         <!--<label class="col-md-3 col-form-label">Clear</label>-->
         <!--<div class="col-md-9">-->

@@ -911,10 +911,31 @@
       })
   }
 
+  /**
+   * Rejects Google Sheets web-view / pubhtml URLs; accepts CSV export links only.
+   * @returns {boolean} true when the URL is usable (or not a Sheets link).
+   */
+  MapSVGAdminCsvController.prototype.validateRemoteCsvUrl = function (url) {
+    var getError =
+      (window.MapSVG && window.MapSVG.getGoogleSheetsCsvUrlError) ||
+      function () {
+        return null
+      }
+    var error = getError(url)
+    if (!error) {
+      this._$fe("GsCsvError").hide().text("")
+      return true
+    }
+    this._$fe("GsCsvError").text(error).show()
+    $.growl.error({ title: "", message: error })
+    return false
+  }
+
   // fetch() is intentionally used here — we're fetching an EXTERNAL CSV URL, not a MapSVG endpoint.
   MapSVGAdminCsvController.prototype.checkCsvUrl = function (url) {
     var _this = this
     if (!url) return
+    if (!_this.validateRemoteCsvUrl(url)) return
     // If a previously valid remote URL is being re-checked, invalidate it first
     if (_this._isGsImportSourceValid()) {
       _this.setImportSetting("gsImportSourceValid", 0)
@@ -1129,6 +1150,7 @@
 
     if (source === "remote") {
       var csvUrl = _this._$fe("CsvUrl").val().trim()
+      if (!_this.validateRemoteCsvUrl(csvUrl)) return
       fields.gsCsvUrl = csvUrl
       fields.gsAutoRefetch = _this._$fe("AutoRefetch").is(":checked") ? 1 : 0
       fields.gsRefetchInterval = parseInt(_this._$fe("Interval").val(), 10) || 24
@@ -1186,6 +1208,7 @@
       $.growl.error({ title: "", message: "Enter a CSV URL first" })
       return
     }
+    if (!_this.validateRemoteCsvUrl(url)) return
 
     _this._setImportInProgress(true)
     _this.setImportProgress("Importing…")

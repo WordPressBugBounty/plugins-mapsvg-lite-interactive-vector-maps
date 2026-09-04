@@ -97,6 +97,30 @@ class CollectionController extends Controller
         return static::render([], 200);
     }
 
+    /**
+     * Permanently delete orphaned region records and detach r2o links.
+     * Regions only — returns 400 for non-region collections.
+     */
+    public static function deleteOrphans(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $repo = RepositoryFactory::get($request['_collection_name']);
+        if (!$repo) {
+            return static::render(['error' => 'Collection not found.'], 400);
+        }
+
+        $schema = $repo->getSchema();
+        if (!$schema || $schema->type !== 'region') {
+            return static::render(['error' => 'Orphan cleanup is only available for region collections.'], 400);
+        }
+
+        if (!($repo instanceof RegionsRepository)) {
+            return static::render(['error' => 'Invalid regions repository.'], 400);
+        }
+
+        $result = $repo->deleteOrphaned();
+        return static::render($result, 200);
+    }
+
     public static function update(\WP_REST_Request $request): \WP_REST_Response
     {
         if ($err = static::rejectIfGsReadOnly($request)) return $err;
@@ -268,13 +292,23 @@ class CollectionController extends Controller
             }
         } else {
             $sourceType = 'remote';
-            $sourceUrl = isset($request['csvUrl']) ? esc_url_raw(trim((string)$request['csvUrl'])) : '';
+            $sourceUrl = isset($request['csvUrl']) ? trim((string)$request['csvUrl']) : '';
             if ($sourceUrl === '') {
                 return static::render(['error' => 'csvUrl or CSV file is required.'], 400);
             }
-            $httpResponse = wp_remote_get($sourceUrl, ['timeout' => 30, 'user-agent' => 'MapSVG/' . \MAPSVG_VERSION]);
+            $httpResponse = SafeRemoteUrl::get($sourceUrl, ['timeout' => 30]);
             if (is_wp_error($httpResponse)) {
-                return static::render(['error' => 'Failed to fetch CSV: ' . $httpResponse->get_error_message()], 502);
+                $status = in_array(
+                    $httpResponse->get_error_code(),
+                    array('mapsvg_unsafe_url', 'mapsvg_invalid_url'),
+                    true
+                ) ? 400 : 502;
+                return static::render([
+                    'error' => SafeRemoteUrl::publicErrorMessage(
+                        $httpResponse,
+                        'Failed to fetch CSV.'
+                    ),
+                ], $status);
             }
             if (wp_remote_retrieve_response_code($httpResponse) !== 200) {
                 return static::render(['error' => 'Remote server returned non-200 response.'], 502);
@@ -745,26 +779,29 @@ class CollectionController extends Controller
         }
 
         $body   = $request->get_params();
-        $csvUrl = isset($body['csvUrl']) ? esc_url_raw(trim($body['csvUrl'])) : '';
+        $csvUrl = isset($body['csvUrl']) ? trim((string) $body['csvUrl']) : '';
 
-        if (empty($csvUrl)) {
+        if ($csvUrl === '') {
             return static::render(['error' => 'csvUrl is required.'], 400);
         }
 
         // Download the remote CSV to a temp file on disk, then hand off to the
         // shared async batch system (same path as a file upload).
-        $httpResponse = wp_remote_get($csvUrl, [
-            'timeout'    => 30,
-            'user-agent' => 'MapSVG/' . \MAPSVG_VERSION,
-        ]);
+        $httpResponse = SafeRemoteUrl::get($csvUrl, ['timeout' => 30]);
 
         if (is_wp_error($httpResponse)) {
-            return static::render(['error' => 'Failed to fetch CSV: ' . $httpResponse->get_error_message()], 502);
+            $status = in_array(
+                $httpResponse->get_error_code(),
+                array('mapsvg_unsafe_url', 'mapsvg_invalid_url'),
+                true
+            ) ? 400 : 502;
+            return static::render([
+                'error' => SafeRemoteUrl::publicErrorMessage($httpResponse, 'Failed to fetch CSV.'),
+            ], $status);
         }
 
-        $httpCode = wp_remote_retrieve_response_code($httpResponse);
-        if ($httpCode !== 200) {
-            return static::render(['error' => 'Remote server returned HTTP ' . $httpCode . '.'], 502);
+        if (wp_remote_retrieve_response_code($httpResponse) !== 200) {
+            return static::render(['error' => 'Remote server returned non-200 response.'], 502);
         }
 
         $csvContent = wp_remote_retrieve_body($httpResponse);

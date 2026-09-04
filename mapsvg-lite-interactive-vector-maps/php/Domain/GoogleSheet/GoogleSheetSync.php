@@ -154,13 +154,15 @@ class GoogleSheetSync
      */
     public static function fetchAndImportCsv(string $csvUrl, Repository $repo, string $tmpSuffix = 'gs', array $geocoding = []): array
     {
-        $httpResponse = wp_remote_get($csvUrl, [
-            'timeout'    => 30,
-            'user-agent' => 'MapSVG/' . \MAPSVG_VERSION,
+        $httpResponse = SafeRemoteUrl::get($csvUrl, [
+            'timeout' => 30,
         ]);
 
         if (is_wp_error($httpResponse)) {
-            return ['count' => 0, 'error' => 'Failed to fetch CSV: ' . $httpResponse->get_error_message()];
+            return [
+                'count' => 0,
+                'error' => SafeRemoteUrl::publicErrorMessage($httpResponse, 'Failed to fetch CSV.'),
+            ];
         }
 
         $httpCode = wp_remote_retrieve_response_code($httpResponse);
@@ -300,9 +302,8 @@ class GoogleSheetSync
                 return;
             }
 
-            $httpResponse = wp_remote_get($settings['gsCsvUrl'], [
-                'timeout'    => 30,
-                'user-agent' => 'MapSVG/' . \MAPSVG_VERSION,
+            $httpResponse = SafeRemoteUrl::get($settings['gsCsvUrl'], [
+                'timeout' => 30,
             ]);
 
             if (is_wp_error($httpResponse) || wp_remote_retrieve_response_code($httpResponse) !== 200) {

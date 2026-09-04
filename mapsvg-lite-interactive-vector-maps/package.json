@@ -1,6 +1,6 @@
 {
   "name": "mapsvg",
-  "version": "8.15.0",
+  "version": "8.16.0",
   "type": "module",
   "main": "dist/mapsvg-front.min.js",
   "module": "dist/mapsvg-front.esm.js",
@@ -94,7 +94,8 @@
     "pretest": "npm run build",
     "gb": "cross-env BABEL_ENV=default NODE_ENV=production webpack",
     "githooks": "rm ./.git/hooks/commit-msg && cp ./.githooks/commit-msg ./.git/hooks/",
-    "docs": "typedoc --entryPointStrategy expand ./js/mapsvg"
+    "docs": "typedoc --entryPointStrategy expand ./js/mapsvg",
+    "svg-center": "node utils/svg-center/computeCenters.mjs"
   },
   "files": [
     "dist"

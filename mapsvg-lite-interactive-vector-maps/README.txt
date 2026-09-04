@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 7.0.1
-Stable tag: 8.15.0
+Stable tag: 8.16.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -138,6 +138,13 @@ MapSVG Premium has an embedded CSV editor, which makes style editing more comfor
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 8.16.0 =
+* Improved: **Regions / SVG changes** — replacing or editing an SVG no longer deletes region records whose IDs disappeared. Those rows stay as orphans so you can copy their data, then remove them from Regions → Settings → Clean orphan region records.
+* Improved: **Region labels** — more reliable label centering (better placement on awkward shapes, no flash before styles load). Bundled SVG maps were updated with the new centers.
+* Fixed: **Security / REST API** — hardened remote CSV and API fetches so user-supplied URLs cannot reach private, loopback, or cloud-metadata hosts.
+* Fixed: **CSV import** — Google Sheets web-view URLs are rejected; use a published CSV link instead.
+* Fixed: **Admin** — stopped a map resize feedback loop that could keep resizing the preview.
 
 = 8.15.0 =
 * Improved: **Elementor + Gutenberg** — added native integrations (Elementor widget and Gutenberg block) with live map preview directly inside the page editor, so you can see map updates while editing.

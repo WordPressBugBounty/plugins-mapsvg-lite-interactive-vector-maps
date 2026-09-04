@@ -419,12 +419,14 @@ class Map extends Model implements \JsonSerializable
 
 	/**
 	 * Parses an SVG file, gets all SVG objects that must be added to the "Regions" table
-	 * and updates "regions" table in the database
+	 * and updates "regions" table in the database.
 	 *
-	 * @param $prefix //If prefix is provided, only SVG objects with the provided prefix get
-	 * @param $updateTitles
-	 * into the "Regions" list
+	 * Region IDs present in MySQL but missing from the SVG are marked orphaned=1
+	 * (not deleted) so customers can migrate custom field data manually.
 	 *
+	 * @param string $prefix If prefix is provided, only SVG objects with the provided prefix get into the "Regions" list
+	 * @param bool|null $updateTitles
+	 * @return array{orphanedMarked: int, orphanedRestored: int, inserted: int, orphanedCount: int}
 	 * @throws \Exception
 	 */
 	function setRegionsTable($prefix = '', $updateTitles = null)
@@ -508,9 +510,12 @@ class Map extends Model implements \JsonSerializable
 		sort($regionIdsFromSvg);
 		sort($regionTitlesFromSvg);
 
-		// Now compare the list of Regions found in the SVG file
-		// with the list of Regions in the database
-		$resp = $this->getRegions()->find();
+		// Compare SVG regions to DB (including already orphaned rows)
+		$regionsRepo = $this->getRegions();
+		$resp = $regionsRepo->find(new Query(array(
+			'perpage' => 0,
+			'filters' => array('includeOrphans' => 1),
+		)));
 		$regionsFromDb = $resp["items"];
 		$regionIdsFromDb = array();
 		$regionTitlesFromDb = array();
@@ -523,28 +528,45 @@ class Map extends Model implements \JsonSerializable
 		sort($regionIdsFromDb);
 		sort($regionTitlesFromDb);
 
-		// Find the regions presented in DB but missing in SVG
-		$uniqueDbRegionsIds = array_diff($regionIdsFromDb, $regionIdsFromSvg);
+		$diff = RegionSvgDiff::diff($regionIdsFromDb, $regionIdsFromSvg);
 
-		// If there is a difference then delete those regions from the database
-		foreach ($uniqueDbRegionsIds as $id) {
-			$this->getRegions()->delete($id);
-		};
+		// DB-only IDs → keep rows, mark as orphaned (no hard delete)
+		$newlyMarked = 0;
+		if (!empty($diff['toOrphan'])) {
+			foreach ($regionsFromDb as $region) {
+				if (in_array((string) $region->id, $diff['toOrphan'], true) && empty($region->orphaned)) {
+					$newlyMarked++;
+				}
+			}
+			$regionsRepo->setOrphanedByIds($diff['toOrphan'], 1);
+		}
 
-		// Find the regions presented in SVG but missing in DB
-		$uniqueSvgRegionsIds = array_diff($regionIdsFromSvg, $regionIdsFromDb);
+		// IDs present in both that were orphaned → clear flag (region returned in SVG)
+		$toRestore = array();
+		foreach ($regionsFromDb as $region) {
+			if (!empty($region->orphaned) && in_array((string) $region->id, $diff['toRestore'], true)) {
+				$toRestore[] = (string) $region->id;
+			}
+		}
+		if (!empty($toRestore)) {
+			$regionsRepo->setOrphanedByIds($toRestore, 0);
+		}
 
-		// If there is a difference then add regions to database
+		// SVG-only IDs → insert
 		$uniqueSvgRegions = [];
 		$uniqueSvgRegionsTitles = [];
-		if (!empty($uniqueSvgRegionsIds)) {
+		if (!empty($diff['toInsert'])) {
+			$regionsFromSvg = isset($regionsFromSvg) ? $regionsFromSvg : array();
 			foreach ($regionsFromSvg as $regionFromSvg) {
-				if (in_array($regionFromSvg['id'], $uniqueSvgRegionsIds)) {
+				if (in_array($regionFromSvg['id'], $diff['toInsert'], true)) {
+					$regionFromSvg['orphaned'] = 0;
 					$uniqueSvgRegions[] = $regionFromSvg;
 					$uniqueSvgRegionsTitles[] = $regionFromSvg['title'];
-				};
+				}
 			}
-			$this->getRegions()->createOrUpdateAll($uniqueSvgRegions);
+			if (!empty($uniqueSvgRegions)) {
+				$regionsRepo->createOrUpdateAll($uniqueSvgRegions);
+			}
 		}
 
 		// If some titles have changed in the SVG file then update corresponding Regions in the database
@@ -555,14 +577,22 @@ class Map extends Model implements \JsonSerializable
 
 		if ((!empty($changedRegionTitles)) && ($updateTitles === true)) {
 			$changedRegions = [];
+			$regionsFromSvg = isset($regionsFromSvg) ? $regionsFromSvg : array();
 			foreach ($regionsFromSvg as $regionFromSvg) {
 				if (in_array($regionFromSvg['title'], $changedRegionTitles)) {
 					$changedRegions[] = $regionFromSvg;
 				}
 			}
 
-			$this->getRegions()->createOrUpdateAll($changedRegions);
+			$regionsRepo->createOrUpdateAll($changedRegions);
 		}
+
+		return array(
+			'orphanedMarked'   => $newlyMarked,
+			'orphanedRestored' => count($toRestore),
+			'inserted'         => count($diff['toInsert']),
+			'orphanedCount'    => $regionsRepo->countOrphaned(),
+		);
 	}
 
 	/**

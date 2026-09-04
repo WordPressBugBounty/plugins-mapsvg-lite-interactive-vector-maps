@@ -90,7 +90,7 @@
                 type="url"
                 name="gsCsvUrl"
                 value="{{gs.gsCsvUrl}}"
-                placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv"
+                placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
               />
               <button class="btn btn-outline-secondary" type="button" id="mapsvg-btn-gs-check-csv" disabled="disabled">
                 <span id="mapsvg-gs-csv-spinner" style="display:none;">
@@ -101,7 +101,8 @@
             </div>
             <div id="mapsvg-gs-csv-error" class="text-danger form-text mt-1" style="display:none;"></div>
             <div class="form-text">
-              Google Sheets: <strong>File → Share → Publish to web → CSV → Copy link</strong>.
+              Google Sheets: <strong>File → Share → Publish to web → CSV → Copy link</strong>
+              (URL must contain <code>output=csv</code> or <code>format=csv</code> — not a web-view / pubhtml link).
             </div>
           </div>
         </div>

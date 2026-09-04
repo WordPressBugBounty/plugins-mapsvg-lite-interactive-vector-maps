@@ -1,13 +1,17 @@
 import { deepMerge, parseBoolean, ucfirst } from "@/Core/Utils"
 import { RegionOptions, RegionStatusOptionsCollection } from "@/Map/OptionsInterfaces/MapOptions"
 import { ArrayIndexed } from "../Core/ArrayIndexed"
-import { SVGPoint } from "../Location/Location"
+import { SVGPoint, ScreenPoint } from "../Location/Location"
 import { MapSVGMap, RegionStylesByStatus, RegionStylesByStatusOptions } from "../Map/Map"
 import { ViewBox } from "../Map/ViewBox"
 import { MapObject, MapObjectEvent, MapObjectType } from "../MapObject/MapObject"
 import { Model } from "../Model/Model"
 import "./region.css"
 const $ = jQuery
+
+/** Matches `.mapsvg-region-label` padding in region.css / mapsvg-bundle.css (`2px 12px`). */
+const REGION_LABEL_PADDING_Y = 2
+const REGION_LABEL_PADDING_X = 12
 
 enum RegionEventType {
   click,
@@ -43,6 +47,8 @@ export class Region extends MapObject {
   customAttrs: Array<string>
   fill?: string
   center?: SVGPoint
+  /** Last screen-space center used for the region label (px). */
+  labelScreenPoint?: ScreenPoint
   label: HTMLElement
   bubble: HTMLElement
   data?: Model | undefined
@@ -577,15 +583,25 @@ export class Region extends MapObject {
         this.center = this.getCenterSVG()
       }
 
-      const labelSize = this.mapsvg.converter.convertSizePixelToSVG({
-        width: this.label.offsetWidth,
-        height: this.label.offsetHeight,
-      })
-      const pos = this.mapsvg.converter.convertSVGToPixel(this.center),
-        x = pos.x - this.label.offsetWidth / 2,
-        y = pos.y - this.label.offsetHeight / 2
+      // Before mapsvg-bundle.css loads, offsetWidth/Height omit label padding.
+      // Add only the missing part so fit-check matches post-CSS size.
+      const computed = window.getComputedStyle(this.label)
+      const appliedPadX =
+        (parseFloat(computed.paddingLeft) || 0) + (parseFloat(computed.paddingRight) || 0)
+      const appliedPadY =
+        (parseFloat(computed.paddingTop) || 0) + (parseFloat(computed.paddingBottom) || 0)
+      const virtualPadX = Math.max(0, REGION_LABEL_PADDING_X * 2 - appliedPadX)
+      const virtualPadY = Math.max(0, REGION_LABEL_PADDING_Y * 2 - appliedPadY)
 
-      this.setLabelScreenPosition(x, y)
+      const labelSize = this.mapsvg.converter.convertSizePixelToSVG({
+        width: this.label.offsetWidth + virtualPadX,
+        height: this.label.offsetHeight + virtualPadY,
+      })
+      const pos = this.mapsvg.converter.convertSVGToPixel(this.center)
+
+      // Anchor at label center via CSS translate(-50%,-50%) so position
+      // does not depend on label size (avoids race before CSS loads).
+      this.setLabelScreenPosition(pos.x, pos.y)
       const bbox = this.getBBox()
       this.label.style.opacity = labelSize.width > bbox.width ? "0" : "1"
     }
@@ -616,16 +632,11 @@ export class Region extends MapObject {
    * @param {number} deltaY
    */
   moveLabelScreenPositionBy(deltaX, deltaY) {
-    if (this.label) {
-      const labelStyle = window.getComputedStyle(this.label),
-        matrix = labelStyle.transform || labelStyle.webkitTransform,
-        matrixValues = matrix.match(/matrix.*\((.+)\)/)
-      if (matrixValues && matrixValues.length > 0) {
-        const matrixParts = matrixValues[1].split(", ")
-        const x = parseFloat(matrixParts[4]) - deltaX
-        const y = parseFloat(matrixParts[5]) - deltaY
-        this.setLabelScreenPosition(x, y)
-      }
+    if (this.label && this.labelScreenPoint) {
+      this.setLabelScreenPosition(
+        this.labelScreenPoint.x - deltaX,
+        this.labelScreenPoint.y - deltaY,
+      )
     }
   }
 
@@ -648,14 +659,18 @@ export class Region extends MapObject {
   }
 
   /**
-   * Set position of Region Labels by given numbers
+   * Set position of Region Labels by given numbers.
+   * x/y are the screen-space center of the region; the label is centered
+   * on that point with translate(-50%, -50%).
    *
    * @param {number} x
    * @param {number} y
    */
   setLabelScreenPosition(x, y) {
     if (this.label) {
-      this.label.style.transform = "translate(" + x + "px," + y + "px)"
+      this.labelScreenPoint = new ScreenPoint(x, y)
+      this.label.style.transform =
+        "translate(-50%,-50%) translate(" + x + "px," + y + "px)"
     }
   }
 

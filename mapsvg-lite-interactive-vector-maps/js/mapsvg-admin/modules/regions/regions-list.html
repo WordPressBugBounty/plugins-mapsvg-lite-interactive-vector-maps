@@ -23,10 +23,12 @@
 
 <script type="text/x-handlebars-template" data-name="item" data-partial="true">
   <tr id="mapsvg-region-{{spacesToUnderscores id}}" data-region-id="{{id}}"
-      class="mapsvg-data-row">{{#each fields}}
+      class="mapsvg-data-row{{#if orphaned}} mapsvg-region-orphaned{{/if}}">{{#each fields}}
       {{#switch type}}
       {{#case "id" break=true}}
-        <td>{{lookup ../region "id"}}</td>
+        <td>
+          <div class="mapsvg-region-id-cell">{{lookup ../region "id"}}{{#if ../region.orphaned}}<span class="mapsvg-orphan-badge">Not in SVG</span>{{/if}}</div>
+        </td>
       {{/case}}
       {{#case "image" break=true}}
         <td>{{getThumbs ../region name}}</td>

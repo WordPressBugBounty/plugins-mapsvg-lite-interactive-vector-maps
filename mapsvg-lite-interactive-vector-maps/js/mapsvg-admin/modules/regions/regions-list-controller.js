@@ -65,6 +65,10 @@
           })
         }
 
+        if (obj.name === "orphaned") {
+          return
+        }
+
         if (onlyVisible) {
           if (!obj.hiddenOnTable) {
             return _fields.push(data)
@@ -281,8 +285,8 @@
             t.closest("td").find(".mapsvg-status-text").html(t.text())
           })
         } else {
-          var region = _this.mapsvg.getRegion(id)
-          _this.editRegion(region)
+          var id = $(this).data("region-id")
+          _this.editRegion(id)
         }
       })
 
@@ -307,16 +311,18 @@
   MapSVGAdminRegionsListController.prototype.updateDataRow = function (region, row) {
     var _this = this
     var regionOpts = _this.mapsvg.getData().options.regions
+    var regionData = region.getData ? region.getData() : region
 
     var data = {
       fields: _this.getDataFieldsForTemplate(true), //_this.database.getSchema().getColumns({visible: true}),
-      region: region.getData(),
+      region: regionData,
+      id: region.id,
+      orphaned: !!(regionData && regionData.orphaned),
+      fill:
+        regionOpts && regionOpts[region.id] && regionOpts[region.id].style && regionOpts[region.id].style.fill
+          ? regionOpts[region.id].style.fill
+          : null,
     }
-    data.id = region.id
-    data.fill =
-      regionOpts[region.id] && regionOpts[region.id].style && regionOpts[region.id].style.fill
-        ? regionOpts[region.id].style.fill
-        : null
 
     var newRow = $(_this.templates.item(data))
 
@@ -334,8 +340,19 @@
     }, 2600)
   }
 
-  MapSVGAdminRegionsListController.prototype.editRegion = function (region, scrollTo) {
+  /**
+   * Open region edit modal. Accepts an SVG Region, a repository Model, or a region id string.
+   * Orphaned DB rows have no SVG shape — edit still works from repository data.
+   */
+  MapSVGAdminRegionsListController.prototype.editRegion = function (regionOrId, scrollTo) {
     var _this = this
+    var regionId =
+      regionOrId && typeof regionOrId === "object" ? regionOrId.id : regionOrId
+    if (regionId === undefined || regionId === null || regionId === "") {
+      return
+    }
+    regionId = regionId + ""
+
     if (
       this.database &&
       typeof this.database.getImportSettings === "function" &&
@@ -348,22 +365,33 @@
       this.database.getImportSettings().always(
         function () {
           this._importSettingsFetchInProgress = false
-          this.editRegion(region, scrollTo)
+          this.editRegion(regionOrId, scrollTo)
         }.bind(this),
       )
       return
     }
 
+    var svgRegion = _this.mapsvg.getRegion(regionId)
+    var repoModel =
+      _this.database.getLoaded && _this.database.getLoaded().findById
+        ? _this.database.getLoaded().findById(regionId)
+        : null
+    var formData = repoModel
+      ? repoModel.getData()
+      : svgRegion && svgRegion.getModel
+        ? svgRegion.getModel().getData()
+        : { id: regionId }
+
     var row = _this.view.find(
       "#mapsvg-region-" +
-        mapsvg.utils.strings.toSnakeCase(region.id).replace(/(:|\(|\)|\.|\[|\]|,|=|@)/g, "\\$1"),
+        mapsvg.utils.strings.toSnakeCase(regionId).replace(/(:|\(|\)|\.|\[|\]|,|=|@)/g, "\\$1"),
     )
 
     if (_this.tableDataActiveRow) _this.tableDataActiveRow.removeClass("mapsvg-row-selected")
 
-    if (region && !region.selected) _this.mapsvg.selectRegion(region)
+    if (svgRegion && !svgRegion.selected) _this.mapsvg.selectRegion(svgRegion)
 
-    if (row) {
+    if (row && row.length) {
       _this.updateScroll()
       if (scrollTo) _this.contentWrap.data("jsp").scrollToElement(row, true, false)
       _this.tableDataActiveRow = row
@@ -404,7 +432,7 @@
       editMode: false,
       mapsvg: _this.mapsvg,
       mediaUploader: mediaUploader,
-      data: region.getModel().getData(),
+      data: formData,
       admin: _this.admin,
       readOnly: isReadOnly,
       readOnlyMessage:

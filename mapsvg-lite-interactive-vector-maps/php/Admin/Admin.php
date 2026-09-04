@@ -111,6 +111,8 @@ class Admin
 
         $options = Options::getAll();
 
+        
+
         // Get the current user's information
         $current_user = wp_get_current_user();
 
@@ -145,6 +147,7 @@ class Admin
             'gitBranch' => "",
             'svgFiles' => $svgRepo->find(),
             'options' => $options,
+            
             'postTypes' => $post_types,
             'userIsAdmin' => current_user_can("manage_options"),
             'pagination' => array(
@@ -157,7 +160,7 @@ class Admin
 
 
 
-        wp_register_script('admin.mapsvg', MAPSVG_PLUGIN_URL . 'js/mapsvg-admin/core/admin.js', array('jquery'), MAPSVG_ASSET_VERSION, true);
+        wp_register_script('admin.mapsvg', MAPSVG_PLUGIN_URL . 'js/mapsvg-admin/core/admin.js', array('jquery'), (string) filemtime(MAPSVG_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'js/mapsvg-admin/core/admin.js'), true);
         wp_enqueue_script('admin.mapsvg');
 
 
@@ -222,7 +225,7 @@ class Admin
 
 
 
-        wp_register_script('admin.mapsvg', MAPSVG_PLUGIN_URL . 'js/mapsvg-admin/core/admin.js', array('jquery'), MAPSVG_ASSET_VERSION, true);
+        wp_register_script('admin.mapsvg', MAPSVG_PLUGIN_URL . 'js/mapsvg-admin/core/admin.js', array('jquery'), (string) filemtime(MAPSVG_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'js/mapsvg-admin/core/admin.js'), true);
         wp_enqueue_script('admin.mapsvg');
 
         wp_localize_script('admin.mapsvg', 'mapsvgBackendParams', array(
@@ -267,4 +270,6 @@ class Admin
         include(__DIR__ . DIRECTORY_SEPARATOR . "Common" . DIRECTORY_SEPARATOR . 'support_modal.php');
         // END
     }
+
+    
 }

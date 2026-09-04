@@ -44,6 +44,15 @@
       "db_default": 1
     },
     {
+      "name": "orphaned",
+      "label": "Orphaned",
+      "type": "checkbox",
+      "db_type": "tinyint(1)",
+      "visible": false,
+      "protected": true,
+      "db_default": 0
+    },
+    {
       "name": "link",
       "label": "Link",
       "type": "text",
