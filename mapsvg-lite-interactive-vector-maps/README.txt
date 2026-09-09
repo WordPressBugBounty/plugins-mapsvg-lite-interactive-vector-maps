@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 7.0.1
-Stable tag: 8.16.0
+Stable tag: 8.16.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -138,6 +138,15 @@ MapSVG Premium has an embedded CSV editor, which makes style editing more comfor
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 8.16.1 =
+* Fixed: **Security** — hardened WordPress post-type REST routes with additional access checks.
+* Fixed: **Filters** — public maps no longer get stuck on a loading spinner when a cached page sends an expired WordPress REST nonce; those reads retry without the stale nonce. Gleap #237612
+* Fixed: **CSV import** — file uploads honor the selected ID column so existing region rows update instead of duplicating. "No ID" appends as expected, and Excel BOM headers no longer create blank IDs. Gleap #237577
+* Fixed: **Loading spinner** — the spinner sits next to the loading text, empty text is hidden, and the preloader is visible before JavaScript runs.
+* Fixed: **Mobile toolbar** — Map/List icons show correctly when Shadow DOM is enabled.
+* Fixed: **Pinch-zoom** — pinch-zoom no longer fails on some iPad browsers (including DuckDuckGo). Gleap #237573
+* Fixed: **USA counties map** — corrected the Orange County spelling.
 
 = 8.16.0 =
 * Improved: **Regions / SVG changes** — replacing or editing an SVG no longer deletes region records whose IDs disappeared. Those rows stay as orphans so you can copy their data, then remove them from Regions → Settings → Clean orphan region records.

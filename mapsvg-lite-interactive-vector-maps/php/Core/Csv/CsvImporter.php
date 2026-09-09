@@ -279,9 +279,32 @@ class CsvImporter
 		}
 
 		return array_map(
-			fn(string $h): string => strtolower(str_replace(' ', '_', trim($h))),
-			$rawHeaders
+			[self::class, 'normalizeHeader'],
+			array_map('strval', $rawHeaders)
 		);
+	}
+
+	/**
+	 * Normalise a CSV header: strip a leading BOM, trim, lowercase, spaces → underscores.
+	 *
+	 * Excel and some Google Sheets exports prefix the first column with a UTF-8 BOM.
+	 * Without stripping it, the ID header never matches the schema `id` field,
+	 * and imports insert blank-ID rows instead of upserting.
+	 */
+	public static function normalizeHeader(string $header): string
+	{
+		if (strncmp($header, "\xEF\xBB\xBF", 3) === 0) {
+			$header = substr($header, 3);
+		}
+		if (strncmp($header, "\xFE\xFF", 2) === 0 || strncmp($header, "\xFF\xFE", 2) === 0) {
+			$header = substr($header, 2);
+		}
+		$stripped = preg_replace('/^\x{FEFF}/u', '', $header);
+		if (is_string($stripped)) {
+			$header = $stripped;
+		}
+
+		return strtolower(str_replace(' ', '_', trim($header)));
 	}
 
 	/**

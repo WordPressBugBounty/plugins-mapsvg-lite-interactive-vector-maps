@@ -105,21 +105,29 @@ class PostTypesRepository
   /**
    * Retrieves distinct values for a given field name from published posts.
    *
+   * Only public-safe wp_posts columns are queried. Password-protected posts
+   * are excluded even for those columns.
+   *
    * @param string $fieldName The name of the field to retrieve distinct values for.
    * @param string $post_type
    * @return array An array of distinct values for the specified field.
    */
   public function getFieldValues($fieldName, $post_type)
   {
-    $db = Database::get();
-    $postsTable = $db->posts();
-    if (!Utils::isSafeSlug($post_type) || !Utils::isTableColumn($postsTable, $fieldName)) {
+    $column = PublicPostColumns::canonicalName($fieldName);
+    if ($column === null || !Utils::isSafeSlug($post_type)) {
       return [];
     }
 
-    // Column name is verified against DESCRIBE; post_type is bound via prepare.
+    $db = Database::get();
+    $postsTable = $db->posts();
+    if (!Utils::isTableColumn($postsTable, $column)) {
+      return [];
+    }
+
+    // Column name is allow-listed and verified against DESCRIBE; post_type is bound via prepare.
     $sql = $db->prepare(
-      "SELECT DISTINCT `{$fieldName}` FROM `{$postsTable}` WHERE post_status = 'publish' AND post_type = %s",
+      "SELECT DISTINCT `{$column}` FROM `{$postsTable}` WHERE post_status = 'publish' AND post_type = %s AND post_password = ''",
       $post_type
     );
     $results = $db->get_col($sql, 0);
@@ -127,14 +135,15 @@ class PostTypesRepository
   }
 
   /**
-   * Retrieves unique taxonomy term names for a given taxonomy from published posts.
+   * Retrieves unique taxonomy term names for a given taxonomy from published posts of one post type.
    *
    * @param string $name The taxonomy name (e.g., 'category', 'post_tag').
+   * @param string $post_type
    * @return array An array of unique term names.
    */
-  public function getTaxonomyValues($name)
+  public function getTaxonomyValues($name, $post_type)
   {
-    if (!Utils::isSafeSlug($name)) {
+    if (!Utils::isSafeSlug($name) || !Utils::isSafeSlug($post_type)) {
       return [];
     }
 
@@ -144,22 +153,24 @@ class PostTypesRepository
                 INNER JOIN {$db->prefix}term_taxonomy tt ON t.term_id = tt.term_id
                 INNER JOIN {$db->prefix}term_relationships tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
                 INNER JOIN {$db->posts} p ON tr.object_id = p.ID
-                WHERE tt.taxonomy = %s AND p.post_status = 'publish'",
-      $name
+                WHERE tt.taxonomy = %s AND p.post_type = %s AND p.post_status = 'publish' AND p.post_password = ''",
+      $name,
+      $post_type
     );
     $results = $db->get_col($sql, 0);
     return $results ? $results : [];
   }
 
   /**
-   * Retrieves unique meta values for a given meta key from published posts.
+   * Retrieves unique meta values for a given meta key from published posts of one post type.
    *
    * @param string $name The meta key.
+   * @param string $post_type
    * @return array An array of unique meta values.
    */
-  public function getMetaValues($name)
+  public function getMetaValues($name, $post_type)
   {
-    if (!Utils::isSafeSlug($name)) {
+    if (!Utils::isSafeSlug($name) || !Utils::isSafeSlug($post_type)) {
       return [];
     }
 
@@ -167,8 +178,9 @@ class PostTypesRepository
     $sql = $db->prepare(
       "SELECT DISTINCT pm.meta_value FROM {$db->postmeta} pm
                 INNER JOIN {$db->posts} p ON pm.post_id = p.ID
-                WHERE pm.meta_key = %s AND p.post_status = 'publish' AND pm.meta_value IS NOT NULL AND pm.meta_value != ''",
-      $name
+                WHERE pm.meta_key = %s AND p.post_type = %s AND p.post_status = 'publish' AND p.post_password = '' AND pm.meta_value IS NOT NULL AND pm.meta_value != ''",
+      $name,
+      $post_type
     );
     $results = $db->get_col($sql, 0);
 

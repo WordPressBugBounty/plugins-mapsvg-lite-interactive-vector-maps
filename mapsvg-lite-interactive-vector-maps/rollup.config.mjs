@@ -12,7 +12,7 @@ import postcss from "rollup-plugin-postcss"
 import rootImport from "rollup-plugin-root-import"
 import sourcemaps from "rollup-plugin-sourcemaps2"
 import { fileURLToPath } from "url"
-import packageJson from "./package.json" assert { type: "json" }
+import packageJson from "./package.json" with { type: "json" }
 import postcssImport from "postcss-import"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))

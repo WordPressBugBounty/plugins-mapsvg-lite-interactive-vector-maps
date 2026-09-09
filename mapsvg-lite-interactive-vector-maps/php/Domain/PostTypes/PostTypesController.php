@@ -55,6 +55,9 @@ class PostTypesController extends Controller
 		if (!$post_type || !$field) {
 			return self::render(['error' => 'No post_type or field specified.']);
 		}
+		if (!PublicPostColumns::isAllowed($field)) {
+			return self::render(['error' => 'Field is not allowed.', 'items' => []], 403);
+		}
 		/** @var \MapSVG\PostTypesRepository $repo */
 		$repo = RepositoryFactory::get('postType');
 		$values = $repo->getFieldValues($field, $post_type);
@@ -75,7 +78,7 @@ class PostTypesController extends Controller
 		}
 		/** @var \MapSVG\PostTypesRepository $repo */
 		$repo = RepositoryFactory::get('postType');
-		$values = $repo->getTaxonomyValues($taxonomy);
+		$values = $repo->getTaxonomyValues($taxonomy, $post_type);
 		return self::render(['items' => $values]);
 	}
 
@@ -93,7 +96,7 @@ class PostTypesController extends Controller
 		}
 		/** @var \MapSVG\PostTypesRepository $repo */
 		$repo = RepositoryFactory::get('postType');
-		$values = $repo->getMetaValues($meta);
+		$values = $repo->getMetaValues($meta, $post_type);
 		return self::render(['items' => $values]);
 	}
 }

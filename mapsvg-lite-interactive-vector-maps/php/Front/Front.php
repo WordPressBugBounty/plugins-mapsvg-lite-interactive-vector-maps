@@ -148,8 +148,8 @@ class Front
 	/**
 	 *  Renders [mapsvg id="xxx"] shortcode.
 	 *
-	 *  Shortcode returns an empty <div id="mapsvg-XXX" class="mapsvg"</div> container
-	 *  and adds a JS script at the bottom of a page that adds the map to the created container
+	 *  Shortcode returns a <div id="mapsvg-XXX" class="mapsvg"> container with an
+	 *  inline preloader, then JS mounts the map into that container.
 	 *
 	 * @param $atts
 	 * Attributes from the shortcode
@@ -181,15 +181,17 @@ class Front
 		$height = isset($map->options["height"]) ? round((float)$map->options["height"], 2) : 800;
 		$mapPadding =  round($height * 100 / $width, 2);
 
-		// Generate empty DIV container for the map
+		$loadingText = isset($map->options["loadingText"]) ? Map::sanitizeLoadingTextForOutput($map->options["loadingText"]) : "";
+
+		// Generate DIV container with a CSS-ready preloader (visible before JS/CSS bundles).
 		$attributes = [
 			'id' => "mapsvg-" . $this->generateContainerId($map->id),
 			'data-id' => $map->id,
 			'class' => 'mapsvg',
 			'data-autoload' => 'true',
 			'data-load-db' => isset($map->options["database"]) && isset($map->options["database"]["loadOnStart"]) && $map->options["database"]["loadOnStart"] === true ? "true" : "false",
-			'data-loading-text' => isset($map->options["loadingText"]) ? Map::sanitizeLoadingTextForOutput($map->options["loadingText"]) : "",
-			'style' => 'width: 100%; height: 0; padding-bottom: ' . $mapPadding . '%'
+			'data-loading-text' => $loadingText,
+			'style' => 'width: 100%; height: 0; padding-bottom: ' . $mapPadding . '%; position: relative;'
 		];
 		if (isset($atts['selected']) && !empty($atts['selected'])) {
 			$attributes["selected"] = str_replace(' ', '_', $atts['selected']);
@@ -198,12 +200,9 @@ class Front
 			$attributes["data-lazy"] = "true";
 		}
 
-		$divElement = new DOMElement('div', $attributes);
+		$divElement = new DOMElement('div', $attributes, MapPreloader::innerHtml($loadingText));
 
-		// Return empty DIV container
-		$content = $divElement->render();
-
-		return $content;
+		return $divElement->render();
 	}
 
 	

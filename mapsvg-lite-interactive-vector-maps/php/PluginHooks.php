@@ -57,6 +57,10 @@ final class PluginHooks
         // Add query vars for custom endpoints
         add_filter('query_vars', array($this, 'addCustomQueryVars'));
 
+        // WordPress cookie authentication creates rest_cookie_invalid_nonce at priority 100,
+        // so this must run afterwards to downgrade only public MapSVG GETs to anonymous reads.
+        add_filter('rest_authentication_errors', array(RestAuth::class, 'allowStaleNonceOnPublicGet'), 110);
+
         // Background geocoding cron — must be registered on every request so WP Cron can fire it.
         add_action('mapsvg_geocode_batch', '\MapSVG\GeocodingQueue::process');
 

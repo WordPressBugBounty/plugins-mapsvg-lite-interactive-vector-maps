@@ -26,13 +26,84 @@ class GoogleSheetSync
         return is_string($settings['gsIdFieldName'] ?? null) && trim((string) $settings['gsIdFieldName']) !== '';
     }
 
-    public static function resolveImportMode(Schema $schema, bool $isAutoRefetch): string
+    /**
+     * Preserve absent vs explicit-empty ID override from a request or preflight value.
+     *
+     * @param mixed $raw Request/preflight idField. null = no override supplied.
+     * @return string|null null, '' (explicit No ID), or a normalised field name
+     */
+    public static function normalizeOverrideIdField($raw): ?string
     {
-        if (self::hasStableId($schema)) {
+        if ($raw === null) {
+            return null;
+        }
+
+        return CsvImporter::normalizeHeader(trim((string) $raw));
+    }
+
+    /**
+     * Read preflight meta `idField` without collapsing a missing/null value to ''.
+     *
+     * @param array|null $preflightMeta
+     * @return string|null
+     */
+    public static function resolveOverrideIdFieldFromPreflight(?array $preflightMeta): ?string
+    {
+        if (!is_array($preflightMeta) || !array_key_exists('idField', $preflightMeta)) {
+            return null;
+        }
+
+        return self::normalizeOverrideIdField($preflightMeta['idField']);
+    }
+
+    /**
+     * Three-state upload/request ID override:
+     * - null: no override supplied; persisted remote/Google Sheets gsIdFieldName may be used
+     * - '': explicit "No ID in CSV file"; must append (or snapshot_replace on auto-refetch)
+     * - non-empty: upsert using that selected field
+     *
+     * @param string|null $overrideIdField
+     * @param bool        $hasPersistedStableId
+     * @param bool        $isAutoRefetch
+     * @return string
+     */
+    public static function resolveImportModeFromOverride(
+        ?string $overrideIdField,
+        bool $hasPersistedStableId,
+        bool $isAutoRefetch
+    ): string {
+        if ($overrideIdField !== null) {
+            if (self::hasExplicitIdField($overrideIdField)) {
+                return self::MODE_UPSERT;
+            }
+
+            return $isAutoRefetch ? self::MODE_SNAPSHOT_REPLACE : self::MODE_APPEND;
+        }
+
+        if ($hasPersistedStableId) {
             return self::MODE_UPSERT;
         }
 
         return $isAutoRefetch ? self::MODE_SNAPSHOT_REPLACE : self::MODE_APPEND;
+    }
+
+    /**
+     * @param string|null $overrideIdField Preflight / request ID column. null = no override;
+     *                                     '' = explicit No ID; non-empty forces upsert.
+     *                                     File-upload imports do not persist gsIdFieldName.
+     */
+    public static function resolveImportMode(Schema $schema, bool $isAutoRefetch, ?string $overrideIdField = null): string
+    {
+        return self::resolveImportModeFromOverride(
+            $overrideIdField,
+            self::hasStableId($schema),
+            $isAutoRefetch
+        );
+    }
+
+    public static function hasExplicitIdField(?string $idFieldName): bool
+    {
+        return is_string($idFieldName) && trim($idFieldName) !== '';
     }
 
     /**

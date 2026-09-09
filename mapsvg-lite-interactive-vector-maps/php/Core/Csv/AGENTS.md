@@ -51,10 +51,16 @@ Extension hooks:
 **Google Sheets auto-refetch** (`GoogleSheetSync`):
 
 - **`hasStableId()`** — `ImportSettingsService` → non-empty `gsIdFieldName` after trim.  
-- **`resolveImportMode($schema, $isAutoRefetch)`** — stable ID → **upsert**; no stable ID → **snapshot_replace** on auto-refetch, **append** on manual path.  
+- **`resolveImportMode($schema, $isAutoRefetch, $overrideIdField)`** — three-state override (see below) then persisted `gsIdFieldName`. No usable ID → **snapshot_replace** on auto-refetch, **append** on manual path.  
 - **Snapshot replace** uses `importWithTableSwap()`: `CREATE TABLE ... LIKE`, import into staging with `upsert=false`, `RENAME TABLE` swap, drop backup — then `setRelationsForAllObjects()`.
 
-Manual REST imports set job `upsert` from `GoogleSheetSync::resolveImportMode($schema, false)` (non-auto-refetch branch).
+Manual REST imports set job `upsert` from `GoogleSheetSync::resolveImportMode($schema, false, $preflightIdField)`. File-upload ID selection is **source-local** and must not write `gsIdFieldName` (that setting is for remote/Google Sheets). Preflight stores `idField` as:
+
+- **`null` / absent** — no upload override; `initImportJob` may fall back to persisted `gsIdFieldName`
+- **`''`** — user chose “No ID in CSV file”; import **must append** and must **not** fall back to `gsIdFieldName`
+- **non-empty** — upsert using that column
+
+`preflightCsv` → `initImportJob` → `resolveImportMode` must preserve null vs `''` (do not coerce a missing override to `''`). `CsvImporter::normalizeHeader()` strips a leading UTF-8 BOM so Excel `id` columns still match the schema field.
 
 ---
 

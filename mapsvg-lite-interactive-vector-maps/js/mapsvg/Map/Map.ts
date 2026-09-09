@@ -5,6 +5,8 @@ import { ArrayIndexed } from "../Core/ArrayIndexed"
 import { EventWithData, Events } from "../Core/Events"
 
 import { mapsvgCore } from "@/Core/Mapsvg"
+import { ensureIconFontFace } from "@/Core/ensureIconFontFace"
+import { ensureLoadingCriticalCss } from "@/Map/mapPreloader"
 
 import {
   MiddlewareHandler,
@@ -69,6 +71,7 @@ import {
 import { ToolbarController } from "./Toolbar"
 import { GeoViewBox, ViewBox } from "./ViewBox"
 import { DefaultOptions } from "./default-options"
+import { getPinchScale } from "./getPinchScale"
 import "./map.css"
 
 const $ = jQuery
@@ -601,39 +604,7 @@ export class MapSVGMap {
     })
 
     this.setLoadingText(mapParams.options ? mapParams.options.loadingText || "" : "")
-    if (this.inBackend) {
-      const style = document.createElement("style")
-      style.textContent = `
-        .mapsvg-loading {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          z-index: 100;
-          padding: 7px 10px;
-          border-radius: 5px;
-          border: 1px solid #ccc;
-          background: #f5f5f2;
-          transform: translate(-50%, -50%);
-          text-align: center;
-          box-shadow: 0px 0px 20px rgba(0,0,0,0.2);
-          line-height: 11px;
-        }
-        .mapsvg-loading-text {
-          display: inline-block;
-          font-size: 12px !important;
-          color: #999;
-          font-family: "Helvetica", sans-serif;
-        }
-        .mapsvg-loading .spinner-border {
-          display: inline-block;
-          margin: 0 auto;
-          color: #888;
-          margin-right: 5px;
-        }
-      `
-
-      document.head.appendChild(style)
-    }
+    ensureLoadingCriticalCss(document.head)
     this.addLoadingMessage()
     this.showLoadingMessage()
 
@@ -4023,8 +3994,12 @@ export class MapSVGMap {
       this.containers.wrapAll.parentNode.insertBefore(this.containers.root, this.containers.wrapAll)
       this.containers.shadowRoot.appendChild(this.containers.wrapAll)
 
+      // @font-face inside Shadow DOM is ignored; register the icon font on the document
+      ensureIconFontFace(mapsvgCore.routes.root, mapsvgCore.version)
+
       // Critical label CSS first (sync), then async bundle/theme links
       this.injectCriticalRegionLabelCss(this.containers.shadowRoot)
+      ensureLoadingCriticalCss(this.containers.shadowRoot)
 
       // 6. Добавляем стили внутрь Shadow
       for (const style of mapsvgCore.styles) {
@@ -4043,6 +4018,7 @@ export class MapSVGMap {
     } else {
       // Critical label CSS first (sync), then async bundle/theme links
       this.injectCriticalRegionLabelCss(document.head)
+      ensureLoadingCriticalCss(document.head)
 
       // 6. Добавляем стили внутрь Shadow
       if (!mapsvgCore.stylesAddedToBody) {
@@ -6482,21 +6458,10 @@ export class MapSVGMap {
     const e = _e.originalEvent || _e
 
     if (this.options.zoom.fingers && e.touches && e.touches.length == 2) {
-      if (!env.getDevice().ios) {
-        // e.scale is present on iOS devices only so we need to add "ts-ignore"
-        // @ts-ignore
-        e.scale =
-          Math.hypot(
-            e.touches[0].pageX - e.touches[1].pageX,
-            e.touches[0].pageY - e.touches[1].pageY,
-          ) / this.scaleDistStart
-      }
+      const scale = getPinchScale(e, this.scaleDistStart)
 
-      // e.scale is present on iOS devices only so we need to add "ts-ignore"
-      // @ts-ignore
-      if (e.scale != 1 && this.canZoom) {
-        // @ts-ignore
-        const d = e.scale > 1 ? 1 : -1
+      if (scale != 1 && this.canZoom) {
+        const d = scale > 1 ? 1 : -1
 
         const cx =
           e.touches[0].pageX >= e.touches[1].pageX
@@ -8495,6 +8460,19 @@ export class MapSVGMap {
   }
 
   private addLoadingMessage(): void {
+    if (!this.containers) {
+      this.containers = {}
+    }
+    const existing = this.container.querySelector(".mapsvg-loading") as HTMLElement | null
+    if (existing) {
+      this.containers.loading = existing
+      const textEl = existing.querySelector(".mapsvg-loading-text") as HTMLElement | null
+      if (textEl) {
+        this.applyLoadingText(textEl, this.options.loadingText)
+      }
+      return
+    }
+
     this.containers.loading = document.createElement("div")
     this.containers.loading.className = "mapsvg-loading"
 

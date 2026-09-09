@@ -228,8 +228,12 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
 
     this.events.trigger(RepositoryEvent.AFTER_LOAD, { data, repository: this })
   }
-  async reload(): Promise<JQueryDeferred<any>> {
-    return await this.find()
+  reload(): JQueryPromise<any> {
+    const request = this.find()
+    // Filter changes call reload() without a fail handler. Attach one so a
+    // rejected request is not an uncaught promise after FAILED_LOAD fires.
+    request.fail(() => undefined)
+    return request
   }
 
   create(object: Record<string, unknown>): JQueryDeferred<any> {
@@ -394,6 +398,7 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
         defer.resolve(this.getLoaded())
       })
       .fail((response) => {
+        this.events.trigger(RepositoryEvent.FAILED_LOAD, { response, repository: this })
         defer.reject(response)
       })
 

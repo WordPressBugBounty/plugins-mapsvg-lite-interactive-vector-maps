@@ -276,7 +276,12 @@ class CollectionController extends Controller
             return static::render(['error' => 'Collection not found.'], 404);
         }
 
-        $idFieldName = sanitize_text_field($request['idFieldName'] ?? $repo->schema->getPrimaryKeyFieldName());
+        $rawIdField = $request['idFieldName'] ?? null;
+        if ($rawIdField !== null) {
+            $rawIdField = sanitize_text_field((string) $rawIdField);
+        }
+        $idFieldOverride = GoogleSheetSync::normalizeOverrideIdField($rawIdField);
+        $idFieldName     = $idFieldOverride ?? $repo->schema->getPrimaryKeyFieldName();
         $csvPath = '';
         $sourceType = 'upload';
         $sourceUrl = null;
@@ -336,7 +341,7 @@ class CollectionController extends Controller
                 'separator' => $init['separator'],
                 'dataOffset' => (int) $init['data_offset'],
                 'rowCount' => (int) $init['total'],
-                'idField' => $idFieldName,
+                'idField' => $idFieldOverride,
                 'idProfile' => $validation['idProfile'],
                 'emptyIdCount' => $validation['emptyIdCount'],
                 'duplicateIdCount' => $validation['duplicateIdCount'],
@@ -430,7 +435,16 @@ class CollectionController extends Controller
                 $init     = $importer->initialize($savedPath);
             }
 
+            $init['headers'] = array_map(
+                [CsvImporter::class, 'normalizeHeader'],
+                array_map('strval', $init['headers'] ?? [])
+            );
+
             (new ImportLogRepository())->clearForSchema($collection);
+
+            $preflightIdField = GoogleSheetSync::resolveOverrideIdFieldFromPreflight(
+                is_array($preflightMeta) ? $preflightMeta : null
+            );
 
             $token = CsvImportJob::create([
                 'file'                   => $savedPath,
@@ -439,7 +453,7 @@ class CollectionController extends Controller
                 'headers'                => $init['headers'],
                 'current_offset'         => $init['data_offset'],
                 'total'                  => $init['total'],
-                'upsert'                 => GoogleSheetSync::resolveImportMode($repo->schema, false) === GoogleSheetSync::MODE_UPSERT,
+                'upsert'                 => GoogleSheetSync::resolveImportMode($repo->schema, false, $preflightIdField) === GoogleSheetSync::MODE_UPSERT,
                 'convertLatlngToAddress' => $params['convertLatlngToAddress'] ?? false,
                 'convertAddressToLatLng' => $params['convertAddressToLatLng'] ?? false,
                 'paidGeocoding'          => $params['paidGeocoding'] ?? false,

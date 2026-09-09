@@ -270,15 +270,61 @@ No need to tag again — `gulp bump` already created and pushed the tag in Step 
 
 ---
 
-## Step 11 — Done
+## Step 11 — Slack `#release` (mandatory)
+
+After deploy + master merge succeed, post the Docusaurus changelog to Slack `#release`. Do this on a normal `/release` and also after a successful `/publish`.
+
+1. Resolve the channel with Slack MCP `slack_search_channels` (`query`: `release`). Use the `#release` channel id (not a similarly named channel).
+2. Read the changelog body from the file created in Step 3:
+
+   `/Users/roma/WebstormProjects/mapsvg-docusaurus/changelog/v{MAJOR}/X.Y.Z.md`
+
+3. Send with Slack MCP `slack_send_message` (`channel_id` = `#release` id).
+
+**Same changelog as Docusaurus**, minus YAML frontmatter. Do not rewrite, shorten, or translate bullets. Slack MCP accepts a **markdown subset**, not full MD and not Slack `mrkdwn`:
+
+| Works | Does not work |
+|---|---|
+| `**bold**` | `#` / `##` / `###` headings (show as literal `###`) |
+| `_italic_` | tables |
+| `` `code` `` / ``` fences | images `![]()` |
+| `-` / `1.` lists | |
+| `[text](url)` | |
+| `> quote` | |
+
+Convert each `### Heading` line to a **bold line** (`**🚀 Features / Improvements**`). Leave `- **Label**: …` bullets as-is.
+
+Prefix one title line, then a blank line, then the adapted body:
+
+```
+Released **X.Y.Z**
+
+**🚀 Features / Improvements**
+
+- **Label**: description.
+
+**🐛 Bug Fixes**
+
+- **Label**: description.
+```
+
+Only include sections that exist in the Docusaurus file.
+
+If Slack MCP is unavailable or `#release` cannot be found: do **not** fail the release. Report the error in chat and paste the exact message so it can be posted manually.
+
+Return the Slack message link in the Step 12 report.
+
+---
+
+## Step 12 — Done
 
 Report success:
 
-> ✅ Released X.Y.Z — master updated, tag pushed, deploy complete.
+> ✅ Released X.Y.Z — master updated, tag pushed, deploy complete, Slack `#release` notified.
 
 ---
 
 ## `/publish X.Y.Z` — retry merge after fixing a failed deploy
 
 If the user types `/publish X.Y.Z`, it means Steps 1–9 already ran but deploy failed.
-Skip directly to Step 9 (deploy) and if successful, do Step 10.
+Skip directly to Step 9 (deploy) and if successful, do Step 10, then Step 11 (Slack), then Step 12.

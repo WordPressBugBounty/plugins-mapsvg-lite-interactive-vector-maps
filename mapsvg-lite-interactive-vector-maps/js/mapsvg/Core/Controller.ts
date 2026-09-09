@@ -12,6 +12,7 @@ import { deepMerge, isPhone, isTablet, parseBoolean, useId } from "./Utils"
 import "./controller.css"
 const $ = jQuery
 import { mapsvgCore } from "@/Core/Mapsvg"
+import { ensureIconFontFace } from "@/Core/ensureIconFontFace"
 
 export enum ControllerEvent {
   RESIZE = "resize",
@@ -375,6 +376,8 @@ export class Controller implements BaseController {
       const shadowRoot = this.containers.shadowRoot.attachShadow({ mode: "open" })
       // Insert this.containers.wrapAll before this.containers.map
       shadowRoot.appendChild(this.containers.main)
+
+      ensureIconFontFace(mapsvgCore.routes.root, mapsvgCore.version)
 
       // 6. Добавляем стили внутрь Shadow
       for (const style of mapsvgCore.styles) {

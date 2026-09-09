@@ -861,8 +861,7 @@ class Router
 				'methods' => 'GET',
 				'callback' => '\MapSVG\PostTypesController::index',
 				'permission_callback' => function () {
-					return true;
-					// return current_user_can('edit_posts');
+					return current_user_can('edit_posts');
 				}
 			)
 		));
@@ -871,7 +870,6 @@ class Router
 				'methods' => 'GET',
 				'callback' => '\MapSVG\PostTypesController::get',
 				'permission_callback' => function () {
-					return true;
 					return current_user_can('edit_posts');
 				}
 			)
@@ -881,8 +879,16 @@ class Router
 				'methods' => 'GET',
 				'callback' => '\MapSVG\PostTypesController::getFieldValues',
 				'permission_callback' => function () {
-					return true;
-				}
+					return current_user_can('edit_posts');
+				},
+				'args' => array(
+					'_field_name' => array(
+						'required' => true,
+						'validate_callback' => function ($param) {
+							return PublicPostColumns::isAllowed($param);
+						},
+					),
+				),
 			)
 		));
 		register_rest_route('mapsvg/v1', $baseRoute . '(?P<_post_type>[a-zA-Z0-9_-]+)/taxonomy/(?P<_taxonomy_name>[a-zA-Z0-9_-]+)', array(
@@ -890,7 +896,7 @@ class Router
 				'methods' => 'GET',
 				'callback' => '\MapSVG\PostTypesController::getTaxonomyValues',
 				'permission_callback' => function () {
-					return true;
+					return current_user_can('edit_posts');
 				}
 			)
 		));
@@ -899,7 +905,7 @@ class Router
 				'methods' => 'GET',
 				'callback' => '\MapSVG\PostTypesController::getMetaValues',
 				'permission_callback' => function () {
-					return true;
+					return current_user_can('edit_posts');
 				}
 			)
 		));

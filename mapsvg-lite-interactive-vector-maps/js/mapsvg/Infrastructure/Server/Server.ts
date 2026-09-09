@@ -21,14 +21,21 @@ export class Server {
       : addTrailingSlash(this.apiUrl) + removeLeadingSlash(path)
   }
   get(path: string, data?: any): JQueryPromise<any> {
-    return $.ajax({
-      url: this.getUrl(path),
-      type: "GET",
-      data: data,
-      beforeSend: (xhr) => {
-        this.addNonceHeader(xhr)
-      },
-    })
+    return $.Deferred((deferred) => {
+      this.getOnce(path, data, true)
+        .done((response) => deferred.resolve(response))
+        .fail((jqXHR, textStatus, errorThrown) => {
+          if (this.isInvalidRestNonce(jqXHR)) {
+            this.getOnce(path, data, false)
+              .done((response) => deferred.resolve(response))
+              .fail((retryXhr, retryStatus, retryError) =>
+                deferred.reject(retryXhr, retryStatus, retryError),
+              )
+            return
+          }
+          deferred.reject(jqXHR, textStatus, errorThrown)
+        })
+    }).promise()
   }
   fetch(path: string, data?: any): Promise<any> {
     return fetch(path.indexOf("http:") === 0 ? path : this.apiUrl + path)
@@ -166,6 +173,28 @@ export class Server {
         }
       })
     }
+  }
+
+  private getOnce(path: string, data: any, sendNonce: boolean): JQueryPromise<any> {
+    return $.ajax({
+      url: this.getUrl(path),
+      type: "GET",
+      data: data,
+      beforeSend: (xhr) => {
+        if (sendNonce) {
+          this.addNonceHeader(xhr)
+        }
+      },
+    })
+  }
+
+  /**
+   * WordPress REST cookie auth returns 403 rest_cookie_invalid_nonce when a
+   * cached page ships a stale X-WP-Nonce. Public GET routes still work
+   * without the header (unauthenticated).
+   */
+  private isInvalidRestNonce(jqXHR: JQueryXHR): boolean {
+    return jqXHR.status === 403 && jqXHR.responseJSON?.code === "rest_cookie_invalid_nonce"
   }
 
   private addNonceHeader(xhr: JQueryXHR): void {

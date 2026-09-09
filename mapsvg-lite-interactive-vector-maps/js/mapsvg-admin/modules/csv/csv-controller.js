@@ -201,6 +201,7 @@
     this.schemaRepo = window.mapsvg.useRepository("schemas", mapsvg)
     this.gsSheetData = null // cache for AppScript sheet/column data
     this.csvIdOptions = { upload: [], remote: [] } // cached ID column options per source
+    this.csvIdFieldSelection = { upload: null, remote: null } // source-local ID column; upload must not touch gsIdFieldName
     this.missingFieldsState = { upload: null, remote: null } // missing-fields rows cached per source
     this._activeMissingFieldsSource = null // source currently shown in missing fields UI
     this._uploadValid = false // transient validation flag for upload source
@@ -288,7 +289,22 @@
     }
   }
 
-  MapSVGAdminCsvController.prototype.getSelectedIdFieldName = function () {
+  MapSVGAdminCsvController.prototype._getActiveImportSource = function () {
+    if (this.view && this.formElements && this.formElements.GsImportSourceInputs) {
+      var $radios = this._$fe("GsImportSourceInputs")
+      if ($radios.length) {
+        return $radios.filter(":checked").val() === "remote" ? "remote" : "upload"
+      }
+    }
+    return this.getImportSetting("gsImportSource", "upload") === "remote" ? "remote" : "upload"
+  }
+
+  MapSVGAdminCsvController.prototype.getSelectedIdFieldName = function (source) {
+    source = source || this._getActiveImportSource()
+    if (source === "upload") {
+      var uploadId = this.csvIdFieldSelection ? this.csvIdFieldSelection.upload : null
+      return typeof uploadId === "string" ? uploadId : ""
+    }
     var value = this.getImportSetting("gsIdFieldName", "")
     return typeof value === "string" ? value : ""
   }
@@ -305,15 +321,25 @@
 
   MapSVGAdminCsvController.prototype._normalizeColumns = function (columns) {
     return (columns || []).map(function (col) {
-      return String(col || "").trim()
+      return String(col || "")
+        .replace(/^\uFEFF/, "")
+        .trim()
     })
   }
 
   MapSVGAdminCsvController.prototype._resolvePreferredIdField = function (columns) {
     var normalized = this._normalizeColumns(columns)
-    var currentId = this.getSelectedIdFieldName()
-    if (currentId && normalized.indexOf(currentId) !== -1) {
-      return currentId
+    var source = this._getActiveImportSource()
+    if (source === "upload") {
+      var uploadId = this.csvIdFieldSelection ? this.csvIdFieldSelection.upload : null
+      if (typeof uploadId === "string" && (uploadId === "" || normalized.indexOf(uploadId) !== -1)) {
+        return uploadId
+      }
+    } else {
+      var currentId = this.getSelectedIdFieldName("remote")
+      if (currentId && normalized.indexOf(currentId) !== -1) {
+        return currentId
+      }
     }
     return normalized.indexOf("id") !== -1 ? "id" : ""
   }
@@ -999,7 +1025,11 @@
       return
     }
 
-    var headers = parsed.data[0]
+    var headers = parsed.data[0].map(function (header) {
+      return String(header || "")
+        .replace(/^\uFEFF/, "")
+        .trim()
+    })
     var dataRows = parsed.data.slice(1)
     var columnValues = {}
     var columnMultiselect = {}
@@ -1068,7 +1098,8 @@
     // Remember pre-sync state for Cancel flow
     _this._preSyncValid = _this.getImportSetting("gsImportSourceValid", 0)
     _this._preSyncUploadValid = _this._uploadValid
-    _this._preSyncIdField = _this.getSelectedIdFieldName()
+    _this._preSyncIdField =
+      source === "upload" ? _this.csvIdFieldSelection.upload : _this.getSelectedIdFieldName("remote")
     _this._preSyncSkipFields = _this.getImportSetting("gsImportSkipFields", null)
 
     // Hide validated blocks initially – only show after Continue
@@ -1144,7 +1175,7 @@
       gsPaidGeocoding: _this._$fe("OptPaidGeocoding").is(":checked") ? 1 : 0,
     }
     var $idField = _this._$fe("IdField")
-    if ($idField.length) {
+    if (source === "remote" && $idField.length) {
       fields.gsIdFieldName = $idField.val() || ""
     }
 
@@ -1557,6 +1588,7 @@
 
     $root.on("change" + ns, fe.CsvFile, function () {
       _this.csvIdOptions["upload"] = []
+      _this.csvIdFieldSelection.upload = null
       _this.missingFieldsState["upload"] = null
       _this._activeMissingFieldsSource = null
       _this._uploadValid = false
@@ -1567,6 +1599,7 @@
 
     $root.on("input" + ns + " paste" + ns + " change" + ns, fe.CsvUrl, function () {
       _this.csvIdOptions["remote"] = []
+      _this.csvIdFieldSelection.remote = null
       _this.missingFieldsState["remote"] = null
       _this._activeMissingFieldsSource = null
       _this.setImportSetting("gsImportSourceValid", 0)
@@ -1596,7 +1629,13 @@
         return
       }
       var $idField = _this._$fe("IdField")
-      var idFieldName = $idField.length ? $idField.val() || "" : _this.getSelectedIdFieldName()
+      var idFieldName = $idField.length ? $idField.val() || "" : _this.getSelectedIdFieldName(source)
+      if (source === "upload") {
+        _this.csvIdFieldSelection.upload = idFieldName
+      } else {
+        _this.csvIdFieldSelection.remote = idFieldName
+        _this.setImportSetting("gsIdFieldName", idFieldName)
+      }
 
       // Collect checked (new) fields and unchecked (skipped) field names
       var newFields = []
@@ -1761,6 +1800,8 @@
         _this.setImportSetting("gsImportSourceValid", _this._preSyncValid || 0)
       } else {
         _this._uploadValid = _this._preSyncUploadValid || false
+        _this.csvIdFieldSelection.upload =
+          _this._preSyncIdField === undefined ? null : _this._preSyncIdField
       }
 
       _this._$fe("CommonCheckedEdit").hide()
