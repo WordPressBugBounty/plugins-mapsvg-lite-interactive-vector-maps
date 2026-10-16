@@ -4,6 +4,19 @@ namespace MapSVG;
 
 class ImportSettingsService
 {
+    /** Keep file paths, hashes and backend metadata out of editor responses. */
+    public static function forResponse(array $settings): array
+    {
+        unset($settings['preflightFilePath'], $settings['preflightFileHash'], $settings['preflightMeta']);
+        return $settings;
+    }
+
+    public static function preflightSummaryForResponse(array $meta): array
+    {
+        unset($meta['filePath'], $meta['fileHash']);
+        return $meta;
+    }
+
     public static function repo(): ImportSettingsRepository
     {
         /** @var ImportSettingsRepository $repo */

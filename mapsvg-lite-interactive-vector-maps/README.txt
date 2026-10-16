@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 7.0.1
-Stable tag: 8.16.1
+Stable tag: 8.16.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -139,14 +139,33 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 
 == Changelog ==
 
+= 8.16.2 =
+* **Security**: Several security-related fixes.
+* **WordPress posts**: Permanently deleted posts now remove their linked MapSVG records.
+* **Gutenberg Location**: Addresses containing escaped characters are preserved when a post is saved.
+* **Region data**: Editing region fields preserves the internal orphan status and existing region records.
+* **Remote CSV import**: The selected ID column is used when updating existing rows.
+* **SVG editing**: Saved SVG changes refresh on the map instead of remaining cached.
+* **Repeated SVG saves**: Saves made within the same second each receive a new SVG version.
+* **Firefox**: Pages scroll normally while the pointer is over map regions.
+* **Mobile Google Maps**: Switching between Map and List preserves the world zoom level.
+* **Google Maps overlays**: SVG overlays stay aligned when the map container has fractional dimensions.
+* **Hidden maps**: Maps redraw when their container becomes visible.
+* **Visibility List**: Hiding an SVG path works when that path has an inline display style.
+* **SVG panning**: The map can be panned after zooming out to the minimum level.
+* **Region color picker**: The current HEX color value appears correctly.
+* **Legacy maps**: Maps created in version 4.x load correctly after upgrading.
+* **Map duplication**: Duplicating a map works on sites using plain permalinks.
+
 = 8.16.1 =
 * Fixed: **Security** — hardened WordPress post-type REST routes with additional access checks.
-* Fixed: **Filters** — public maps no longer get stuck on a loading spinner when a cached page sends an expired WordPress REST nonce; those reads retry without the stale nonce. Gleap #237612
-* Fixed: **CSV import** — file uploads honor the selected ID column so existing region rows update instead of duplicating. "No ID" appends as expected, and Excel BOM headers no longer create blank IDs. Gleap #237577
+* Fixed: **Filters** — public maps no longer get stuck on a loading spinner when a cached page sends an expired WordPress REST nonce; those reads retry without the stale nonce.
+* Fixed: **CSV import** — file uploads honor the selected ID column so existing region rows update instead of duplicating. "No ID" appends as expected, and Excel BOM headers no longer create blank IDs.
 * Fixed: **Loading spinner** — the spinner sits next to the loading text, empty text is hidden, and the preloader is visible before JavaScript runs.
 * Fixed: **Mobile toolbar** — Map/List icons show correctly when Shadow DOM is enabled.
-* Fixed: **Pinch-zoom** — pinch-zoom no longer fails on some iPad browsers (including DuckDuckGo). Gleap #237573
+* Fixed: **Pinch-zoom** — pinch-zoom no longer fails on some iPad browsers (including DuckDuckGo).
 * Fixed: **USA counties map** — corrected the Orange County spelling.
+* Fixed: **World map** — Oahu’s south-shore path now covers Sand Island / Honolulu Harbor so true WGS84 pins there sit on land. Gleap #237364
 
 = 8.16.0 =
 * Improved: **Regions / SVG changes** — replacing or editing an SVG no longer deletes region records whose IDs disappeared. Those rows stay as orphans so you can copy their data, then remove them from Regions → Settings → Clean orphan region records.

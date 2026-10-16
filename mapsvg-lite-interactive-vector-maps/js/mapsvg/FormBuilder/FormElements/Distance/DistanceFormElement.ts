@@ -38,7 +38,7 @@ export class DistanceFormElement extends FormElement {
   addressField: boolean
   addressFieldPlaceholder: string
   languages: { [key: string]: string }[]
-  countries: string[]
+  countries: Array<{ label: string; value: string }>
   country: string
   language: string
   searchByZip: boolean

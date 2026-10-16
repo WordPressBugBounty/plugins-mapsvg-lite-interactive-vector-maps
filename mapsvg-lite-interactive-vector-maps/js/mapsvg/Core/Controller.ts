@@ -1,3 +1,4 @@
+import { textElement } from "./textElement"
 /**
  * Abstract class. Creates a scrollable controller. Extended by {@link #mapsvgpopovercontroller|PopoverController} / {@link #mapsvgdetailscontroller|DetailsController} / {@link #mapsvgdirectorycontroller|DirectoryController}
  * @abstract
@@ -416,12 +417,13 @@ export class Controller implements BaseController {
     }
 
     if (this.closable && !this.mobileCloseBtn) {
-      this.mobileCloseBtn = $(
-        '<button class="mapsvg-mobile-modal-close">' +
-          this.map.getData().options.mobileView.labelClose +
-          "</button>",
-      )[0]
-      $(this.containers.view).append(this.mobileCloseBtn)
+      this.mobileCloseBtn = textElement(
+        "button",
+        "mapsvg-mobile-modal-close",
+        this.map.getData().options.mobileView.labelClose,
+      )
+      this.mobileCloseBtn.setAttribute("type", "button")
+      this.containers.view.appendChild(this.mobileCloseBtn)
     }
 
     this.loaded = true

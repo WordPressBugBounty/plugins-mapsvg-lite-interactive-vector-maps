@@ -268,6 +268,9 @@ export class Model {
   getData(): { [key: string]: any } {
     const data = {}
     for (const name in this._data) {
+      // Loaded records may still contain a field removed by a schema edit.
+      const field = this.schema.getField(name)
+      if (!field) continue
       if (
         this._data[name] !== null &&
         this._data[name] !== undefined &&
@@ -277,7 +280,6 @@ export class Model {
       } else {
         data[name] = this._data[name]
       }
-      const field = this.schema.getField(name)
       if (["select", "radio", "enum", "status"].includes(field.type)) {
         data[name + "_text"] = field.getEnumLabel(data[name])
       }

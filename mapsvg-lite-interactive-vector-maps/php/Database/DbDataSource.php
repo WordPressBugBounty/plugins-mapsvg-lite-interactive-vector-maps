@@ -601,12 +601,21 @@ class DbDataSource implements DataSourceInterface
     Logger::info('DbDataSource::create - pkFieldObj: ' . print_r($pkFieldObj, true));
     Logger::info('DbDataSource::create - isAutoIncrement: ' . $isAutoIncrement);
 
-    if ($isAutoIncrement) {
+    if ($isAutoIncrement && !empty($this->db->insert_id)) {
       Logger::info('DbDataSource::create - auto increment: ' . $this->db->insert_id);
       return $this->findOne([$pkField => $this->db->insert_id]);
     }
-    Logger::info('DbDataSource::create - auto increment: ' . $data[$pkField]);
-    return $this->findOne([$pkField => $data[$pkField]]);
+    $idVal = isset($data[$pkField]) ? $data[$pkField] : null;
+    if ($idVal !== null) {
+      Logger::info('DbDataSource::create - primary key: ' . $idVal);
+      return $this->findOne([$pkField => $idVal]);
+    }
+    // Fallback if findOne() couldn't retrieve the row.
+    // Ensure the generated insert_id is attached to $data before returning.
+    if (!empty($this->db->insert_id) && !isset($data[$pkField])) {
+      $data[$pkField] = $this->db->insert_id;
+    }
+    return $data;
   }
 
   public function update($data, $criteria)
@@ -672,7 +681,10 @@ class DbDataSource implements DataSourceInterface
       );
     }
 
-    $this->db->query($query);
+    if ($this->db->query($query) === false) {
+      // Database logs the SQL error; callers must not count a rejected batch as imported.
+      throw new \RuntimeException('Could not save imported rows to the database. See the server error log for details.');
+    }
 
     return $data;
   }

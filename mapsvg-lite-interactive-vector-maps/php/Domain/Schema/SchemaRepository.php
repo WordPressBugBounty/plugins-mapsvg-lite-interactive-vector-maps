@@ -39,7 +39,7 @@ class SchemaRepository extends Repository
 	function create($schema)
 	{
 		if (!is_object($schema)) {
-			$schema    = $this->newObject($schema);
+			$schema = $this->newObject(SchemaSqlDefinition::input($schema));
 		}
 
 
@@ -69,26 +69,23 @@ class SchemaRepository extends Repository
 				$schema->fields = $defSchema->fields;
 			}
 
-			// Validate: ensure exactly one id-type primary key field
-			$idFields = array();
-			foreach ($schema->fields as $field) {
-				if (isset($field->type) && $field->type === 'id') {
-					$idFields[] = $field->name;
-				}
-			}
-			if (empty($idFields)) {
-				throw new \Exception('Schema must have exactly one id-type field (primary key).');
-			}
-			if (count($idFields) > 1) {
-				throw new \Exception('Schema must have exactly one id-type field, found: ' . implode(', ', $idFields));
-			}
 		}
 
+		$this->validateForWrite($schema);
 		$dataForDB = $this->encodeParams($schema->getData());
 
 
 		$data = $this->source->create($dataForDB);
-		$schema->setId($data["id"]);
+		if (!is_array($data)) {
+			throw new \Exception("data is not an array.");
+		}
+
+		$pk = $schema->getPrimaryKeyFieldName();
+		if (isset($data[$pk])) {
+			$schema->setId($data[$pk]);
+		} elseif (isset($data['id'])) {
+			$schema->setId($data['id']);
+		}
 
 		// Don't create new table for "api"
 		if ($schema->type === "object" || $schema->type === "post" || $schema->type === "region") {
@@ -110,12 +107,16 @@ class SchemaRepository extends Repository
 
 		if (!($data instanceof Schema)) {
 			/** @var Schema $schema */
-			$schema = $this->findById($data['id']);
+			$data = SchemaSqlDefinition::input($data);
+			$existing = $this->findById($data['id']);
+			if (!$existing || !$existing->id) throw new \InvalidArgumentException('Schema not found.', 404);
+			$schema = clone $existing;
 			$schema->update($data);
 		} else {
-			$schema = $data;
+			$schema = clone $data;
 		}
 
+		$this->validateForWrite($schema);
 		parent::update($schema);
 		if (!$skip_db_update) {
 			if ($schema->type === "region" || $schema->type === "object" || $schema->type === "post") {
@@ -229,6 +230,20 @@ class SchemaRepository extends Repository
 		}
 	}
 
+	/** Validate before metadata persistence, including identifiers read back from an existing table. */
+	private function validateForWrite($schema): void
+	{
+		if (!$this->db) $this->db = Database::get();
+		SchemaSqlDefinition::validate($schema);
+		$schema->ensureInternalFields();
+		SchemaSqlDefinition::validate($schema);
+		$table = $this->db->mapsvg_prefix . $schema->name;
+		$quoted = SchemaSqlDefinition::identifier($table);
+		if (static::tableExists($schema->name)) {
+			foreach ($this->db->get_col("DESC {$quoted}", 0) as $column) SchemaSqlDefinition::identifier($column);
+		}
+	}
+
 	/**
 	 * Create or alter custom table structure
 	 */
@@ -241,7 +256,10 @@ class SchemaRepository extends Repository
 			$this->db = Database::get();
 		}
 
-		$tableNameSanitized = $this->db->mapsvg_prefix . preg_replace('/[^a-zA-Z0-9_]/', '', $schema->name);
+		$this->validateForWrite($schema);
+		$tableNameSanitized = $this->db->mapsvg_prefix . $schema->name;
+		$tableSql = SchemaSqlDefinition::identifier($tableNameSanitized);
+		$defaults = [];
 
 		$pkField              = $schema->getPrimaryKeyFieldName();
 		$old_searchable_fields  = $schema->getSearchableFields($schema->getPrevFields(), ['onlyNames' => true, 'onlyFulltext' => true]);
@@ -257,31 +275,7 @@ class SchemaRepository extends Repository
 
 			$field = (array)$field;
 
-			// Resolve db_type from field type when not explicitly provided
-			if (empty($field['db_type'])) {
-				static $typeToDbType = [
-					'id'          => 'int(11)',
-					'text'        => 'varchar(255)',
-					'title'       => 'varchar(255)',
-					'textarea'    => 'text',
-					'number'      => 'varchar(255)',
-					'select'      => 'varchar(255)',
-					'checkbox'    => 'tinyint(1)',
-					'checkboxes'  => 'text',
-					'radio'       => 'varchar(255)',
-					'status'      => 'varchar(255)',
-					'image'       => 'text',
-					'images'      => 'text',
-					'location'    => 'text',
-					'date'        => 'varchar(50)',
-					'datetime'    => 'varchar(50)',
-					'post'        => 'int(11)',
-					'region'      => 'text',
-					'regions'     => 'text',
-					'colorpicker' => 'varchar(255)',
-				];
-				$field['db_type'] = $typeToDbType[$field['type']] ?? 'varchar(255)';
-			}
+			$field['type'] = strtolower($field['type']);
 
 			if ($field['type'] == 'id' && ($field['db_type'] === 'varchar(255)' || strpos($field['db_type'], 'varchar') === 0)) {
 				$primary_key = 'PRIMARY KEY  (`' . $field['name'] . '`(40))';
@@ -299,7 +293,11 @@ class SchemaRepository extends Repository
 				$field['type'] = 'text';
 			}
 
-			$field_create_db_string = '`' . $field['name'] . '` ' . $field['db_type'] . (isset($field['db_default']) ? ' DEFAULT ' . $field['db_default'] : '');
+			$field_create_db_string = SchemaSqlDefinition::identifier($field['name']) . ' ' . $field['db_type'];
+			if (array_key_exists('db_default', $field)) {
+				$defaults[$field['name']] = SchemaSqlDefinition::defaultSql($field['db_default'], $field['db_type']);
+				$field_create_db_string .= ' DEFAULT ' . $defaults[$field['name']];
+			}
 			if (isset($field['not_null']) && $field['not_null']) {
 				$field_create_db_string .= ' NOT NULL';
 			}
@@ -310,12 +308,13 @@ class SchemaRepository extends Repository
 			$new_field_names[] = $field['name'];
 
 			if (($field['type'] == 'select' && $field['multiselect'] !== true) || $field['type'] == 'radio' || $field['type'] == 'status') {
-				$db_string = $field['name'] . '_text' . ' varchar(255)';
+				$db_string = SchemaSqlDefinition::identifier($field['name'] . '_text') . ' varchar(255)';
 				if (isset($field['db_default'])) {
 					foreach ($field['options'] as $opt) {
 						$opt = (array)$opt;
 						if ((string)$opt['value'] === (string)$field['db_default']) {
-							$db_string .= " DEFAULT '" . $opt['label'] . "'";
+							$defaults[$field['name'] . '_text'] = SchemaSqlDefinition::stringLiteral($opt['label']);
+							$db_string .= ' DEFAULT ' . $defaults[$field['name'] . '_text'];
 							break;
 						}
 					}
@@ -385,19 +384,19 @@ class SchemaRepository extends Repository
 		}
 
 
-		$table_exists = $this->db->get_var('SHOW TABLES LIKE \'' . $tableNameSanitized . '\'');
+		$table_exists = static::tableExists($schema->name);
 
 		if ($table_exists && ($searchable_fields != $old_searchable_fields)) {
-			$index = $this->db->get_row("SHOW INDEX FROM `{$tableNameSanitized}` WHERE Key_name = '_keywords'", OBJECT);
+			$index = $this->db->get_row("SHOW INDEX FROM {$tableSql} WHERE Key_name = '_keywords'", OBJECT);
 			if ($index) {
-				$this->db->query("DROP INDEX `_keywords` ON {$tableNameSanitized}");
+				$this->db->query("DROP INDEX `_keywords` ON {$tableSql}");
 			}
 		}
 
 		$searchable_fields_sanitized = '';
 		if (!empty($searchable_fields)) {
 			$searchable_fields = array_map(function ($field) {
-				return '`' . $field . '`';
+				return SchemaSqlDefinition::identifier($field);
 			}, $searchable_fields);
 			$searchable_fields_sanitized = ",\nFULLTEXT KEY _keywords (" . implode(',', $searchable_fields) . ')';
 		} else {
@@ -412,19 +411,38 @@ class SchemaRepository extends Repository
 
 		$charset_collate   = "default character set utf8\ncollate utf8_unicode_ci";
 
-		$sql = "CREATE TABLE $tableNameSanitized (
+		$sql = "CREATE TABLE $tableSql (
 		" . implode(",\n", $fields) . ",
 		" . $primary_key . $searchable_fields_sanitized . "
 		) " . $engine . $charset_collate;
 
 		require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-		dbDelta($sql);
+		// dbDelta must never split a SQL literal on semicolons.
+		dbDelta([$sql]);
+		// dbDelta does not reliably compare/parse quoted defaults. Apply validated literals ourselves.
+		foreach ($defaults as $column => $default) {
+			$columnSql = SchemaSqlDefinition::identifier($column);
+			$this->db->query("ALTER TABLE {$tableSql} ALTER COLUMN {$columnSql} SET DEFAULT {$default}");
+		}
+		foreach ($schema->getPrevFields() as $previous) {
+			$previousColumns = [$previous->name];
+			if (($previous->type === 'select' && empty($previous->multiselect)) || in_array($previous->type, ['radio', 'status'], true)) {
+				$previousColumns[] = $previous->name . '_text';
+			}
+			foreach ($previousColumns as $column) {
+				if (property_exists($previous, 'db_default') && in_array($column, $new_field_names, true) && !array_key_exists($column, $defaults)) {
+					$columnSql = SchemaSqlDefinition::identifier($column);
+					$this->db->query("ALTER TABLE {$tableSql} ALTER COLUMN {$columnSql} DROP DEFAULT");
+				}
+			}
+		}
 
 		// DROP removed columns
-		$columns = $this->db->get_col("DESC {$tableNameSanitized}", 0);
+		$columns = $this->db->get_col("DESC {$tableSql}", 0);
 		foreach ($columns as $column_name) {
 			if (!in_array($column_name, $new_field_names)) {
-				$this->db->query("ALTER TABLE {$tableNameSanitized} DROP COLUMN {$column_name}");
+				$columnSql = SchemaSqlDefinition::identifier($column_name);
+				$this->db->query("ALTER TABLE {$tableSql} DROP COLUMN {$columnSql}");
 			}
 		}
 
@@ -435,18 +453,21 @@ class SchemaRepository extends Repository
 					$data = array();
 					if ($field['type'] == 'select' && ($field['prev_multiselect'] === true || $field['next_multiselect'] === true)) {
 						if ($field['prev_multiselect'] === true && $field['next_multiselect'] === true) {
-							$prev = esc_sql($prev_options[$field['name']][$id]);
-							$label = esc_sql($label);
-							$query = "UPDATE {$tableNameSanitized} SET `{$field['name']}` = REPLACE(`{$field['name']}`, '\"label\":\"{$prev}\"', '\"label\":\"{$label}\"')";
+							$columnSql = SchemaSqlDefinition::identifier($field['name']);
+							if (!array_key_exists($id, $prev_options[$field['name']])) continue;
+							$prev = '"label":' . wp_json_encode($prev_options[$field['name']][$id], JSON_UNESCAPED_UNICODE);
+							$next = '"label":' . wp_json_encode($label, JSON_UNESCAPED_UNICODE);
+							$query = $this->db->prepare("UPDATE {$tableSql} SET {$columnSql} = REPLACE({$columnSql}, %s, %s)", $prev, $next);
 							$this->db->query($query);
 						} else {
-							$this->db->query("UPDATE {$tableNameSanitized} SET `{$field['name']}`=''");
+							$columnSql = SchemaSqlDefinition::identifier($field['name']);
+							$this->db->query("UPDATE {$tableSql} SET {$columnSql}=''");
 						}
 					} else {
 						$f = $field['name'] . '_text';
-						$data[$f] = esc_sql($label);
+						$data[$f] = $label;
 						$where = array();
-						$where[$field['name']] = esc_sql($id);
+						$where[$field['name']] = $id;
 						$this->db->update($tableNameSanitized, $data, $where);
 					}
 				}
@@ -456,7 +477,8 @@ class SchemaRepository extends Repository
 		if ($clear_fields) {
 			$field = '';
 			foreach ($clear_fields as $field) {
-				$this->db->query("UPDATE {$tableNameSanitized} SET `{$field}`='' ");
+				$columnSql = SchemaSqlDefinition::identifier($field);
+				$this->db->query("UPDATE {$tableSql} SET {$columnSql}='' ");
 			}
 		}
 
@@ -466,6 +488,7 @@ class SchemaRepository extends Repository
 
 	public function decodeParams($data)
 	{
+		if (!$data) return null;
 		$data['fields'] = json_decode($data['fields']);
 		if (isset($data["apiEndpoints"]) && is_string($data["apiEndpoints"])) {
 			$data['apiEndpoints'] = json_decode($data['apiEndpoints'], true);
@@ -504,7 +527,7 @@ class SchemaRepository extends Repository
 	{
 		$db = Database::get();
 		$tableNameSanitized = $db->mapsvg_prefix . preg_replace('/[^a-zA-Z0-9_]/', '', $name);
-		$table_exists = $db->get_var($db->prepare("SHOW TABLES LIKE %s", $tableNameSanitized));
+		$table_exists = $db->get_var($db->prepare("SHOW TABLES LIKE %s", $db->esc_like($tableNameSanitized)));
 		return (bool)$table_exists;
 	}
 }

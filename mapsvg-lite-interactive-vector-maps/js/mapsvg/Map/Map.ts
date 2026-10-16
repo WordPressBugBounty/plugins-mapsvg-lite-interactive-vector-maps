@@ -1,5 +1,6 @@
 /// <reference types="@types/google.maps" />
 // import {} from "googlemaps";
+import { textElement } from "@/Core/textElement"
 import tinycolor from "tinycolor2"
 import { ArrayIndexed } from "../Core/ArrayIndexed"
 import { EventWithData, Events } from "../Core/Events"
@@ -70,11 +71,24 @@ import {
 } from "./OptionsInterfaces/MapOptions"
 import { ToolbarController } from "./Toolbar"
 import { GeoViewBox, ViewBox } from "./ViewBox"
+import {
+  clampViewBoxToScrollBoundaries,
+  viewBoxForZoomLevel,
+} from "./clampViewBoxToScrollBoundaries"
 import { DefaultOptions } from "./default-options"
+import { applyGroupsVisibility } from "./applySvgObjectVisibility"
 import { getPinchScale } from "./getPinchScale"
+import { forwardFirefoxPageScrollKey, lockFirefoxDocumentScroll, shouldResetFirefoxDocumentScroll } from "./firefoxPageScroll"
+import {
+  captureGoogleMapsViewport,
+  hasVisibleMapSize,
+  shouldSkipGoogleMapsResize,
+  shouldSyncGoogleMapsOverlay,
+} from "./googleMapsViewport"
 import "./map.css"
 
 const $ = jQuery
+let firefoxScrollHandlerId = 0
 
 enum MapEventType {
   AFTER_INIT = "afterInit",
@@ -177,6 +191,11 @@ export class MapSVGMap {
     initialized: boolean
     maxZoomService?: google.maps.MaxZoomService
     currentMaxZoom?: number
+    savedViewport?: {
+      center: google.maps.LatLngLiteral
+      zoom: number
+    }
+    needsViewportRestore?: boolean
   } = {
     loaded: false,
     initialized: false,
@@ -500,7 +519,11 @@ export class MapSVGMap {
     insideIframe: boolean
     scrollX: number
     scrollY: number
+    lockPageScroll?: boolean
+    lockUntil?: number
   }
+  private readonly firefoxScrollNamespace = ".mapsvg.firefoxScroll" + ++firefoxScrollHandlerId
+  pointerOverMap: boolean = false
   canZoom: boolean
   eventsPreventList: { [key: string]: boolean } = {}
   googleMapsScript: HTMLScriptElement
@@ -1029,16 +1052,7 @@ export class MapSVGMap {
       this.options.groups = this.groups
     }
 
-    this.groups.forEach((g: GroupOptionsInterface) => {
-      g.objects &&
-        g.objects.length &&
-        g.objects.forEach((obj) => {
-          const elems = this.containers.svg.querySelector(`[id="${obj.value}"]`)
-          if (elems) {
-            elems.classList.toggle("mapsvg-hidden", !g.visible)
-          }
-        })
-    })
+    applyGroupsVisibility(this.containers.svg, this.groups)
   }
 
   /**
@@ -1109,7 +1123,7 @@ export class MapSVGMap {
         this.containers.mapContainer.appendChild(this.containers.layersControl)
       }
       this.containers.layersControl.style.display = "block"
-      this.containers.layersControlLabel.innerHTML = this.options.layersControl.label
+      this.containers.layersControlLabel.textContent = this.options.layersControl.label
 
       this.containers.layersControlLabel.style.display = "block"
       this.containers.layersControlList.innerHTML = ""
@@ -1137,12 +1151,11 @@ export class MapSVGMap {
         const item = document.createElement("div")
         item.classList.add("mapsvg-layers-item")
         item.setAttribute("data-group-id", g.id)
-        item.innerHTML =
-          '<input type="checkbox" class="ios8-switch ios8-switch-sm" ' +
-          (g.visible ? "checked" : "") +
-          " /><label>" +
-          g.title +
-          "</label>"
+        const checkbox = document.createElement("input")
+        checkbox.type = "checkbox"
+        checkbox.className = "ios8-switch ios8-switch-sm"
+        checkbox.checked = !!g.visible
+        item.append(checkbox, textElement("label", "", g.title))
         this.containers.layersControlList.appendChild(item)
       })
 
@@ -1392,17 +1405,22 @@ export class MapSVGMap {
     const _this = this
 
     // pager && (pager.empty().remove());
-    const pager = $(
-      '<nav class="mapsvg-pagination"><ul class="pager"><!--<li class="mapsvg-first"><a href="#">First</a></li>--><li class="mapsvg-prev"><a href="#">&larr; ' +
-        _this.options.database.pagination.prev +
-        " " +
-        _this.options.database.pagination.perpage +
-        '</a></li><li class="mapsvg-next"><a href="#">' +
-        _this.options.database.pagination.next +
-        " " +
-        _this.options.database.pagination.perpage +
-        ' &rarr;</a></li><!--<li class="mapsvg-last"><a href="#">Last</a></li>--></ul></nav>',
-    )
+    const nav = textElement("nav", "mapsvg-pagination")
+    const list = textElement("ul", "pager")
+    for (const direction of ["prev", "next"]) {
+      const item = textElement("li", "mapsvg-" + direction)
+      const options = this.options.database.pagination
+      const label =
+        direction === "prev"
+          ? `← ${options.prev ?? ""} ${options.perpage}`
+          : `${options.next ?? ""} ${options.perpage} →`
+      const link = textElement("a", "", label)
+      link.setAttribute("href", "#")
+      item.appendChild(link)
+      list.appendChild(item)
+    }
+    nav.appendChild(list)
+    const pager = $(nav)
 
     if (!this.objectsRepository) {
       return pager[0]
@@ -2810,6 +2828,44 @@ export class MapSVGMap {
     this.setViewBox(viewBox)
   }
   /**
+   * Whether the map container currently has a non-zero layout size.
+   * Google Maps treats a hidden (display:none) container as 0x0 and resets to world zoom.
+   */
+  isMapContainerVisible(): boolean {
+    const map = this.containers.map
+    return hasVisibleMapSize(map?.clientWidth ?? 0, map?.clientHeight ?? 0)
+  }
+
+  /**
+   * Stores the current Google Maps center and zoom so they can be restored
+   * after the map is shown again (e.g. mobile Map/List toggle).
+   */
+  saveGoogleMapsViewport(): void {
+    if (!this.googleMaps?.map || this.googleMaps.needsViewportRestore) {
+      return
+    }
+    const captured = captureGoogleMapsViewport(
+      this.isMapContainerVisible(),
+      this.googleMaps.map.getCenter()?.toJSON(),
+      this.googleMaps.map.getZoom(),
+    )
+    if (captured) {
+      this.googleMaps.savedViewport = captured
+    }
+  }
+
+  /**
+   * Restores the last saved Google Maps center and zoom after a resize/show.
+   */
+  restoreGoogleMapsViewport(): void {
+    if (!this.googleMaps?.map || !this.googleMaps.savedViewport) {
+      return
+    }
+    this.googleMaps.map.setCenter(this.googleMaps.savedViewport.center)
+    this.googleMaps.map.setZoom(this.googleMaps.savedViewport.zoom)
+  }
+
+  /**
    * Redraws the map.
    * Must be called when the map is shown after being hidden.
    */
@@ -2820,10 +2876,20 @@ export class MapSVGMap {
     // }
 
     if (this.googleMaps.map) {
-      // var center = this.googleMaps.map.getCenter();
-      google.maps.event.trigger(this.googleMaps.map, "resize")
-      // this.googleMaps.map.setCenter(center);
-      // this.setViewBoxByGoogleMapBounds();
+      if (shouldSkipGoogleMapsResize(this.isMapContainerVisible())) {
+        // A 0x0 Google Map resize snaps the camera to world zoom.
+        this.googleMaps.needsViewportRestore = true
+      } else {
+        if (!this.googleMaps.needsViewportRestore) {
+          this.saveGoogleMapsViewport()
+        }
+        // Resize may synchronously emit idle. Freeze capture until restoration is complete.
+        this.googleMaps.needsViewportRestore = true
+        google.maps.event.trigger(this.googleMaps.map, "resize")
+        this.restoreGoogleMapsViewport()
+        this.googleMaps.needsViewportRestore = false
+        this.setViewBoxByGoogleMapsOverlay()
+      }
     } else {
       this.setViewBox(this.viewBox)
     }
@@ -2946,37 +3012,57 @@ export class MapSVGMap {
 
     deepMerge(this.options, { zoom: options })
     $(this.containers.scrollpaneWrap).off("wheel.mapsvg")
+    $(this.layers.markers).off("wheel.mapsvg")
+    $(this.containers.scrollpaneWrap).off(this.firefoxScrollNamespace)
+    $(this.eventDocument).off("scroll" + this.firefoxScrollNamespace)
+    if (this.firefoxScroll) this.firefoxScroll.lockPageScroll = false
 
     if (this.options.zoom.mousewheel) {
       // var lastZoomTime = 0;
       // var zoomTimeDelta = 0;
 
       if (utils.env.getBrowser().firefox) {
-        this.firefoxScroll = { insideIframe: false, scrollX: 0, scrollY: 0 }
+        this.firefoxScroll = {
+          insideIframe: false,
+          scrollX: 0,
+          scrollY: 0,
+          lockPageScroll: false,
+        }
 
         $(this.containers.scrollpaneWrap)
-          .on("mouseenter", () => {
+          .on("mouseenter" + this.firefoxScrollNamespace, () => {
             this.firefoxScroll.insideIframe = true
-            this.firefoxScroll.scrollX = window.scrollX
-            this.firefoxScroll.scrollY = window.scrollY
+            this.firefoxScroll.scrollX = this.eventWindow.scrollX
+            this.firefoxScroll.scrollY = this.eventWindow.scrollY
           })
-          .on("mouseleave", () => {
+          .on("mouseleave" + this.firefoxScrollNamespace, () => {
             this.firefoxScroll.insideIframe = false
+            this.firefoxScroll.lockPageScroll = false
           })
 
-        $(document).scroll(() => {
-          if (this.firefoxScroll.insideIframe)
-            window.scrollTo(this.firefoxScroll.scrollX, this.firefoxScroll.scrollY)
+        // Lock the page only for wheel-triggered scrolls (Firefox still
+        // scrolls the document while zooming). Keyboard page-scroll keys
+        // must not be reset — see handleFirefoxPageScrollKey().
+        $(this.eventDocument).on("scroll" + this.firefoxScrollNamespace, () => {
+          if (shouldResetFirefoxDocumentScroll(this.firefoxScroll)) {
+            this.eventWindow.scrollTo(this.firefoxScroll.scrollX, this.firefoxScroll.scrollY)
+          }
         })
       }
 
       $(this.containers.scrollpaneWrap).on("wheel.mapsvg", (event: JQuery.MouseEventBase) => {
+        if (this.firefoxScroll) {
+          lockFirefoxDocumentScroll(this.firefoxScroll, this.eventWindow)
+        }
         event.preventDefault()
         this.mouseWheelZoom(event)
         // this.throttle(this.mouseWheelZoom, 500, this, [event]);
         return false
       })
       $(this.layers.markers).on("wheel.mapsvg", (event: JQuery.MouseEventBase) => {
+        if (this.firefoxScroll) {
+          lockFirefoxDocumentScroll(this.firefoxScroll, this.eventWindow)
+        }
         event.preventDefault()
         this.mouseWheelZoom(event)
         return false
@@ -3129,16 +3215,10 @@ export class MapSVGMap {
    * @returns ViewBox for the specified zoom level
    */
   getZoomLevelViewBox(level: number): ViewBox {
-    const viewBox = this.getAdjustedSvgDefaultViewBox()
-
     const delta = this.googleMaps.map ? 2 : this.options.zoom.delta
-
-    // Calculate scale using the same logic as setZoomLevels
-    const scale = level >= 0 ? Math.pow(delta, level) : 1 / Math.pow(delta, Math.abs(level))
-
-    viewBox.update(0, 0, viewBox.width / scale, viewBox.height / scale)
-
-    return viewBox
+    return new ViewBox(
+      viewBoxForZoomLevel(this.getAdjustedSvgDefaultViewBox(), level, delta),
+    )
   }
   /**
    * Sets mouse pointer cursor style on hover on regions / markers.
@@ -3220,17 +3300,10 @@ export class MapSVGMap {
       if (!this.containers.choroplethSourceSelect) {
         const sourceSelectOptions = []
         this.options.choropleth.sourceFieldSelect.variants.forEach((variant) => {
-          sourceSelectOptions.push(
-            $(
-              '<option value="' +
-                variant +
-                '" ' +
-                (variant === this.options.choropleth.sourceField ? "selected" : "") +
-                ">" +
-                variant +
-                "</option>",
-            ),
-          )
+          const option = textElement("option", "", variant) as HTMLOptionElement
+          option.value = variant
+          option.selected = variant === this.options.choropleth.sourceField
+          sourceSelectOptions.push(option)
         })
 
         this.containers.choroplethSourceSelect = {
@@ -3268,17 +3341,10 @@ export class MapSVGMap {
         $(this.containers.choroplethSourceSelect.select).find("option").remove()
         this.containers.choroplethSourceSelect.options = []
         this.options.choropleth.sourceFieldSelect.variants.forEach((variant) => {
-          this.containers.choroplethSourceSelect.options.push(
-            $(
-              '<option value="' +
-                variant +
-                '" ' +
-                (variant === this.options.choropleth.sourceField ? "selected" : "") +
-                ">" +
-                variant +
-                "</option>",
-            )[0],
-          )
+          const option = textElement("option", "", variant) as HTMLOptionElement
+          option.value = variant
+          option.selected = variant === this.options.choropleth.sourceField
+          this.containers.choroplethSourceSelect.options.push(option)
         })
         $(this.containers.choroplethSourceSelect.select).append(
           this.containers.choroplethSourceSelect.options,
@@ -3306,109 +3372,79 @@ export class MapSVGMap {
 
     if (this.options.choropleth.on && this.options.choropleth.coloring.legend.on) {
       const legend = this.options.choropleth.coloring.legend
-      let coloring = ""
-
-      if (this.options.choropleth.coloring.mode === "gradient") {
-        //Gradient mode
-        coloring +=
-          '<div class="mapsvg-choropleth-legend-gradient-no-data">' +
-          this.options.choropleth.coloring.noData.description +
-          "</div>"
-
-        let legendGradient = ""
-
+      const coloringOptions = this.options.choropleth.coloring
+      const mode = coloringOptions.mode === "gradient" ? "gradient" : "palette"
+      const coloring = textElement("div", "mapsvg-choropleth-legend-" + mode)
+      if (mode === "gradient") {
+        coloring.appendChild(
+          textElement(
+            "div",
+            "mapsvg-choropleth-legend-gradient-no-data",
+            coloringOptions.noData.description,
+          ),
+        )
+        const colors = textElement("div", "mapsvg-choropleth-legend-gradient-colors")
         for (let chunkIdx = 1; chunkIdx < 5; chunkIdx++) {
-          legendGradient +=
-            '<div class="mapsvg-choropleth-legend-gradient-chunk">' +
-            ((this.options.choropleth.coloring.gradient.values.maxAdjusted * chunkIdx) / 5 +
-              this.options.choropleth.coloring.gradient.values.min) +
-            "</div>"
+          const values = coloringOptions.gradient.values
+          colors.appendChild(
+            textElement(
+              "div",
+              "mapsvg-choropleth-legend-gradient-chunk",
+              (values.maxAdjusted * chunkIdx) / 5 + values.min,
+            ),
+          )
         }
-
-        coloring +=
-          '<div class="mapsvg-choropleth-legend-gradient-colors">' + legendGradient + "</div>"
+        coloring.appendChild(colors)
       } else {
-        //Palette mode
-
-        coloring +=
-          '<div class="mapsvg-choropleth-legend-palette-color-wrap" data-idx="no-data">' +
-          '<div class="mapsvg-choropleth-legend-palette-color"></div>' +
-          '<div class="mapsvg-choropleth-legend-palette-color-description">' +
-          this.options.choropleth.coloring.noData.description +
-          "</div>" +
-          "</div>"
-
-        coloring +=
-          '<div class="mapsvg-choropleth-legend-palette-color-wrap" data-idx="out-of-range">' +
-          '<div class="mapsvg-choropleth-legend-palette-color"></div>' +
-          '<div class="mapsvg-choropleth-legend-palette-color-description">' +
-          this.options.choropleth.coloring.palette.outOfRange.description +
-          "</div>" +
-          "</div>"
-
-        const paletteColors = this.options.choropleth.coloring.palette.colors
-
-        paletteColors.forEach((paletteColor, idx) => {
-          let paletteColorElementText = ""
-          if (paletteColor.description) {
-            paletteColorElementText = paletteColor.description
-          } else {
-            if (idx === 0 && !paletteColor.valueFrom && paletteColor.valueFrom !== 0) {
-              if (legend.layout === "vertical") {
-                paletteColorElementText = "Less then " + paletteColor.valueTo
-              } else {
-                paletteColorElementText = "< " + paletteColor.valueTo
-              }
-            } else if (idx === paletteColors.length - 1 && !paletteColor.valueTo) {
-              if (legend.layout === "vertical") {
-                paletteColorElementText = paletteColor.valueFrom + " or more"
-              } else {
-                paletteColorElementText = paletteColor.valueFrom + " <"
-              }
+        const addColor = (index: string | number, description: unknown) => {
+          const row = textElement("div", "mapsvg-choropleth-legend-palette-color-wrap")
+          row.setAttribute("data-idx", String(index))
+          row.append(
+            textElement("div", "mapsvg-choropleth-legend-palette-color"),
+            textElement("div", "mapsvg-choropleth-legend-palette-color-description", description),
+          )
+          coloring.appendChild(row)
+        }
+        addColor("no-data", coloringOptions.noData.description)
+        addColor("out-of-range", coloringOptions.palette.outOfRange.description)
+        const paletteColors = coloringOptions.palette.colors
+        paletteColors.forEach((color, idx) => {
+          let description = color.description
+          if (!description) {
+            if (idx === 0 && !color.valueFrom && color.valueFrom !== 0) {
+              description =
+                legend.layout === "vertical" ? "Less then " + color.valueTo : "< " + color.valueTo
+            } else if (idx === paletteColors.length - 1 && !color.valueTo) {
+              description =
+                legend.layout === "vertical" ? color.valueFrom + " or more" : color.valueFrom + " <"
             } else {
-              paletteColorElementText = paletteColor.valueFrom + " &#8804; " + paletteColor.valueTo
+              description = color.valueFrom + " ≤ " + color.valueTo
             }
           }
-
-          coloring +=
-            '<div class="mapsvg-choropleth-legend-palette-color-wrap" data-idx="' +
-            idx +
-            '">' +
-            '<div class="mapsvg-choropleth-legend-palette-color"></div>' +
-            '<div class="mapsvg-choropleth-legend-palette-color-description">' +
-            paletteColorElementText +
-            "</div>" +
-            "</div>"
+          addColor(idx, description)
         })
       }
-
       this.containers.legend = {
-        title: $('<div class="mapsvg-choropleth-legend-title">' + legend.title + "</div>")[0],
-        text: $('<div class="mapsvg-choropleth-legend-text">' + legend.text + "</div>")[0],
-        coloring: $(
-          '<div class="mapsvg-choropleth-legend-' +
-            this.options.choropleth.coloring.mode +
-            '">' +
-            coloring +
-            "</div>",
-        )[0],
-        description: $(
-          '<div class="mapsvg-choropleth-legend-description">' + legend.description + "</div>",
-        )[0],
-        container: $("<div />").addClass(
+        title: textElement("div", "mapsvg-choropleth-legend-title", legend.title),
+        text: textElement("div", "mapsvg-choropleth-legend-text", legend.text),
+        coloring,
+        description: textElement("div", "mapsvg-choropleth-legend-description", legend.description),
+        container: textElement(
+          "div",
           "mapsvg-choropleth-legend mapsvg-choropleth-legend-" +
             legend.layout +
             " mapsvg-choropleth-legend-container-" +
             legend.container,
-        )[0],
+        ),
       }
-
-      $(this.containers.legend.container)
-        .append(this.containers.legend.title)
-        .append(this.containers.legend.text)
-        .append(this.containers.legend.coloring)
-        .append(this.containers.legend.description)
-      $(this.containers.map).append(this.containers.legend.container)
+      const elements = this.containers.legend
+      elements.container.append(
+        elements.title,
+        elements.text,
+        elements.coloring,
+        elements.description,
+      )
+      this.containers.map.appendChild(elements.container)
 
       this.setChoroplethLegendCSS()
 
@@ -3867,14 +3903,18 @@ export class MapSVGMap {
       tags.push({ label: fieldFormattedName, value: fieldFormattedValue, name: field_name })
     }
 
-    $(this.containers.filterTags).html(
-      tags
-        .map(
-          (tag) =>
-            `<div class="mapsvg-filter-tag">${tag.label ? tag.label + ": " : ""}${tag.value}<span class="mapsvg-filter-delete" data-filter="${tag.name}">×</span></div>`,
-        )
-        .join(""),
-    )
+    this.containers.filterTags.replaceChildren()
+    for (const tag of tags) {
+      const element = textElement(
+        "div",
+        "mapsvg-filter-tag",
+        `${tag.label ? tag.label + ": " : ""}${tag.value ?? ""}`,
+      )
+      const remove = textElement("span", "mapsvg-filter-delete", "×")
+      remove.setAttribute("data-filter", tag.name)
+      element.appendChild(remove)
+      this.containers.filterTags.appendChild(element)
+    }
   }
 
   /**
@@ -4176,6 +4216,10 @@ export class MapSVGMap {
               break
             }
             case "menu": {
+              this.saveGoogleMapsViewport()
+              if (this.googleMaps) {
+                this.googleMaps.needsViewportRestore = true
+              }
               $(this.containers.mapContainer).hide()
               $(this.controllers.directory.containers.parent).show()
               if (
@@ -4421,6 +4465,7 @@ export class MapSVGMap {
 
           this.googleMaps.map.addListener("idle", () => {
             this.isZooming = false
+            this.saveGoogleMapsViewport()
             // this.syncZoomLevelWithGoogle()
           })
           google.maps.event.addListenerOnce(this.googleMaps.map, "idle", () => {
@@ -4983,6 +5028,8 @@ export class MapSVGMap {
    * @returns {MapSVGMap}
    */
   destroy(): void {
+    $(this.eventDocument).off("keydown" + this.firefoxScrollNamespace)
+    $(this.eventDocument).off("scroll" + this.firefoxScrollNamespace)
     $(this.containers.map)
       .empty()
       .insertBefore($(this.containers.wrapAll))
@@ -5170,6 +5217,25 @@ export class MapSVGMap {
     }
   }
   /**
+   * Fractional CSS-pixel size of the map container.
+   * clientWidth/offsetWidth are integers and disagree with Google Maps overlay
+   * math on mobile when the container is a subpixel size (e.g. 352.73).
+   */
+  getMapContainerSize(): { width: number; height: number } {
+    const map = this.containers?.map
+    if (map && typeof map.getBoundingClientRect === "function") {
+      const rect = map.getBoundingClientRect()
+      if (rect) {
+        return { width: rect.width, height: rect.height }
+      }
+    }
+    return {
+      width: map?.clientWidth || map?.offsetWidth || 0,
+      height: map?.clientHeight || map?.offsetHeight || 0,
+    }
+  }
+
+  /**
    * Returns current SVG scale related to screen - map screen pixels to SVG points ratio.
    * Example: if SVG current viewBox width is 600 and the map is shown in a 300px container,
    * the map scale is 0.5 (300/600 = 0.5)
@@ -5177,7 +5243,8 @@ export class MapSVGMap {
    * @returns {number} Map scale related to screen
    */
   getScale(viewBox?: ViewBox): number {
-    const scale2 = this.containers.map.clientWidth / (viewBox?.width || this.viewBox.width)
+    const { width } = this.getMapContainerSize()
+    const scale2 = width / (viewBox?.width || this.viewBox.width)
     return scale2 || 1
   }
 
@@ -5884,20 +5951,11 @@ export class MapSVGMap {
 
   private shiftViewBoxToScrollBoundaries(newViewBox: ViewBox): ViewBox {
     if (this.options.scroll.limit) {
-      if (newViewBox.x < this.svgDefault.viewBox.x) newViewBox.x = this.svgDefault.viewBox.x
-      else if (
-        newViewBox.x + newViewBox.width >
-        this.svgDefault.viewBox.x + this.svgDefault.viewBox.width
+      clampViewBoxToScrollBoundaries(
+        newViewBox,
+        this.svgDefault.viewBox,
+        this.getAdjustedSvgDefaultViewBox(),
       )
-        newViewBox.x = this.svgDefault.viewBox.x + this.svgDefault.viewBox.width - newViewBox.width
-
-      if (newViewBox.y < this.svgDefault.viewBox.y) newViewBox.y = this.svgDefault.viewBox.y
-      else if (
-        newViewBox.y + newViewBox.height >
-        this.svgDefault.viewBox.y + this.svgDefault.viewBox.height
-      )
-        newViewBox.y =
-          this.svgDefault.viewBox.y + this.svgDefault.viewBox.height - newViewBox.height
     }
     return newViewBox
   }
@@ -6265,16 +6323,14 @@ export class MapSVGMap {
 
     // Limit scroll to map boundaries
     if (this.options.scroll.limit) {
-      if (vx < this.svgDefault.viewBox.x) vx = this.svgDefault.viewBox.x
-      else if (this.viewBox.width + vx > this.svgDefault.viewBox.x + this.svgDefault.viewBox.width)
-        vx = this.svgDefault.viewBox.x + this.svgDefault.viewBox.width - this.viewBox.width
-
-      if (vy < this.svgDefault.viewBox.y) vy = this.svgDefault.viewBox.y
-      else if (
-        this.viewBox.height + vy >
-        this.svgDefault.viewBox.y + this.svgDefault.viewBox.height
+      const limited = new ViewBox(vx, vy, this.viewBox.width, this.viewBox.height)
+      clampViewBoxToScrollBoundaries(
+        limited,
+        this.svgDefault.viewBox,
+        this.getAdjustedSvgDefaultViewBox(),
       )
-        vy = this.svgDefault.viewBox.y + this.svgDefault.viewBox.height - this.viewBox.height
+      vx = limited.x
+      vy = limited.y
     }
 
     this.scroll.vx = vx
@@ -6328,17 +6384,26 @@ export class MapSVGMap {
   }
 
   setViewBoxByGoogleMapsOverlay(): void {
-    if (!this.googleMaps.initialized) return
+    if (
+      !shouldSyncGoogleMapsOverlay(
+        this.googleMaps.initialized,
+        this.isMapContainerVisible(),
+        !!this.googleMaps.needsViewportRestore,
+      )
+    ) {
+      return
+    }
 
     const bounds = this.googleMaps.overlay.getPixelBounds()
     const scale = this.googleMaps.overlay.getScale()
     if (!scale || !bounds) return
 
+    const { width, height } = this.getMapContainerSize()
     const viewBox = new ViewBox(
       this.svgDefault.viewBox.x - bounds.sw.x / scale,
       this.svgDefault.viewBox.y - bounds.ne.y / scale,
-      this.containers.map.offsetWidth / scale,
-      this.containers.map.offsetHeight / scale,
+      width / scale,
+      height / scale,
     )
 
     this.setViewBox(viewBox, false)
@@ -7718,6 +7783,76 @@ export class MapSVGMap {
   }
 
   /**
+   * Firefox swallows Arrow/Page keys while the pointer is over an SVG region.
+   * Forward those keys to the page unless the map is actively consuming them
+   * (for example while the user is panning).
+   * @private
+   */
+  setFirefoxPageScrollHandlers(): void {
+    $(this.eventDocument).off("keydown" + this.firefoxScrollNamespace)
+    if (this.containers?.map) {
+      $(this.containers.map).off(this.firefoxScrollNamespace)
+    }
+
+    if (!utils.env.getBrowser().firefox || !this.containers?.map) {
+      return
+    }
+
+    this.pointerOverMap = false
+    $(this.containers.map)
+      .on("mouseenter" + this.firefoxScrollNamespace, () => {
+        this.pointerOverMap = true
+      })
+      .on("mouseleave" + this.firefoxScrollNamespace, () => {
+        this.pointerOverMap = false
+      })
+
+    $(this.eventDocument).on("keydown" + this.firefoxScrollNamespace, (e: JQuery.KeyDownEvent) => {
+      this.handleFirefoxPageScrollKey(e)
+    })
+  }
+
+  /**
+   * Restores page scrolling for Arrow/Page keys while hovering the map in Firefox.
+   * @private
+   */
+  handleFirefoxPageScrollKey(e: JQuery.KeyDownEvent): void {
+    const forwarded = forwardFirefoxPageScrollKey(
+      {
+        key: e.key,
+        keyCode: e.keyCode,
+        which: e.which,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        altKey: e.altKey,
+        shiftKey: e.shiftKey,
+        target: e.target,
+        defaultPrevented: e.isDefaultPrevented() || !!e.originalEvent?.defaultPrevented,
+      },
+      {
+        isFirefox: true,
+        pointerOverMap: this.pointerOverMap,
+        mapConsumesKey: this.mapConsumesPageScrollKey(),
+        firefoxScroll: this.firefoxScroll,
+        win: this.eventWindow,
+      },
+    )
+
+    if (forwarded) {
+      e.preventDefault()
+    }
+  }
+
+  /**
+   * Arrow/Page keys are not used for map navigation. They are only blocked
+   * while the map is being panned so a drag is not interrupted.
+   * @private
+   */
+  mapConsumesPageScrollKey(): boolean {
+    return this.isScrolling
+  }
+
+  /**
    * Sets all event handlers
    * @private
    */
@@ -7728,6 +7863,7 @@ export class MapSVGMap {
     $(_this.containers.scrollpane).off(".common.mapsvg")
     $(_this.eventDocument).off(".scroll.mapsvg")
     $(_this.eventDocument).off(".scrollInit.mapsvg")
+    this.setFirefoxPageScrollHandlers()
 
     if (_this.editMarkers.on) {
       $(_this.containers.map).on(
@@ -7785,8 +7921,7 @@ export class MapSVGMap {
       $(doc).on("keydown.scroll.mapsvg", function (e) {
         if (
           !(
-            doc.activeElement.tagName === "INPUT" &&
-            $(doc.activeElement).attr("type") === "text"
+            doc.activeElement.tagName === "INPUT" && $(doc.activeElement).attr("type") === "text"
           ) &&
           !_this.isScrolling &&
           e.keyCode == 32
@@ -8665,8 +8800,8 @@ export class MapSVGMap {
       _this.$gauge.container = $("<div />").addClass("mapsvg-gauge").hide()
       _this.$gauge.table = $("<table />")
       const tr = $("<tr />")
-      _this.$gauge.labelLow = $("<td>" + _this.options.choropleth.labels.low + "</td>")
-      _this.$gauge.labelHigh = $("<td>" + _this.options.choropleth.labels.high + "</td>")
+      _this.$gauge.labelLow = $(textElement("td", "", _this.options.choropleth.labels.low))
+      _this.$gauge.labelHigh = $(textElement("td", "", _this.options.choropleth.labels.high))
       tr.append(_this.$gauge.labelLow)
       tr.append(_this.$gauge.gradient)
       tr.append(_this.$gauge.labelHigh)
@@ -8709,8 +8844,8 @@ export class MapSVGMap {
     }
 
     if (options.labels) {
-      _this.$gauge.labelLow.html(_this.options.choropleth.labels.low)
-      _this.$gauge.labelHigh.html(_this.options.choropleth.labels.high)
+      _this.$gauge.labelLow[0].textContent = _this.options.choropleth.labels.low
+      _this.$gauge.labelHigh[0].textContent = _this.options.choropleth.labels.high
     }
 
     needsRedraw && _this.redrawGauge()

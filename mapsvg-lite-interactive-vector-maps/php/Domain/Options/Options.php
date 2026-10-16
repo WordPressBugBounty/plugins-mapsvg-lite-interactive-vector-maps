@@ -61,9 +61,8 @@ class Options
      */
     public static function get($field)
     {
-        $cache = static::getCache($field);
-        if ($cache) {
-            return $cache;
+        if (isset(static::$options) && is_array(static::$options) && array_key_exists($field, static::$options)) {
+            return static::$options[$field];
         }
         $db = Database::get();
         $value = $db->get_var("SELECT value FROM " . $db->mapsvg_prefix . "settings WHERE `key`='" . esc_sql($field) . "'");
@@ -80,8 +79,8 @@ class Options
     {
         if (static::hasAccessTo($field)) {
             $db = Database::get();
-            $value = static::encodeValue($field, $value);
-            $db->replace($db->mapsvg_prefix . "settings", ["key" => $field, "value" => $value]);
+            $encoded = static::encodeValue($field, $value);
+            $db->replace($db->mapsvg_prefix . "settings", ["key" => $field, "value" => $encoded]);
             static::setCache($field, $value);
         }
     }

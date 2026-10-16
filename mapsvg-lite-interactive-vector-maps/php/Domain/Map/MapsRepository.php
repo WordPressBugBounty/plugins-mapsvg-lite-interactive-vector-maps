@@ -165,6 +165,7 @@ class MapsRepository extends Repository
 
 		// If SVG file was copied, create new map in DB
 		$newMapData = $map->getData();
+		$newMapData['options'] = Map::sanitizeOptionsForWrite($newMapData['options']);
 		$newMapData['title'] = $newData['title'];
 		$newMapData['options']['title'] = $newData['title'];
 		unset($newMapData['id']);
@@ -175,8 +176,8 @@ class MapsRepository extends Repository
 
 		if (isset($newMapData['options']['templates']) && isset($newMapData['options']['templates']['directory'])) {
 			$dirTemplate = $newMapData['options']['templates']['directory'];
-			$dirTemplate = str_replace('{{>directoryItem-' . $map->id, '{{>directoryItem}}', $dirTemplate);
-			$dirTemplate = str_replace('{{>directoryCategoryItem-' . $map->id, '{{>directoryCategoryItem}}', $dirTemplate);
+			$dirTemplate = str_replace('{{>directoryItem-' . $map->id . '}}', '{{>directoryItem}}', $dirTemplate);
+			$dirTemplate = str_replace('{{>directoryCategoryItem-' . $map->id . '}}', '{{>directoryCategoryItem}}', $dirTemplate);
 			$mapUpdate['options']['templates']['directory'] = $dirTemplate;
 			$needUpdate = true;
 		}

@@ -117,6 +117,11 @@ class ImportSettingsRepository extends Repository
         if (!$expires || $expires < time()) {
             return null;
         }
+        $file = $this->resolvePreflightFile((string) ($data['preflightFilePath'] ?? ''));
+        if ($file === null) {
+            return null;
+        }
+        $data['preflightFilePath'] = $file;
         $meta = [];
         if (!empty($data['preflightMeta'])) {
             $decoded = json_decode((string)$data['preflightMeta'], true);
@@ -145,8 +150,8 @@ class ImportSettingsRepository extends Repository
             return;
         }
         $data = is_object($row) && method_exists($row, 'getData') ? (array)$row->getData() : (array)$row;
-        $file = (string) ($data['preflightFilePath'] ?? '');
-        if ($deleteFile && $file !== '' && file_exists($file)) {
+        $file = $this->resolvePreflightFile((string) ($data['preflightFilePath'] ?? ''));
+        if ($deleteFile && $file !== null) {
             @unlink($file); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
         }
         $this->upsertBySchema($schema, [
@@ -157,6 +162,17 @@ class ImportSettingsRepository extends Repository
             'preflightFileHash' => null,
             'preflightMeta' => null,
         ]);
+    }
+
+    /** Resolve only regular CSV-directory files; stored paths are not trusted. */
+    private function resolvePreflightFile(string $file): ?string
+    {
+        if ($file === '' || strpos($file, "\0") !== false || is_link($file)) return null;
+        $directory = realpath(MAPSVG_UPLOADS_DIR . DIRECTORY_SEPARATOR . 'csv');
+        $resolved = realpath($file);
+        if ($directory === false || $resolved === false || !is_file($resolved)) return null;
+        $prefix = $directory . DIRECTORY_SEPARATOR;
+        return strncmp($resolved, $prefix, strlen($prefix)) === 0 ? $resolved : null;
     }
 
     public function clearExpiredPreflightFiles(): int

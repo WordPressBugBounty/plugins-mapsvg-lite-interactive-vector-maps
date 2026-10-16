@@ -1,3 +1,4 @@
+import { textElement } from "@/Core/textElement"
 import { ObjectWithEvents } from "@/Core/Controller"
 import { mapsvgCore } from "@/Core/Mapsvg"
 import { getNestedValue, ucfirst } from "@/Core/Utils"
@@ -526,7 +527,7 @@ export class FormBuilder {
           }
         } else {
           // Skip internal orphaned flag — not editable in the region form.
-          if (field.name === "orphaned") {
+          if (this.schema.type === "region" && field.name === "orphaned") {
             return
           }
           field.value = this.data
@@ -615,21 +616,29 @@ export class FormBuilder {
     // If FormBuilder is used to create filters and "Add clear button" option is "on"
     // then add the "Clear all" button
     if (_this.filtersMode && _this.clearButton) {
-      _this.elements.buttons.clearButton = $(
-        '<div class="form-group mapsvg-filters-reset-container">' +
-          '<button type="button" class="btn btn-outline-secondary mapsvg-filters-reset">' +
-          _this.clearButtonText +
-          "</button></div>",
-      )[0]
-      $(this.getForm()).append(_this.elements.buttons.clearButton)
+      const container = textElement("div", "form-group mapsvg-filters-reset-container")
+      const button = textElement(
+        "button",
+        "btn btn-outline-secondary mapsvg-filters-reset",
+        this.clearButtonText,
+      )
+      button.setAttribute("type", "button")
+      container.appendChild(button)
+      this.elements.buttons.clearButton = container
+      this.getForm().appendChild(container)
     }
     if (_this.filtersMode && _this.searchButton) {
-      _this.elements.buttons.searchButton = $(
-        '<div class="form-group mapsvg-filters-reset-container" id="mapsvg-search-container"><button class="btn btn-outline-secondary mapsvg-filters-reset">' +
-          _this.searchButtonText +
-          "</button></div>",
-      )[0]
-      $(this.getForm()).append(_this.elements.buttons.searchButton)
+      const container = textElement("div", "form-group mapsvg-filters-reset-container")
+      container.id = "mapsvg-search-container"
+      const button = textElement(
+        "button",
+        "btn btn-outline-secondary mapsvg-filters-reset",
+        this.searchButtonText,
+      )
+      button.setAttribute("type", "button")
+      container.appendChild(button)
+      this.elements.buttons.searchButton = container
+      this.getForm().appendChild(container)
     }
 
     if (!this.editMode && !_this.filtersMode)
@@ -734,9 +743,16 @@ export class FormBuilder {
   }
 
   getSchema() {
-    return this.formElements.map(function (formElement) {
+    const fields = this.formElements.map(function (formElement) {
       return formElement.getSchema()
     })
+    if (!this.filtersMode && this.schema?.type === "region") {
+      const internalField = this.schema.getField("orphaned")
+      if (internalField && !fields.some((field) => field.name === "orphaned")) {
+        fields.push({ ...internalField })
+      }
+    }
+    return fields
   }
 
   close() {

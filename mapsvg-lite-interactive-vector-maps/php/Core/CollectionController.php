@@ -245,19 +245,9 @@ class CollectionController extends Controller
             return static::render(['error' => $message], 400);
         }
 
-        $file = $files['csv'];
-        $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ['csv', 'txt'], true)) {
-            return static::render(['error' => 'Only CSV files are allowed.'], 400);
-        }
-
-        $csvDir    = MAPSVG_UPLOADS_DIR . DIRECTORY_SEPARATOR . 'csv';
-        wp_mkdir_p($csvDir);
-        $savedPath = $csvDir . DIRECTORY_SEPARATOR . 'import_' . time() . '_'
-            . wp_unique_filename($csvDir, sanitize_file_name($file['name']));
-
-        if (!move_uploaded_file($file['tmp_name'], $savedPath)) {
-            return static::render(['error' => 'Could not save uploaded file.'], 500);
+        $savedPath = CsvUpload::save($files['csv']);
+        if (is_wp_error($savedPath)) {
+            return static::render(['error' => $savedPath->get_error_message()], $savedPath->get_error_data()['status']);
         }
 
         return static::initImportJob($savedPath, $request['_collection_name'], [
@@ -287,13 +277,10 @@ class CollectionController extends Controller
         $sourceUrl = null;
 
         $files = $request->get_file_params();
-        if (!empty($files['csv']) && ($files['csv']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-            $csvDir    = MAPSVG_UPLOADS_DIR . DIRECTORY_SEPARATOR . 'csv';
-            wp_mkdir_p($csvDir);
-            $csvPath = $csvDir . DIRECTORY_SEPARATOR . 'preflight_' . time() . '_'
-                . wp_unique_filename($csvDir, sanitize_file_name($files['csv']['name']));
-            if (!move_uploaded_file($files['csv']['tmp_name'], $csvPath)) {
-                return static::render(['error' => 'Could not save uploaded file.'], 500);
+        if (!empty($files['csv']) && ($files['csv']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $csvPath = CsvUpload::save($files['csv']);
+            if (is_wp_error($csvPath)) {
+                return static::render(['error' => $csvPath->get_error_message()], $csvPath->get_error_data()['status']);
             }
         } else {
             $sourceType = 'remote';
@@ -322,9 +309,10 @@ class CollectionController extends Controller
             if ($csvContent === '') {
                 return static::render(['error' => 'Remote CSV is empty.'], 400);
             }
-            $csvDir = MAPSVG_UPLOADS_DIR . DIRECTORY_SEPARATOR . 'csv';
-            wp_mkdir_p($csvDir);
-            $csvPath = $csvDir . DIRECTORY_SEPARATOR . 'preflight_url_' . sanitize_key($repo->schema->name) . '_' . time() . '.csv';
+            $csvPath = CsvUpload::temporaryPath();
+            if (is_wp_error($csvPath)) {
+                return static::render(['error' => $csvPath->get_error_message()], 500);
+            }
             if (file_put_contents($csvPath, $csvContent) === false) {
                 return static::render(['error' => 'Could not write temporary CSV file.'], 500);
             }
@@ -356,7 +344,7 @@ class CollectionController extends Controller
             return static::render([
                 'preflightToken' => $saved['preflightToken'] ?? null,
                 'preflightExpiresAt' => $saved['preflightExpiresAt'] ?? null,
-                'summary' => $meta,
+                'summary' => ImportSettingsService::preflightSummaryForResponse($meta),
             ], 200);
         } catch (\Exception $e) {
             if ($csvPath !== '' && file_exists($csvPath)) {
@@ -500,6 +488,7 @@ class CollectionController extends Controller
         }
 
         if (in_array($job['status'], ['complete', 'failed'], true)) {
+            unset($job['file']); // The stored file path is private even when polling a failed job.
             return static::render($job, 200);
         }
 
@@ -670,6 +659,7 @@ class CollectionController extends Controller
             );
         } catch (\Exception $e) {
             CsvImportJob::update($token, ['status' => 'failed', 'error' => $e->getMessage()]);
+            (new ImportLogRepository())->upsert($job['collection'], $e->getMessage(), 'error');
             if (!empty($job['preflight_token']) && isset($repo) && $repo && $repo->schema) {
                 ImportSettingsService::updateForSchema($repo->schema, ['preflightStatus' => 'failed']);
             }
@@ -823,9 +813,10 @@ class CollectionController extends Controller
             return static::render(['error' => 'Remote CSV is empty.'], 400);
         }
 
-        $csvDir    = MAPSVG_UPLOADS_DIR . DIRECTORY_SEPARATOR . 'csv';
-        wp_mkdir_p($csvDir);
-        $tmpPath = $csvDir . DIRECTORY_SEPARATOR . 'url_import_' . time() . '.csv';
+        $tmpPath = CsvUpload::temporaryPath();
+        if (is_wp_error($tmpPath)) {
+            return static::render(['error' => $tmpPath->get_error_message()], 500);
+        }
 
         if (file_put_contents($tmpPath, $csvContent) === false) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
             return static::render(['error' => 'Could not write temporary CSV file.'], 500);

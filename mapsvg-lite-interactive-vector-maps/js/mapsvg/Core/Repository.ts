@@ -551,39 +551,11 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     const defer = jQuery.Deferred()
     defer.promise()
 
-    if (!this.schema || !this.schema.id) {
-      defer.resolve({})
-      return defer
-    }
-
-    if (!force && this.importSettingsLoaded && this.importSettings !== null) {
-      defer.resolve(this.importSettings)
-      return defer
-    }
-
-    if (!force && this.importSettingsPromise) {
-      return this.importSettingsPromise
-    }
-
-    const route = `schemas/${this.schema.id}/import-settings`
-    this.importSettingsPromise = defer
-    this.server
-      .get(route)
-      .done((body: any) => {
-        this.importSettings = (body && body.importSettings) || {}
-        this.importSettingsLoaded = true
-        defer.resolve(this.importSettings)
-      })
-      .fail(() => {
-        this.importSettings = {}
-        this.importSettingsLoaded = false
-        defer.reject()
-      })
-      .always(() => {
-        this.importSettingsPromise = null
-      })
-
-    return defer
+    this.importSettings = {}
+this.importSettingsLoaded = true
+defer.resolve(this.importSettings)
+return defer
+    
   }
 
   updateImportSettings(fields: Record<string, any>): JQueryDeferred<any> {

@@ -189,12 +189,15 @@ class GoogleSheetAppScript
      */
     public static function buildSyncUrl(string $collection, string $schemaName): string
     {
+        $route = 'mapsvg/v1/' . $collection . '/' . $schemaName . '/sync';
+        $rest_url = get_rest_url(null, $route);
+
         if (defined('MAPSVG_REST_BASE_URL')) {
-            $base = rtrim(\MAPSVG_REST_BASE_URL, '/') . '/wp-json/mapsvg/v1';
-        } else {
-            $base = rtrim(get_rest_url(null, 'mapsvg/v1'), '/');
+            $site_url = get_option('siteurl');
+            return str_replace($site_url, rtrim(\MAPSVG_REST_BASE_URL, '/'), $rest_url);
         }
-        return $base . '/' . $collection . '/' . $schemaName . '/sync';
+
+        return $rest_url;
     }
 
     // ──────────────────────────────────────────────────────────────────────────

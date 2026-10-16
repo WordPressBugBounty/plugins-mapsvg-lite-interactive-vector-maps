@@ -16,7 +16,7 @@ return function (&$map) {
 
 
     if (!empty($map["options"]['events'])) {
-        if (isset($map["options"]['events']['afterLoad'])) {
+        if (!empty($map["options"]['events']['afterLoad'])) {
             $map["options"]['events']['afterLoad'] = 'function(event) {
     const { map, data } = event;
 
@@ -26,12 +26,14 @@ return function (&$map) {
         }
 
 
+        if (!empty($map["options"]['events']['beforeLoad'])) {
         $map["options"]['events']['beforeLoad'] = 'function(event) {
     const { map, data } = event;
 
     // This event handler was automatically modified to match the new event parameters format
     (' . $map["options"]['events']['beforeLoad'] . ').call(map, map);
 }';
+        }
 
         if (!empty($map["options"]['events']['regionsLoaded'])) {
             $map["options"]['events']['afterLoad.regions'] = 'function(event) {
@@ -42,7 +44,7 @@ return function (&$map) {
 }';
         }
 
-        if (isset($map["options"]['events']['databaseLoaded'])) {
+        if (!empty($map["options"]['events']['databaseLoaded'])) {
             $map["options"]['events']['afterLoad.objects'] = 'function(event) {
     const { map, data } = event;
 
@@ -54,7 +56,7 @@ return function (&$map) {
         }
 
 
-        if (isset($map["options"]['events']['click.region'])) {
+        if (!empty($map["options"]['events']['click.region'])) {
             $map["options"]['events']['click.region'] = 'function(event) {
     const { map, domEvent, data: { region } } = event;
 
@@ -64,63 +66,79 @@ return function (&$map) {
         }
 
 
+        if (!empty($map["options"]['events']['mouseover.region'])) {
         $map["options"]['events']['mouseover.region'] = 'function(event) {
     const { map, domEvent, data: { region } } = event;
 
     // This event handler was automatically modified to match the new event parameters format
     (' . $map["options"]['events']['mouseover.region'] . ').call(region, domEvent, region, map);
 }';
+        }
 
+        if (!empty($map["options"]['events']['mouseout.region'])) {
         $map["options"]['events']['mouseout.region'] = 'function(event) {
     const { map, domEvent, data: { region } } = event;
 
     // This event handler was automatically modified to match the new event parameters format
     (' . $map["options"]['events']['mouseout.region'] . ').call(region, domEvent, region, map);
 }';
+        }
 
+        if (!empty($map["options"]['events']['click.marker'])) {
         $map["options"]['events']['click.marker'] = 'function(event) {
     const { map, domEvent, data: { marker } } = event;
 
     // This event handler was automatically modified to match the new event parameters format
     (' . $map["options"]['events']['click.marker'] . ').call(marker, domEvent, marker, map);
 }';
+        }
 
+        if (!empty($map["options"]['events']['mouseover.marker'])) {
         $map["options"]['events']['mouseover.marker'] = 'function(event) {
     const { map, domEvent, data: { marker } } = event;
 
     // This event handler was automatically modified to match the new event parameters format
     (' . $map["options"]['events']['mouseover.marker'] . ').call(marker, domEvent, marker, map);
 }';
+        }
 
+        if (!empty($map["options"]['events']['mouseout.marker'])) {
         $map["options"]['events']['mouseout.marker'] = 'function(event) {
     const { map, domEvent, data: { marker } } = event;
 
     // This event handler was automatically modified to match the new event parameters format
     (' . $map["options"]['events']['mouseout.marker'] . ').call(marker, domEvent, marker, map);
 }';
+        }
 
+        if (!empty($map["options"]['events']['click.directoryItem'])) {
         $map["options"]['events']['click.directoryItem'] = 'function(event) {
     const { map, domEvent, data: { region, object, directoryItem } } = event;
 
     // This event handler was automatically modified to match the new event parameters format
     (' . $map["options"]['events']['click.directoryItem'] . ').call(directoryItem, domEvent, region || object, map);
 }';
+        }
 
+        if (!empty($map["options"]['events']['mouseover.directoryItem'])) {
         $map["options"]['events']['mouseover.directoryItem'] = 'function(event) {
     const { map, domEvent, data: { region, object, directoryItem } } = event;
 
     // This event handler was automatically modified to match the new event parameters format
     (' . $map["options"]['events']['mouseover.directoryItem'] . ').call(directoryItem, domEvent, region || object, map);
 }';
+        }
 
+        if (!empty($map["options"]['events']['mouseout.directoryItem'])) {
         $map["options"]['events']['mouseout.directoryItem'] = 'function(event) {
     const { map, domEvent, data: { region, object, directoryItem } } = event;
 
     // This event handler was automatically modified to match the new event parameters format
     (' . $map["options"]['events']['mouseout.directoryItem'] . ').call(directoryItem, domEvent, region || object, map);
 }';
+        }
 
-        if (isset($map["options"]['events']['shown.popover'])) {
+        if (!empty($map["options"]['events']['shown.popover'])) {
             $map["options"]['events']['afterShow.popover'] = 'function(event) {
     const { map, domEvent, data: { controller } } = event;
 
@@ -131,7 +149,7 @@ return function (&$map) {
         }
 
 
-        if (isset($map["options"]['events']['shown.detailsView'])) {
+        if (!empty($map["options"]['events']['shown.detailsView'])) {
             $map["options"]['events']['afterShow.detailsView'] = 'function(event) {
     const { map, domEvent, data: { controller } } = event;
 
@@ -142,7 +160,7 @@ return function (&$map) {
         }
 
 
-        if (isset($map["options"]['events']['closed.popover'])) {
+        if (!empty($map["options"]['events']['closed.popover'])) {
             $map["options"]['events']['afterClose.popover'] = 'function(event) {
     const { map, domEvent, data: { controller } } = event;
 
@@ -153,7 +171,7 @@ return function (&$map) {
         }
 
 
-        if (isset($map["options"]['events']['closed.detailsView'])) {
+        if (!empty($map["options"]['events']['closed.detailsView'])) {
             $map["options"]['events']['afterClose.detailsView'] = 'function(event) {
     const { map, domEvent, data: { controller } } = event;
 
@@ -179,7 +197,7 @@ return function (&$map) {
     {{/if}}';
 
         $map["options"]['templates']['directoryItem'] =
-            '<div id="mapsvg-directory-item-{{toSnakeCase id}}" class="mapsvg-directory-item" data-object-id="{{id}}">' . $map["options"]['templates']['directoryItem'] . '</div>';
+            '<div id="mapsvg-directory-item-{{toSnakeCase id}}" class="mapsvg-directory-item" data-object-id="{{id}}">' . ($map["options"]['templates']['directoryItem'] ?? '') . '</div>';
 
         $map["options"]['templates']['categoryItem'] =
             '<div id="mapsvg-category-item-{{value}}" class="mapsvg-category-item" data-category-value="{{value}}">

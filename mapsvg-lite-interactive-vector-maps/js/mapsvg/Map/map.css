@@ -1015,7 +1015,7 @@ iframe.mapsvg-iframe-post {
 }
 
 .mapsvg-hidden {
-  display: none;
+  display: none !important;
 }
 .mapsvg-invisible {
   opacity: 0;

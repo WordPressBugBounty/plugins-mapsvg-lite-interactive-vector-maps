@@ -217,7 +217,9 @@ class CsvImporter
 				try {
 					$this->source->import($batch, $upsert);
 				} catch (\Exception $e) {
-					$errors[] = ['message' => $e->getMessage()];
+					// A rejected database batch is fatal, not a recoverable row warning.
+					fclose($handle);
+					throw $e;
 				}
 				$batch = [];
 			}
@@ -230,11 +232,7 @@ class CsvImporter
 		fclose($handle);
 
 		if (! empty($batch)) {
-			try {
-				$this->source->import($batch, $upsert);
-			} catch (\Exception $e) {
-				$errors[] = ['message' => $e->getMessage()];
-			}
+			$this->source->import($batch, $upsert);
 		}
 
 		return [

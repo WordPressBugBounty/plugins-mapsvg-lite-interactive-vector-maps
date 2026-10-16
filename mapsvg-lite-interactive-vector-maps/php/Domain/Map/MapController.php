@@ -46,6 +46,16 @@ class MapController extends Controller
 
 		$response['map'] = $map;
 
+		if (!$map) {
+			return self::render($response, 404);
+		}
+
+		if (!empty($map->optionsBroken) || !is_array($map->options)) {
+			$response['regions'] = ["items" => [], "hasMore" => false];
+			$response['objects'] = ["items" => [], "hasMore" => false];
+			return self::render($response, 200);
+		}
+
 
 		$withData = isset($request["withData"]) ? explode(",", $request["withData"]) : false;
 		$loadRegions = $withData && in_array("regions", $withData);
@@ -209,6 +219,23 @@ class MapController extends Controller
 		// Add more validation checks here as needed
 	}
 
+	/** Decode the REST options format, including the client mod_sec placeholders. */
+	private static function decodeOptionsForWrite($options): array
+	{
+		if (is_string($options)) {
+			$options = str_replace(
+				['!mapsvg-encoded-slct', '!mapsvg-encoded-tbl', '!mapsvg-encoded-db', '!mapsvg-encoded-vc', '!mapsvg-encoded-int'],
+				['select', 'table', 'database', 'varchar', 'int(11)'],
+				$options
+			);
+			$options = json_decode($options, true);
+		}
+		if (!is_array($options)) {
+			throw new \Exception('Invalid map options.', 400);
+		}
+		return $options;
+	}
+
 	/**
 	 * Creates a new map
 	 *
@@ -225,13 +252,9 @@ class MapController extends Controller
 		 */
 		$mapsRepository = RepositoryFactory::get("map");
 
-		$map["options"] = json_decode($map["options"], true);
-		if (is_array($map["options"])) {
-			$map["options"] = Map::sanitizeOptionsForWrite($map["options"]);
-		}
-
 		// Validate map data
 		try {
+			$map['options'] = Map::prepareOptionsForWrite(self::decodeOptionsForWrite($map['options']));
 			self::validate($map);
 		} catch (\Exception $e) {
 			return self::render(["error" => $e->getMessage()], $e->getCode() ?: 400);
@@ -331,8 +354,11 @@ class MapController extends Controller
 
 		$mapData = $request['map'];
 
-		if (is_string($mapData['options'])) {
-			$mapData['options'] = json_decode($mapData['options'], true);
+		try {
+			$mapData['options'] = Map::prepareOptionsForWrite(self::decodeOptionsForWrite($mapData['options']));
+			self::validate($mapData);
+		} catch (\Exception $e) {
+			return self::render(['error' => $e->getMessage()], $e->getCode() ?: 400);
 		}
 
 		$map = $mapsRepository->create([
@@ -553,6 +579,7 @@ class MapController extends Controller
 		$map->options['templates']['tooltipMarker'] = '{{tooltip}}';
 		$map->options['templates']['tooltipRegion'] = '{{tooltip}}';
 
+		$map->options = Map::sanitizeOptionsForWrite($map->options);
 		$mapsRepository->update($map);
 
 		return self::render(['map' => $map], 200);;
@@ -568,7 +595,11 @@ class MapController extends Controller
 	public static function copy($request)
 	{
 		$repository = RepositoryFactory::get("map");
-		$newMap = $repository->copy($request['id'], json_decode($request['options'], true));
+		try {
+			$newMap = $repository->copy($request['id'], self::decodeOptionsForWrite($request['options']));
+		} catch (\Exception $e) {
+			return self::render(['error' => $e->getMessage()], $e->getCode() ?: 400);
+		}
 		return self::render(['map' => $newMap], 200);
 	}
 
@@ -583,34 +614,26 @@ class MapController extends Controller
 	{
 		$mapData = (array)$request['map'];
 
-		// Prevent blockage by Apache's mod_sec
-		if (isset($request['map']) && isset($request['map']['options'])) {
-			$mapData['options'] = str_replace("!mapsvg-encoded-slct", "select", $mapData['options']);
-			$mapData['options'] = str_replace("!mapsvg-encoded-tbl", "table", $mapData['options']);
-			$mapData['options'] = str_replace("!mapsvg-encoded-db", "database", $mapData['options']);
-			$mapData['options'] = str_replace("!mapsvg-encoded-vc", "varchar", $mapData['options']);
-			$mapData['options'] = str_replace("!mapsvg-encoded-int", "int(11)", $mapData['options']);
+		$mapsRepository = RepositoryFactory::get("map");
+		$map = $mapsRepository->findById($request['id']);
+		if (!$map || !$map->id) {
+			return self::render(['error' => 'Map not found.'], 404);
 		}
+		$mapData['id'] = $map->id;
 
-		if (isset($mapData['options']) && is_string($mapData['options'])) {
-			$decodedOptions = json_decode($mapData['options'], true);
-			if (is_array($decodedOptions)) {
-				$mapData['options'] = $decodedOptions;
-			}
-		}
-		if (isset($mapData['options']) && is_array($mapData['options'])) {
-			$mapData['options'] = Map::sanitizeOptionsForWrite($mapData['options']);
-		}
-
-		// Validate map data
+		// Validate and authorize before any write. The URL selects the map.
 		try {
+			if (isset($mapData['options'])) {
+				$mapData['options'] = Map::prepareOptionsForWrite(
+					self::decodeOptionsForWrite($mapData['options']),
+					is_array($map->options) ? $map->options : []
+				);
+			}
 			self::validate($mapData);
 		} catch (\Exception $e) {
 			return self::render(["error" => $e->getMessage()], $e->getCode() ?: 400);
 		}
 
-		$mapsRepository = RepositoryFactory::get("map");
-		$map = $mapsRepository->findById($mapData['id']);
 		$map->update($mapData);
 		$mapsRepository->update($map);
 

@@ -107,6 +107,7 @@ Rules:
 - Do not copy commit prefixes into changelog text (`feat:`, `fix:`, `refactor:`, `chore:`).
 - Skip low-signal items unless they affect behavior, reliability, or migration safety.
 - **Never** put build, deploy, CI, `gulp bump`, SVN, release-script, or other internal release-process changes in the user-facing changelog (Docusaurus + README). Those belong in commit messages only, not in product release notes.
+- **Never** put `Gleap #...` (or other internal ticket IDs) in Docusaurus or README.txt. Ticket IDs go only in the Slack `#release` post (Step 11).
 
 Default size:
 
@@ -138,6 +139,7 @@ Before showing the draft, self-check:
 4. Is there any commit-message artifact left in wording?
 5. Were build/deploy/release-tooling bullets excluded from the draft?
 6. Omit `### 🚀 Features / Improvements` entirely when there are no user-facing feature bullets (patch-only bugfix releases are OK with only `### 🐛 Bug Fixes`).
+7. Does the Docusaurus or README draft contain any `Gleap #...`? If yes, remove them; keep the IDs for Slack only.
 
 ---
 
@@ -170,7 +172,9 @@ slug: X.Y.Z
 
 Only include sections that have entries. Use today's date.
 
-Before creating the file and proceeding further, output full generated changelog to chat and ask for a confirmation.
+**No Gleap / ticket IDs on the website.** Do not write `Gleap #123123` (or similar) in this file. If the user maps commits to Gleap IDs, keep that mapping for Step 11 (Slack) only.
+
+Before creating the file and proceeding further, output full generated changelog to chat and ask for a confirmation. If Gleap IDs were provided, show them separately as “Slack only”, not inside the Docusaurus draft.
 
 ---
 
@@ -184,6 +188,8 @@ Changelog order is **newest first** (reverse chronological). Insert the new sect
 = X.Y.Z =
 * <bullet points from step 2>
 ```
+
+Same product bullets as Docusaurus. **No `Gleap #...` in README.txt.**
 
 ---
 
@@ -272,7 +278,7 @@ No need to tag again — `gulp bump` already created and pushed the tag in Step 
 
 ## Step 11 — Slack `#release` (mandatory)
 
-After deploy + master merge succeed, post the Docusaurus changelog to Slack `#release`. Do this on a normal `/release` and also after a successful `/publish`.
+After deploy + master merge succeed, post the changelog to Slack `#release`. Do this on a normal `/release` and also after a successful `/publish`.
 
 1. Resolve the channel with Slack MCP `slack_search_channels` (`query`: `release`). Use the `#release` channel id (not a similarly named channel).
 2. Read the changelog body from the file created in Step 3:
@@ -281,7 +287,9 @@ After deploy + master merge succeed, post the Docusaurus changelog to Slack `#re
 
 3. Send with Slack MCP `slack_send_message` (`channel_id` = `#release` id).
 
-**Same changelog as Docusaurus**, minus YAML frontmatter. Do not rewrite, shorten, or translate bullets. Slack MCP accepts a **markdown subset**, not full MD and not Slack `mrkdwn`:
+Start from the Docusaurus changelog, minus YAML frontmatter. Do not rewrite, shorten, or translate bullets. **Do append `Gleap #123123` to the matching bullets** when the user (or commit mapping) provided ticket IDs for this release. Docusaurus and README stay without Gleap; Slack is the place for those IDs.
+
+Slack MCP accepts a **markdown subset**, not full MD and not Slack `mrkdwn`:
 
 | Works | Does not work |
 |---|---|
@@ -301,11 +309,11 @@ Released **X.Y.Z**
 
 **🚀 Features / Improvements**
 
-- **Label**: description.
+- **Label**: description. Gleap #123123.
 
 **🐛 Bug Fixes**
 
-- **Label**: description.
+- **Label**: description. Gleap #123123.
 ```
 
 Only include sections that exist in the Docusaurus file.

@@ -121,20 +121,37 @@
       }, 200)
 
       var btn = $(this)
-      _this.colorpickerRegionBtn && _this.colorpickerRegionBtn.colorpicker("destroy")
+      if (_this.colorpickerRegionBtn) {
+        _this.colorpickerRegionBtn.off(".mapsvgRegionColor").colorpicker("destroy")
+      }
+      btn.off(".mapsvgRegionColor")
       _this.colorpickerRegionBtn = btn
       _this.colorpickerRegionId = $(this).closest(".mapsvg-data-row").data("region-id")
-      var rOptions = _this.mapsvg.getOptions().regions[_this.colorpickerRegionId]
-      var curColor = rOptions ? rOptions.fill : ""
+      // Region colors live at options.regions[id].style.fill. Keep a fallback
+      // to the legacy top-level fill so older saved maps still load the HEX.
+      var regionOpts = _this.mapsvg.options.regions
+      var rOptions = regionOpts && regionOpts[_this.colorpickerRegionId]
+      var curColor =
+        rOptions && rOptions.style && typeof rOptions.style.fill === "string"
+          ? rOptions.style.fill
+          : rOptions && typeof rOptions.fill === "string"
+            ? rOptions.fill
+            : ""
+      if (curColor === "none") curColor = ""
+      var colorpickerOptions = {
+        template:
+          '<div class="colorpicker dropdown-menu"><div class="colorpicker-saturation"><i><b></b></i></div><div class="colorpicker-hue"><i></i></div><div class="colorpicker-alpha"><i></i></div><div class="colorpicker-input-wrap"><input class="colorpicker-input" type="text"/><i></i></div><div class="colorpicker-reset-wrap"><button class="btn btn-xs btn-default colorpicker-reset">Reset</button><i></i></div></div>',
+      }
+      if (curColor) {
+        colorpickerOptions.color = curColor
+      }
       _this.colorpicker = btn
-        .colorpicker({
-          template:
-            '<div class="colorpicker dropdown-menu"><div class="colorpicker-saturation"><i><b></b></i></div><div class="colorpicker-hue"><i></i></div><div class="colorpicker-alpha"><i></i></div><div class="colorpicker-input-wrap"><input class="colorpicker-input" type="text"/><i></i></div><div class="colorpicker-reset-wrap"><button class="btn btn-xs btn-default colorpicker-reset">Reset</button><i></i></div></div>',
-        })
+        .colorpicker(colorpickerOptions)
         .colorpicker("show")
 
-      var colorInput = $(".colorpicker-input")
-      var colorReset = $(".colorpicker-reset")
+      var picker = btn.data("colorpicker")
+      var colorInput = picker.picker.find(".colorpicker-input")
+      var colorReset = picker.picker.find(".colorpicker-reset")
       colorReset.on("click", function () {
         var rid = _this.colorpickerRegionId
         _this.mapsvg.update({
@@ -150,7 +167,11 @@
         btn.css({ background: "" })
         btn.colorpicker("destroy")
       })
-      if (curColor) colorInput.val(curColor)
+      if (curColor) {
+        var initial = picker.color.toRGB()
+        colorInput.val(initial.a === 1 ? picker.color.toHex() :
+          "rgba(" + initial.r + "," + initial.g + "," + initial.b + "," + initial.a + ")")
+      }
       colorInput.on("focus", function () {
         colorInput.focused = true
       })
@@ -162,7 +183,7 @@
         btn.colorpicker("setValue", color)
       })
 
-      btn.colorpicker().on("changeColor", function (event) {
+      btn.on("changeColor.mapsvgRegionColor", function (event) {
         var rid = _this.colorpickerRegionId
         var c = event.color.toRGB()
         var color
@@ -183,9 +204,9 @@
         if (!colorInput.focused) colorInput.val(color)
         btn.css({ background: color })
       })
-      if (curColor) btn.colorpicker("setValue", curColor)
-      $(window).on("mousedown.colorpicker", function (e) {
-        if ($(e.target).not("input")) {
+      // Initialization is read-only; setValue here would save an override on open.
+      $(window).off("mousedown.mapsvgRegionColor").on("mousedown.mapsvgRegionColor", function (e) {
+        if (!$(e.target).is("input")) {
           _this.view.removeClass("mapsvg-cpicker-opened")
           colorInput.blur()
         }

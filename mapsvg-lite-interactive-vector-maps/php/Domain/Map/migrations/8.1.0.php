@@ -15,8 +15,12 @@ return function (&$map) {
     }
 
     if (isset($map["options"]['events'])) {
-        $map["options"]['events']['afterInit'] = $map["options"]['events']['afterLoad'] ?? "";
-        $map["options"]['events']['beforeInit'] = $map["options"]['events']['beforeLoad'] ?? "";
+        if (isset($map["options"]['events']['afterLoad'])) {
+            $map["options"]['events']['afterInit'] = $map["options"]['events']['afterLoad'];
+        }
+        if (isset($map["options"]['events']['beforeLoad'])) {
+            $map["options"]['events']['beforeInit'] = $map["options"]['events']['beforeLoad'];
+        }
         unset($map["options"]['events']['afterLoad']);
         unset($map["options"]['events']['beforeLoad']);
 

@@ -169,7 +169,8 @@ class Admin
             'user' => array(
                 "name" => $user_name,
                 "email" => $user_email,
-                "isAdmin" => current_user_can("manage_options")
+                "isAdmin" => current_user_can("manage_options"),
+                "canEditJavaScript" => current_user_can("unfiltered_html")
             ),
             'maps' => $mapsRepo->find($query),
             'gitBranch' => "",
@@ -241,7 +242,8 @@ class Admin
             'user' => array(
                 "name" => $user_name,
                 "email" => $user_email,
-                "isAdmin" => current_user_can("manage_options")
+                "isAdmin" => current_user_can("manage_options"),
+                "canEditJavaScript" => current_user_can("unfiltered_html")
             ),
             'phpIni' => array(
                 'post_max_size'       => ini_get('post_max_size'),

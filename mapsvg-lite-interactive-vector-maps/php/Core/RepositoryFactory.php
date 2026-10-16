@@ -8,6 +8,16 @@ namespace MapSVG;
  */
 class RepositoryFactory
 {
+  private const INTERNAL_SCHEMA_NAMES = ['map', 'schema', 'token', 'log', 'postType', 'import_settings'];
+
+  /** Reserved repositories are available to server code, never through collection REST routes. */
+  public static function isInternalSchemaName(string $name): bool
+  {
+    foreach (self::INTERNAL_SCHEMA_NAMES as $reserved) {
+      if (strcasecmp($name, $reserved) === 0) return true;
+    }
+    return false;
+  }
 
   /**
    * @var Schema
@@ -19,7 +29,7 @@ class RepositoryFactory
   public static function get($schemaName)
   {
     $schema = null;
-    if ($schemaName === "map" || $schemaName === "schema" || $schemaName === "token" || $schemaName === "log" || $schemaName === "postType" || $schemaName === "import_settings") {
+    if (in_array($schemaName, self::INTERNAL_SCHEMA_NAMES, true)) {
       $schema = static::getDefaultSchema($schemaName);
     } else {
       $schema = static::loadSchema($schemaName);

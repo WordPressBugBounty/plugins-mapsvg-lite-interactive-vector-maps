@@ -25,42 +25,45 @@ class MapUpdater
 	 */
 	function maybeUpdate(&$map)
 	{
-
-		if ($map["version"] === MAPSVG_VERSION) {
+		$originalMap = $map;
+		$currentVersion = isset($map["version"]) ? (string) $map["version"] : '0.0.0';
+		if (version_compare($currentVersion, MAPSVG_VERSION, '>')) {
 			return $map;
 		}
 
-		// Backup the original state of the map
-		$originalMap = $map;
-
-		// Check if the current map version is outdated
-		if (version_compare($map["version"], MAPSVG_VERSION, '<')) {
-			// Get all migration files with version numbers higher than the current version
-			$migrations = $this->getPendingMigrations($map["version"]);
-
-			// Apply each migration to the map options
-			foreach ($migrations as $migrationFile) {
-				try {
-					$this->applyMigration($map, $migrationFile);
-				} catch (\Exception $e) {
-					// An error occurred, rollback the map to its original state
-					$map = $originalMap;
-					// Optionally log the error or handle it as needed
-					Logger::error("[SERVER-013] Migration failed: " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-013");
-					break;
-				}
-			}
-
-			$map["version"] = MAPSVG_VERSION;
-			$repo = RepositoryFactory::get("map");
-			$repo->update($map);
+		// Database options are normally JSON strings, including on current maps.
+		// Only non-JSON JavaScript literals indicate the skipped legacy migration.
+		$options = $map['options'] ?? null;
+		$legacyLiteral = is_string($options) && !is_array(json_decode($options, true));
+		if ($currentVersion === MAPSVG_VERSION && !$legacyLiteral) {
+			return $map;
 		}
 
-		// Return the updated map instance
+		try {
+			$options = Map::fixJsonOptions($options);
+			if (!is_array($options) || !isset($options['source']) || !is_string($options['source']) || $options['source'] === '') {
+				throw new \UnexpectedValueException('Map options could not be recovered');
+			}
+			$map['options'] = $options;
+			// A legacy literal can survive an incorrectly advanced map version.
+			// Replay the complete ordered chain, not a hardcoded subset of files.
+			$fromVersion = $legacyLiteral ? '0.0.0' : $currentVersion;
+			foreach ($this->getPendingMigrations($fromVersion) as $migrationFile) {
+				$this->applyMigration($map, $migrationFile);
+				if (!is_array($map['options'])) {
+					throw new \UnexpectedValueException('Migration produced invalid map options');
+				}
+			}
+			$map['version'] = MAPSVG_VERSION;
+			RepositoryFactory::get('map')->update($map);
+		} catch (\Throwable $e) {
+			$map = $originalMap;
+			Logger::error("[SERVER-013] Migration failed: " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-013");
+		}
 		return $map;
 	}
 
-	private function getPendingMigrations($currentVersion)
+	protected function getPendingMigrations($currentVersion)
 	{
 		$migrations = [];
 		$migrationDir = __DIR__ . DIRECTORY_SEPARATOR . 'migrations';
@@ -70,7 +73,7 @@ class MapUpdater
 			$version = basename($file, '.php');
 
 			// Check if the file's version is higher than the current version
-			if (version_compare($version, $currentVersion, '>')) {
+			if (version_compare($version, $currentVersion, '>') && version_compare($version, MAPSVG_VERSION, '<=')) {
 				$migrations[$version] = $file;
 			}
 		}
@@ -81,7 +84,7 @@ class MapUpdater
 		return $migrations;
 	}
 
-	private function applyMigration(&$map, $migrationFile)
+	protected function applyMigration(&$map, $migrationFile)
 	{
 		$migration = require $migrationFile;
 

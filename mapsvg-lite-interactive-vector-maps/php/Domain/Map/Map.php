@@ -79,10 +79,16 @@ class Map extends Model implements \JsonSerializable
 			return;
 		}
 
+		if (isset($this->options['database']) && !is_array($this->options['database'])) {
+			$this->setOptionsBroken(true);
+			return;
+		}
+
 		if (isset($this->options['database']) && isset($this->options['database']['schemas'])) {
 			if (!$this->validateSchemasStructure($this->options['database']['schemas'])) {
-				// Handle invalid schema structure
-				throw new \Exception('Invalid schemas structure');
+				// Preserve custom table bindings for repair; do not silently replace them.
+				$this->setOptionsBroken(true);
+				return;
 			}
 		}
 
@@ -122,6 +128,9 @@ class Map extends Model implements \JsonSerializable
 			}
 
 			if (isset($schemaData['apiEndpoints'])) {
+				if (!is_array($schemaData['apiEndpoints'])) {
+					return false;
+				}
 				foreach ($schemaData['apiEndpoints'] as $endpoint) {
 					if (!is_array($endpoint) || !isset($endpoint['url']) || !isset($endpoint['method']) || !isset($endpoint['name'])) {
 						return false;
@@ -135,6 +144,9 @@ class Map extends Model implements \JsonSerializable
 
 	public function getRegions()
 	{
+		if ($this->optionsBroken || !is_array($this->options)) {
+			return null;
+		}
 
 		if (!$this->regions) {
 			if (isset($this->options['database']) && isset($this->options['database']['schemas']) && isset($this->options['database']['schemas']["regions"]) && isset($this->options['database']['schemas']["regions"]["name"])) {
@@ -162,6 +174,9 @@ class Map extends Model implements \JsonSerializable
 
 	public function getObjects()
 	{
+		if ($this->optionsBroken || !is_array($this->options)) {
+			return null;
+		}
 
 		if (!$this->objects) {
 			if (isset($this->options['database']) && isset($this->options['database']['schemas']) && isset($this->options['database']["schemas"]["objects"]) && isset($this->options['database']["schemas"]["objects"]["name"])) {
@@ -225,7 +240,7 @@ class Map extends Model implements \JsonSerializable
 
 		$data = $this->getData();
 
-		if (isset($data['optionsBroken'])) {
+		if (isset($data['optionsBroken']) || !is_array($data['options'])) {
 			return $data;
 		}
 
@@ -276,8 +291,12 @@ class Map extends Model implements \JsonSerializable
 	{
 		if ($this->svgFilePath !== $svgFilePath) {
 			$this->svgFilePath = $svgFilePath;
-			$this->svgFile = new SVGFile(array('relativeUrl' => $this->svgFilePath));
-			$this->setSvgFileLastChanged($this->svgFile->lastChanged());
+			try {
+				$this->svgFile = new SVGFile(array('relativeUrl' => $this->svgFilePath));
+				$this->setSvgFileLastChanged($this->svgFile->lastChanged());
+			} catch (\Throwable $e) {
+				$this->setSvgFileLastChanged(0);
+			}
 		}
 	}
 
@@ -340,7 +359,7 @@ class Map extends Model implements \JsonSerializable
 	}
 
 	/**
-	 * Apply write-time sanitization to map options that can contain HTML.
+	 * Sanitize explicit UI text paths and the existing loadingText HTML policy.
 	 *
 	 * @param array $options
 	 * @return array
@@ -350,7 +369,88 @@ class Map extends Model implements \JsonSerializable
 		if (isset($options['loadingText'])) {
 			$options['loadingText'] = self::sanitizeLoadingText($options['loadingText']);
 		}
+		// Explicit UI text paths. Templates, code, identifiers and option values are not text labels.
+		$paths = [
+			'title', 'database.pagination.prev', 'database.pagination.next',
+			'layersControl.label', 'floorsControl.label', 'groups.*.title', 'floors.*.title',
+			'mobileView.labelMap', 'mobileView.labelList', 'mobileView.labelClose',
+			'filters.showButtonText', 'filters.clearButtonText', 'filters.searchButtonText',
+			'menu.searchPlaceholder', 'menu.noResultsText', 'regionStatuses.*.label',
+			'choropleth.labels.low', 'choropleth.labels.high',
+			'choropleth.coloring.gradient.labels.low', 'choropleth.coloring.gradient.labels.high',
+			'choropleth.coloring.noData.description', 'choropleth.coloring.palette.outOfRange.description',
+			'choropleth.coloring.palette.colors.*.description',
+			'choropleth.coloring.legend.title', 'choropleth.coloring.legend.text', 'choropleth.coloring.legend.description',
+		];
+		foreach (['label', 'help', 'placeholder', 'checkboxLabel', 'distanceUnitsLabel', 'fromLabel', 'addressFieldPlaceholder', 'showButtonText'] as $field) {
+			$paths[] = 'filtersSchema.*.' . $field;
+		}
+		$paths[] = 'filtersSchema.*.options.*.label';
+		$paths[] = 'filtersSchema.*.options.*.options.*.label';
+		$paths[] = 'filtersSchema.*.optionsDict.*.label';
+		$paths[] = 'filtersSchema.*.optionsDict.*.options.*.label';
+		// Some element types store label strings; others store full choice objects.
+		if (isset($options['filtersSchema']) && is_array($options['filtersSchema'])) {
+			foreach ($options['filtersSchema'] as &$field) {
+				if (!is_array($field) || !isset($field['optionsDict']) || !is_array($field['optionsDict'])) continue;
+				foreach ($field['optionsDict'] as &$choice) {
+					if (is_scalar($choice)) {
+						$choice = sanitize_text_field((string)$choice);
+					}
+				}
+				unset($choice);
+			}
+			unset($field);
+		}
+		foreach ($paths as $path) {
+			self::sanitizeTextPath($options, explode('.', $path));
+		}
 		return $options;
+	}
+
+	private static function sanitizeTextPath(array &$data, array $path)
+	{
+		$key = array_shift($path);
+		$keys = $key === '*' ? array_keys($data) : [$key];
+		foreach ($keys as $name) {
+			if (!array_key_exists($name, $data)) {
+				continue;
+			}
+			if (!$path) {
+				$data[$name] = is_scalar($data[$name]) ? sanitize_text_field((string)$data[$name]) : '';
+			} elseif (is_array($data[$name])) {
+				self::sanitizeTextPath($data[$name], $path);
+			}
+		}
+	}
+
+	/** Authorize submitted code, preserving stored hooks when an ordinary save omits them. */
+	public static function prepareOptionsForWrite(array $options, array $previous = [])
+	{
+		if (!current_user_can('unfiltered_html')) {
+			foreach (['events', 'middlewares', 'onClick', 'mouseOver', 'mouseOut', 'menuOnClick', 'beforeLoad', 'afterLoad'] as $key) {
+				if (array_key_exists($key, $options) && $options[$key] !== ($previous[$key] ?? null) && !self::isEmptyCode($options[$key])) {
+					throw new \Exception('Changing map JavaScript requires unfiltered_html.', 403);
+				}
+				if (array_key_exists($key, $previous)) {
+					$options[$key] = $previous[$key];
+				} else {
+					unset($options[$key]);
+				}
+			}
+		}
+		return self::sanitizeOptionsForWrite($options);
+	}
+
+	private static function isEmptyCode($value)
+	{
+		if (is_array($value)) {
+			foreach ($value as $code) {
+				if (!self::isEmptyCode($code)) return false;
+			}
+			return true;
+		}
+		return $value === null || $value === '';
 	}
 
 	/**
@@ -359,34 +459,33 @@ class Map extends Model implements \JsonSerializable
 	 */
 	public function setOptions($options)
 	{
-
 		if (is_string($options)) {
-			try {
-				$tryDecode = json_decode($options, true);
-				if (!$tryDecode) {
-					throw new \Exception("Failed to decode options");
-				}
-				$options = $tryDecode;
-			} catch (\Exception $e) {
+			$decoded = self::fixJsonOptions($options);
+			if (!is_array($decoded)) {
 				$this->setOptionsBroken(true);
 				return;
 			}
+			$options = $decoded;
 		}
 
-		if (is_array($options) && isset($options['loadingText'])) {
+		if (!is_array($options)) {
+			$this->setOptionsBroken(true);
+			return;
+		}
+
+		if (isset($options['loadingText'])) {
 			$options['loadingText'] = self::sanitizeLoadingTextForOutput($options['loadingText']);
 		}
 
 		$this->options = $options;
 
-		if ($this->options && is_array($this->options) && isset($this->options['source'])) {
+		if (isset($this->options['source']) && is_string($this->options['source']) && $this->options['source'] !== '') {
 			$this->setOptionsBroken(false);
-			$filePath = isset($this->options['source']) ? $this->options['source'] : '';
-			$this->setSvgFilePath($filePath);
-		} else {
-			$this->setOptionsBroken(true);
+			$this->setSvgFilePath($this->options['source']);
 			return;
 		}
+
+		$this->setOptionsBroken(true);
 	}
 
 	public static function fixJsonOptions($options)

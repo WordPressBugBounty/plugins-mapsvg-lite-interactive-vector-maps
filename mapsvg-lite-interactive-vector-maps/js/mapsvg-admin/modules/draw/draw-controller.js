@@ -1100,6 +1100,7 @@
 
       const formData = new FormData()
       formData.append("path", _this.filepath)
+      formData.append("svgFileLastChanged", String(_this.mapsvg.svgFileLastChanged || 0))
       var parts = _this.filepath.split("/")
       var name = parts.pop()
       var file = {
@@ -1119,7 +1120,7 @@
 
           _this.changed = false
           _this.changes = []
-          _this.mapsvg.options.svgFileVersion++
+          _this.applySavedSvgVersion(data)
 
           _this.mapsvg.reloadRegions()
           _this.mapsvg.adjustStrokes()
@@ -1135,6 +1136,21 @@
           $("#mapsvg-save-svg").buttonLoading(false)
         })
     })
+  }
+  /**
+   * Persist the cache-buster returned by svgfile/update onto the in-memory map
+   * so later map saves do not write the pre-edit timestamp back to the DB,
+   * and so any same-session SVG reload uses a new ?version= query param.
+   *
+   * @param {{ svgFileLastChanged?: number|string }|null} data
+   */
+  MapSVGAdminDrawController.prototype.applySavedSvgVersion = function (data) {
+    var lastChanged =
+      data && data.svgFileLastChanged ? parseInt(data.svgFileLastChanged, 10) : 0
+    if (!lastChanged) {
+      lastChanged = Math.max(Math.floor(Date.now() / 1000), Number(this.mapsvg.svgFileLastChanged || 0) + 1)
+    }
+    this.mapsvg.setSvgFileLastChanged(Math.max(lastChanged, Number(this.mapsvg.svgFileLastChanged || 0)))
   }
   MapSVGAdminDrawController.prototype.close = function () {
     var _this = this

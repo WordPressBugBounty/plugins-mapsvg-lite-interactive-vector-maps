@@ -1,5 +1,5 @@
-import { Mapsvg } from "@/Core/InitGlobals"
-import { MapsvgFrontendParams } from "@/Core/Mapsvg"
+import { MapsvgClient } from "@/Core/InitGlobals"
+import { Mapsvg, MapsvgFrontendParams } from "@/Core/Mapsvg"
 import CodeMirror from "codemirror"
 import Handlebars from "handlebars/runtime"
 
@@ -25,11 +25,18 @@ export type MapSVGPaths = {
   home: string
 }
 
+// Core initialization exposes Mapsvg first, then installs the full browser client.
+// Legacy admin scripts populate countries; touchDevice is an optional legacy flag.
+type MapsvgBrowserGlobal = Mapsvg & Partial<MapsvgClient> & {
+  countries?: Array<{ label: string; value: string }>
+  touchDevice?: boolean
+}
+
 declare global {
   interface Window {
     mapsvgAdmin: any
     mapsvgFrontendParams: MapsvgFrontendParams
-    MapSVG: Mapsvg
+    MapSVG: MapsvgBrowserGlobal
     Handlebars: typeof Handlebars
     jQuery: JQueryStatic
     wp: any
@@ -42,7 +49,7 @@ declare global {
     google: google.maps.Map
     mapsvgInitGoogleMap: () => void
     CoreMirror: typeof CodeMirror
-    mapsvg: Mapsvg
+    mapsvg: MapsvgBrowserGlobal
     bootstrap: {
       Popover: any
     }

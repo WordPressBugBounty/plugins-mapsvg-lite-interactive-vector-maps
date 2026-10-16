@@ -10,7 +10,23 @@ export class MapsRepository extends Repository {
   encodeData(params: any): { [key: string]: any } {
     const data: { [key: string]: any } = {}
     if (typeof params.options !== "undefined") {
-      data.options = JSON.stringify(params.options)
+      // An ordinary settings save must not submit default or stored code for a restricted editor.
+      const options = { ...params.options }
+      if ((window as any).mapsvgBackendParams?.user?.canEditJavaScript === false) {
+        for (const key of [
+          "events",
+          "middlewares",
+          "onClick",
+          "mouseOver",
+          "mouseOut",
+          "menuOnClick",
+          "beforeLoad",
+          "afterLoad",
+        ]) {
+          delete options[key]
+        }
+      }
+      data.options = JSON.stringify(options)
 
       // Apache mod_sec blocks requests with the following words:
       // table, select, database. Encode those words to decode them later in PHP to prevent blocking:

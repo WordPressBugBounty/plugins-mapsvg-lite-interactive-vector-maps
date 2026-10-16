@@ -1,3 +1,4 @@
+import { textElement } from "@/Core/textElement"
 /**
  * FiltersController class adds filters for the database.
  * @param options
@@ -166,11 +167,13 @@ export class FiltersController extends DetailsController {
       const filtersCounter = Object.keys(this.query.filters).length
 
       const filtersCounterString = filtersCounter === 0 ? "" : filtersCounter.toString()
-      this.formBuilder &&
-        this.formBuilder.showFiltersButton &&
-        $(this.formBuilder.showFiltersButton.domElements.main)
-          .find("button")
-          .html(this.showButtonText + " <b>" + filtersCounterString + "</b>")
+      const button = this.formBuilder?.showFiltersButton?.domElements.main.querySelector("button")
+      if (button) {
+        button.replaceChildren(
+          document.createTextNode(this.showButtonText + " "),
+          textElement("b", "", filtersCounterString),
+        )
+      }
     }
   }
 

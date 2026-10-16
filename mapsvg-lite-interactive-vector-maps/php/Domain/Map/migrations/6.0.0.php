@@ -48,7 +48,7 @@ return function (&$map) {
                 $map["options"]['containers'][$map["options"]['menu']['location']] = ['on' => false, 'width' => "200px"];
             }
 
-            $map["options"]['containers'][$map["options"]['menu']['location']]['width'] = $map["options"]['menu']['width'];
+            $map["options"]['containers'][$map["options"]['menu']['location']]['width'] = $map["options"]['menu']['width'] ?? '200px';
 
             if (isset($map["options"]['menu']['on']) && (bool) $map["options"]['menu']['on']) {
                 $map["options"]['containers'][$map["options"]['menu']['location']]['on'] = true;
@@ -61,7 +61,7 @@ return function (&$map) {
     }
 
     // Fix Details View options
-    if (isset($map["options"]['detailsView']) && in_array($map["options"]['detailsView']['location'], ['mapContainer', 'near', 'top'])) {
+    if (isset($map["options"]['detailsView']['location']) && in_array($map["options"]['detailsView']['location'], ['mapContainer', 'near', 'top'])) {
         $map["options"]['detailsView']['location'] = "map";
     }
 

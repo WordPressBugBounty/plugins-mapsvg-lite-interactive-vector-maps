@@ -79,13 +79,31 @@ class SVGFile extends File
 		}
 	}
 
-	public function lastChanged()
+	/**
+	 * File mtime used as the SVG URL cache-buster.
+	 *
+	 * Clears PHP's stat cache so a write in this same request is visible.
+	 *
+	 * @return int
+	 */
+	public function lastChanged(): int
 	{
-		if (file_exists($this->serverPath)) {
-			return filemtime($this->serverPath);
-		} else {
-			return 0;
+		if (!empty($this->serverPath) && file_exists($this->serverPath)) {
+			clearstatcache(true, $this->serverPath);
+			return (int) filemtime($this->serverPath);
 		}
+		return 0;
+	}
+
+	/**
+	 * Integer SVG revision, compatible with the existing timestamp column.
+	 * Advance beyond the previous acknowledged revision even if mtime/time are unchanged.
+	 *
+	 * @return int
+	 */
+	public function cacheBuster(int $previous = 0): int
+	{
+		return max($this->lastChanged(), time(), $previous + 1);
 	}
 
 	/**

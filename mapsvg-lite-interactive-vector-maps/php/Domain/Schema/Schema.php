@@ -153,8 +153,7 @@ class Schema extends Model
 
 	private function getDefaultApiBaseUrl()
 	{
-		$base_url = trailingslashit(home_url());
-		return $base_url . 'wp-json/mapsvg/v1/';
+		return get_rest_url(null, 'mapsvg/v1/');
 	}
 
 
@@ -298,6 +297,25 @@ class Schema extends Model
 		}
 
 		return true;
+	}
+
+	/** Internal region fields are part of storage, even though absent from the editor. */
+	public function ensureInternalFields(): void
+	{
+		if ($this->type !== 'region') return;
+		$defaults = json_decode(file_get_contents(__DIR__ . '/../../Core/schema/region.json'), true);
+		foreach ($defaults['fields'] as $definition) {
+			if (empty($definition['protected']) || !isset($definition['visible']) || $definition['visible'] !== false) continue;
+			$found = false;
+			foreach ($this->fields as $index => $field) {
+				if ($field->name === $definition['name']) {
+					$this->fields[$index] = $this->formatField((object) $definition);
+					$found = true;
+					break;
+				}
+			}
+			if (!$found) $this->fields[] = $this->formatField((object) $definition);
+		}
 	}
 
 	public function getFieldsOptions()

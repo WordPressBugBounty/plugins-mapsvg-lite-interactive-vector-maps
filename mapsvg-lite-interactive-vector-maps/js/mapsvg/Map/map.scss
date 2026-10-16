@@ -960,7 +960,7 @@ iframe.mapsvg-iframe-post
 }
 
 .mapsvg-hidden {
-    display: none;
+    display: none !important;
 }
 .mapsvg-invisible {
     visibility: hidden;

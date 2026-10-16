@@ -621,35 +621,14 @@
 
   MapSVGAdminCsvController.prototype.viewLoaded = function () {
     MapSVGAdminController.prototype.viewLoaded.call(this)
-    if (!this._importSettingsLoaded) {
-      var _this = this
-      this.fetchImportSettings().always(function () {
-        _this._importSettingsLoaded = true
-        _this.redraw()
-        _this._finishCsvViewLoaded()
-      })
-      return
-    }
-    this._finishCsvViewLoaded()
+    
   }
 
   MapSVGAdminCsvController.prototype.fetchImportSettings = function () {
     var _this = this
-    if (this.database && typeof this.database.getImportSettings === "function") {
-      return this.database
-        .getImportSettings()
-        .done(function (settings) {
-          _this.importSettings = settings || {}
-        })
-        .fail(function () {
-          _this.importSettings = {}
-        })
-    }
-    var settingsRoute = "schemas/" + this.schema.id + "/import-settings"
-    return this.server.get(settingsRoute).done(function (body) {
-      var settings = (body && body.importSettings) || {}
-      _this.importSettings = settings
-    })
+    _this.importSettings = {}
+return $.Deferred().resolve(_this.importSettings).promise()
+    
   }
 
   MapSVGAdminCsvController.prototype.saveImportSettings = function (fields) {
@@ -1174,9 +1153,8 @@
       gsGeocodeConvertAddressToLatLng: _this._$fe("OptAddressToLatlng").is(":checked") ? 1 : 0,
       gsPaidGeocoding: _this._$fe("OptPaidGeocoding").is(":checked") ? 1 : 0,
     }
-    var $idField = _this._$fe("IdField")
-    if (source === "remote" && $idField.length) {
-      fields.gsIdFieldName = $idField.val() || ""
+    if (source === "remote") {
+      fields.gsIdFieldName = _this.getSelectedIdFieldName("remote")
     }
 
     if (source === "remote") {
@@ -1245,7 +1223,8 @@
     _this.setImportProgress("Importing…")
 
     var useGeocode = _this._$fe("Geocode").is(":checked")
-    var selectedId = _this._$fe("IdField").length ? _this._$fe("IdField").val() || "" : ""
+    // Continue commits the mapping; the hidden select can contain an unconfirmed edit.
+    var selectedId = _this.getSelectedIdFieldName("remote")
     var preflightPayload = { csvUrl: url, idFieldName: selectedId }
     var convertLatlngToAddress =
       useGeocode && _this._$fe("OptLatlngToAddress").is(":checked") ? 1 : 0

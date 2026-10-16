@@ -20,7 +20,7 @@ class SchemaController extends Controller
 		}
 
 		$settings = ImportSettingsService::getForSchema($schema);
-		return self::render(['importSettings' => $settings], 200);
+		return self::render(['importSettings' => ImportSettingsService::forResponse($settings)], 200);
 	}
 
 	/**
@@ -73,7 +73,7 @@ class SchemaController extends Controller
 
 		$settings = ImportSettingsService::updateForSchema($schema, $payload);
 		GoogleSheetSync::syncCronAfterImportSettingsChange($schema);
-		return self::render(['importSettings' => $settings], 200);
+		return self::render(['importSettings' => ImportSettingsService::forResponse($settings)], 200);
 	}
 
 	/**
@@ -93,7 +93,7 @@ class SchemaController extends Controller
 		$repo = ImportSettingsService::repo();
 		$settings = ImportSettingsService::updateForSchema($schema, $repo->defaultPayloadForSchema($schema));
 		GoogleSheetSync::syncCronAfterImportSettingsChange($schema);
-		return self::render(['importSettings' => $settings], 200);
+		return self::render(['importSettings' => ImportSettingsService::forResponse($settings)], 200);
 	}
 
 	/**
@@ -122,7 +122,11 @@ class SchemaController extends Controller
 		if (!isset($request['schema'])) {
 			return new \WP_REST_Response(["data" => ["error" => "Schema is required"]], 400);
 		}
-		$data = static::formatReceivedData($request['schema']);
+		try {
+			$data = SchemaSqlDefinition::input(static::formatReceivedData($request['schema']));
+		} catch (\InvalidArgumentException $e) {
+			return self::render(['error' => $e->getMessage()], 400);
+		}
 		$schemaRepository = RepositoryFactory::get("schema");
 
 		// Sanitize objectNamePlural into a MySQL-safe table name suffix
@@ -152,19 +156,13 @@ class SchemaController extends Controller
 		}
 
 		$response = array();
-		$response['schema'] = $schemaRepository->create($data);
-
-
-		if ($data["type"] === "post") {
-			$post_types = Options::get("mappable_post_types") ?? [];
-
-			$post_type = $data["postType"];
-
-			if (!in_array($post_type, $post_types)) {
-				$post_types[] = $post_type;
-				Options::set("mappable_post_types", $post_types);
-			}
+		try {
+			$response['schema'] = $schemaRepository->create($data);
+		} catch (\InvalidArgumentException $e) {
+			return self::render(['error' => $e->getMessage()], $e->getCode() ?: 400);
 		}
+
+		MappablePostTypes::syncOption();
 
 		return self::render($response, 200);
 	}
@@ -178,7 +176,7 @@ class SchemaController extends Controller
 	 */
 	private static function sanitizeSchemaName($raw): ?string
 	{
-		if ($raw === null || $raw === '') {
+		if (!is_string($raw) || $raw === '') {
 			return null;
 		}
 
@@ -199,7 +197,11 @@ class SchemaController extends Controller
 	public static function update($request)
 	{
 		$schemaRepository = RepositoryFactory::get("schema");
-		$data = static::formatReceivedData($request['schema']);
+		try {
+			$data = SchemaSqlDefinition::input(static::formatReceivedData($request['schema']));
+		} catch (\InvalidArgumentException $e) {
+			return self::render(['error' => $e->getMessage()], 400);
+		}
 
 		// if (isset($data['objectNamePlural'])) {
 		// 	// Replace dashes with underscores in the table name
@@ -209,7 +211,14 @@ class SchemaController extends Controller
 		// don't allow changing the name during update
 		unset($data['name']);
 
-		$schemaRepository->update($data);
+		$data['id'] = (int)$request['id'];
+		try {
+			$schemaRepository->update($data);
+		} catch (\InvalidArgumentException $e) {
+			return self::render(['error' => $e->getMessage()], $e->getCode() ?: 400);
+		}
+
+		MappablePostTypes::syncOption();
 
 		return self::render([], 200);
 	}
@@ -234,31 +243,13 @@ class SchemaController extends Controller
 			return new \WP_REST_Response(["data" => ["error" => "Region data sources cannot be deleted"]], 403);
 		}
 
-		if ($schema->type === "post" && !empty($schema->postType)) {
-			$db = Database::get();
-			$schemaTable = $db->mapsvg_prefix . 'schema';
-			$stillUsed = (int) $db->get_var(
-				$db->prepare(
-					"SELECT COUNT(*) FROM `{$schemaTable}` WHERE `postType` = %s AND `id` != %d",
-					$schema->postType,
-					$schemaId
-				)
-			);
-			if ($stillUsed === 0) {
-				$postTypes = Options::get("mappable_post_types") ?? [];
-				$postType = $schema->postType;
-				$postTypes = array_values(array_filter($postTypes, function ($type) use ($postType) {
-					return $type !== $postType;
-				}));
-				Options::set("mappable_post_types", $postTypes);
-			}
-		}
-
 		if (!empty($schema->name)) {
 			GoogleSheetSync::clearForSchema($schema->name);
 		}
 
 		$schemaRepository->delete($schemaId);
+
+		MappablePostTypes::syncOption();
 
 		return self::render([], 200);
 	}

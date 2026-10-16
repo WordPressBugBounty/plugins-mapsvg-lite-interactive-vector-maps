@@ -362,7 +362,7 @@ class Repository implements JsonSerializable
 					try {
 						$objectFormatted = $this->decodeParams($object);
 						$items[] = $objectFormatted;
-					} catch (\Exception $e) {
+					} catch (\Throwable $e) {
 						Logger::error("[SERVER-017] " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-017");
 					}
 				}

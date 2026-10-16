@@ -61,6 +61,7 @@
         },
       },
       mode: "javascript",
+      readOnly: window.mapsvgBackendParams?.user?.canEditJavaScript === false,
       matchBrackets: true,
       lineNumbers: true,
       gutters: ["CodeMirror-lint-markers"],

@@ -14,6 +14,7 @@ For **database DDL** (e.g. `import_settings`, dropping `gs*` from `schema`), fol
 | `CsvRowParser.php` | Maps each CSV row (header → string) to DB columns using **field-type parsers** in registration order; first `supports()` wins, else `DefaultFieldParser`. |
 | `FieldParser/*.php` | Type-specific parsing (`location`, `select`, `region`, `image`, dates, etc.). Implement `FieldParserInterface`. |
 | `CsvImportJob.php` | Background job state in **WordPress transients** (`mapsvg_csv_job_*`), TTL ~24h: `pending` → `processing` → `complete` \| `failed`. |
+| `CsvUpload.php` | Shared multipart CSV/TXT validation and random server-generated `.csv` filenames for uploaded and remote temporary files. |
 
 Extension hooks:
 
@@ -25,7 +26,7 @@ Extension hooks:
 ## End-to-end flow (admin CSV upload / URL)
 
 1. **Preflight (optional but recommended for large files)** — `CollectionController::preflightCsv()`  
-   - Saves CSV under `MAPSVG_UPLOADS_DIR/csv/` (`preflight_*` or `preflight_url_*`).  
+   - Validates multipart CSV/TXT uploads before saving and stores uploaded/remote files under `MAPSVG_UPLOADS_DIR/csv/csv_<random>.csv`. Legacy `preflight_*` files can still be cleaned or consumed when their real paths are valid.
    - `CsvImporter::initialize()` gets delimiter, headers, row count, data byte offset.  
    - `validateCsvIds()` scans **the full file** on the server (empty IDs, duplicates, numeric vs string profile).  
    - `ImportSettingsService::savePreflight()` writes a token + file path + hash + JSON **`preflightMeta`** on the `import_settings` row (hybrid: indexed columns + JSON blob).  
@@ -85,6 +86,7 @@ All **`gs*`** sync/import settings and **preflight** columns live in **`import_s
 - `php/Domain/ImportSettings/*` — persistence and preflight lifecycle.
 
 Frontend behavior (preflight modal, import-settings API) is documented separately under `js/mapsvg-admin/modules/csv/AGENTS.md` (DOM ID prefixing and tab isolation).
+REST access, upload types, private file metadata and cleanup invariants are documented in [CSV preflight security](../../../docs/csv-preflight-security.md).
 
 ---
 
