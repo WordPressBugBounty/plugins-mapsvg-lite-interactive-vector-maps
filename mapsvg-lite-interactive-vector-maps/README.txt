@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: map, store locator, google maps, floorplan, image map
 Requires at least: 5.0
 Tested up to: 7.0.1
-Stable tag: 8.16.2
+Stable tag: 8.16.3
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -138,6 +138,10 @@ MapSVG Premium has an embedded CSV editor, which makes style editing more comfor
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 8.16.3 =
+* **Site stability**: Fixed site-wide fatal error after updating to 8.16.2 on some sites.
+* **Database migration**: The database migration is more robust and no longer retries on every request after a failure.
 
 = 8.16.2 =
 * **Security**: Several security-related fixes.

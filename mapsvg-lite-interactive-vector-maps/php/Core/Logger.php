@@ -19,6 +19,9 @@ class Logger
 
 	private static bool $isFinalized = false;
 
+	/** @var bool Clockwork boot deferred until the init hook. */
+	private static $clockworkBootScheduled = false;
+
 	private static function clockworkEnabled()
 	{
 		return self::$clockwork;
@@ -31,15 +34,75 @@ class Logger
 	 */
 	public static function init($params)
 	{
-
-		$canLog = defined('MAPSVG_DEBUG') && MAPSVG_DEBUG;
-
 		self::$clockwork = null;
 		
 
 		if ($params["logToFile"]) {
 			self::$logToFile = true;
 		}
+	}
+
+	/**
+	 * Start Clockwork once its REST URL can be built.
+	 *
+	 * checkDebugMode() calls Logger::init() while the plugin file is loading, before
+	 * WordPress creates $wp_rewrite. Pretty permalinks make get_rest_url() fatal at
+	 * that point, so boot waits for the init hook. Plain permalinks are safe immediately.
+	 *
+	 * @return void
+	 */
+	public static function bootClockwork()
+	{
+		if (self::$clockwork) {
+			return;
+		}
+
+		if (!Schema::canResolveRestUrl()) {
+			self::scheduleClockworkBoot();
+			return;
+		}
+
+		$db = Database::get();
+
+		try {
+			$host = $db->dbhost;
+			$portWithParameterName = "";
+			if (strpos($db->dbhost, ':') !== false) {
+				list($hostPart, $port) = explode(':', $db->dbhost);
+				$portWithParameterName = "port={$port};";
+				$host = $hostPart;
+			}
+			self::$clockwork = CustomClockwork::init([
+				'enable' => true,
+				'api'              => Schema::resolveRestUrl('mapsvg/v1/clockwork/'),
+				'register_helpers' => true,
+				'storage' => 'sql',
+				'storage_sql_database' => "mysql:host={$host};{$portWithParameterName}dbname={$db->dbname};charset=utf8mb4",
+				'storage_sql_table' => $db->mapsvg_prefix . 'clockwork',
+				'storage_sql_username' => $db->dbuser,
+				'storage_sql_password' => $db->dbpassword,
+				'authentication'   => "\MapSVG\LoggerAuth"
+			]);
+		} catch (\Throwable $e) {
+			if (defined('WP_DEBUG') && WP_DEBUG) {
+				// phpcs:disable WordPress.PHP.DevelopmentFunctions
+				error_log("Failed to initialize Clockwork: " . $e->getMessage());
+				// phpcs:enable
+			}
+			self::$clockwork = null;
+		}
+	}
+
+	/**
+	 * @return void
+	 */
+	private static function scheduleClockworkBoot()
+	{
+		if (self::$clockworkBootScheduled || !function_exists('add_action')) {
+			return;
+		}
+		self::$clockworkBootScheduled = true;
+		add_action('init', array(__CLASS__, 'bootClockwork'), 0);
 	}
 
 	/**

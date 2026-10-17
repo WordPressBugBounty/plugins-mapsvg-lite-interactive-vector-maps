@@ -62,7 +62,7 @@ class Front
 		wp_localize_script('mapsvg', 'mapsvgFrontendParams', array(
 			'routes' => array(
 				'root'      => MAPSVG_PLUGIN_RELATIVE_URL,
-				'api' => get_rest_url(null, 'mapsvg/v1/'),
+				'api' => Schema::resolveRestUrl('mapsvg/v1/'),
 				'templates' => MAPSVG_PLUGIN_RELATIVE_URL . 'js/mapsvg-admin/templates/',
 				'maps'      => wp_parse_url(MAPSVG_MAPS_URL, PHP_URL_PATH),
 				'uploads'   => wp_parse_url(MAPSVG_UPLOADS_URL, PHP_URL_PATH),

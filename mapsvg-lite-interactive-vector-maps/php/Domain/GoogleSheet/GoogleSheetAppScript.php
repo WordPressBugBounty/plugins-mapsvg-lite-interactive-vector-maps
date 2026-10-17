@@ -190,7 +190,7 @@ class GoogleSheetAppScript
     public static function buildSyncUrl(string $collection, string $schemaName): string
     {
         $route = 'mapsvg/v1/' . $collection . '/' . $schemaName . '/sync';
-        $rest_url = get_rest_url(null, $route);
+        $rest_url = Schema::resolveRestUrl($route);
 
         if (defined('MAPSVG_REST_BASE_URL')) {
             $site_url = get_option('siteurl');

@@ -18,10 +18,18 @@ class Upgrade
     }
 
     /**
-     * Checks the mapsvg version and upgrades it if necessary
+     * Checks the mapsvg version and upgrades it if necessary.
+     *
+     * A failed migration is logged and paused for one hour. db_version stays
+     * put so the repair can run again. The pause is keyed to MAPSVG_VERSION,
+     * so a newer release is not blocked by an older failure. ?dbUpgrade= on
+     * an admin request bypasses the pause.
      */
     function run()
     {
+        if (!$this->isForcedDbUpgrade() && $this->migrationBackoffActive()) {
+            return;
+        }
 
         $dbVersion = $this->isSettingsTableExists() ? Options::get('db_version') : '1.0.0';
 
@@ -31,22 +39,79 @@ class Upgrade
 
         // Check if the current map version is outdated
         if (is_null($dbVersion) || version_compare($dbVersion, MAPSVG_VERSION, '<')) {
-            // Get all migration files with version numbers higher than the current version
-            $migrations = $this->getPendingMigrations($dbVersion);
+            $this->applyPendingMigrations($this->getPendingMigrations($dbVersion));
+        }
+    }
 
-
-            // Apply each migration to the map options
-            foreach ($migrations as $migrationFile) {
-                try {
-                    $this->applyMigration($migrationFile);
-                } catch (\Exception $e) {
-                    // Optionally log the error or handle it as needed
-                    Logger::error("[SERVER-005] Migration failed: " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-005");
-                    break;
-                }
+    /**
+     * Run pending migrations. On failure, log and pause instead of advancing db_version.
+     *
+     * @param array<string, string> $migrations Version => absolute path.
+     * @return bool True when every migration finished.
+     */
+    public function applyPendingMigrations(array $migrations)
+    {
+        foreach ($migrations as $migrationFile) {
+            try {
+                $this->applyMigration($migrationFile);
+            } catch (\Throwable $e) {
+                Logger::error("[SERVER-005] Migration failed: " . get_class($e) . ': ' . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-005");
+                $this->pauseMigrationsAfterFailure();
+                return false;
             }
+        }
 
-            Options::set('db_version', MAPSVG_VERSION);
+        Options::set('db_version', MAPSVG_VERSION);
+        $this->clearMigrationBackoff();
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    private function isForcedDbUpgrade()
+    {
+        return function_exists('is_admin') && is_admin() && isset($_GET['dbUpgrade']);
+    }
+
+    /**
+     * @return string
+     */
+    private function migrationBackoffKey()
+    {
+        return 'mapsvg_migration_backoff_' . MAPSVG_VERSION;
+    }
+
+    /**
+     * @return bool
+     */
+    private function migrationBackoffActive()
+    {
+        if (!function_exists('get_transient')) {
+            return false;
+        }
+        return (bool) get_transient($this->migrationBackoffKey());
+    }
+
+    /**
+     * @return void
+     */
+    private function pauseMigrationsAfterFailure()
+    {
+        if (!function_exists('set_transient')) {
+            return;
+        }
+        $ttl = defined('HOUR_IN_SECONDS') ? (int) HOUR_IN_SECONDS : 3600;
+        set_transient($this->migrationBackoffKey(), time(), $ttl);
+    }
+
+    /**
+     * @return void
+     */
+    private function clearMigrationBackoff()
+    {
+        if (function_exists('delete_transient')) {
+            delete_transient($this->migrationBackoffKey());
         }
     }
 

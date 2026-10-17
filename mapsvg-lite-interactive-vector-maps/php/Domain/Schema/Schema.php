@@ -153,7 +153,54 @@ class Schema extends Model
 
 	private function getDefaultApiBaseUrl()
 	{
-		return get_rest_url(null, 'mapsvg/v1/');
+		return self::resolveRestUrl('mapsvg/v1/');
+	}
+
+	/**
+	 * REST URL that does not call rewrite-dependent APIs before $wp_rewrite exists.
+	 *
+	 * With pretty permalinks, get_rest_url() calls $wp_rewrite->using_index_permalinks().
+	 * WordPress creates that object after plugin files are included, so a call during
+	 * plugin load is a fatal error. Plain permalinks never touch $wp_rewrite.
+	 *
+	 * @param string $path Route relative to the REST namespace, slashes optional.
+	 * @return string
+	 */
+	public static function resolveRestUrl($path)
+	{
+		$path = ltrim((string) $path, '/');
+		if (self::canResolveRestUrl()) {
+			return get_rest_url(null, $path);
+		}
+
+		$home = function_exists('home_url') ? home_url('/') : '/';
+		return rtrim($home, '/') . '/wp-json/' . $path;
+	}
+
+	/**
+	 * Whether get_rest_url() can run without an uninitialized $wp_rewrite.
+	 *
+	 * @return bool
+	 */
+	public static function canResolveRestUrl()
+	{
+		global $wp_rewrite;
+
+		if (is_object($wp_rewrite)) {
+			return function_exists('get_rest_url');
+		}
+
+		// Direct tests stub get_rest_url() and do not boot WordPress.
+		if (!function_exists('get_option')) {
+			return function_exists('get_rest_url') || function_exists(__NAMESPACE__ . '\\get_rest_url');
+		}
+
+		// Non-empty permalink_structure takes the $wp_rewrite branch inside get_rest_url().
+		if (!empty(get_option('permalink_structure'))) {
+			return false;
+		}
+
+		return function_exists('get_rest_url') || function_exists(__NAMESPACE__ . '\\get_rest_url');
 	}
 
 
