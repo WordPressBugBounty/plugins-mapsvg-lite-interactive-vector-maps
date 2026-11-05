@@ -3,6 +3,12 @@
   "primaryKeyField": "id",
   "objectNameSingular": "region",
   "objectNamePlural": "regions",
+  "bindings": {
+    "svg": {
+      "match": "elementId",
+      "source": "primaryKey"
+    }
+  },
   "apiEndpoints": [
     { "url": "regions/%name%", "method": "GET", "name": "index" },
     { "url": "regions/%name%/[:id]", "method": "GET", "name": "show" },

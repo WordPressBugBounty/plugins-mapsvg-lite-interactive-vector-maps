@@ -1,0 +1,287 @@
+{
+  "source_commit": "23d4574d8c11f8cc3af1d950020e99f3cd9298f9",
+  "options": {
+    "containers": {
+      "leftSidebar": {
+        "on": false,
+        "width": "250px"
+      },
+      "rightSidebar": {
+        "on": false,
+        "width": "250px"
+      },
+      "header": {
+        "on": true,
+        "height": "auto"
+      },
+      "footer": {
+        "on": false,
+        "height": "auto"
+      }
+    },
+    "menu": {
+      "on": false,
+      "hideOnMobile": true,
+      "location": "leftSidebar",
+      "locationMobile": "leftSidebar",
+      "search": false,
+      "containerId": "",
+      "searchPlaceholder": "Search...",
+      "searchFallback": false,
+      "source": "database",
+      "showFirst": "map",
+      "showMapOnClick": true,
+      "minHeight": "400",
+      "sortBy": "id",
+      "sortDirection": "desc",
+      "categories": {
+        "on": false,
+        "groupBy": "",
+        "hideEmpty": true,
+        "collapse": true,
+        "collapseOther": true
+      },
+      "clickActions": {
+        "region": "default",
+        "marker": "default",
+        "directoryItem": {
+          "triggerClick": true,
+          "showPopover": false,
+          "showDetails": true
+        }
+      },
+      "detailsViewLocation": "overDirectory",
+      "noResultsText": "No results found",
+      "filterout": {
+        "field": "",
+        "cond": "=",
+        "val": ""
+      }
+    },
+    "filters": {
+      "on": true,
+      "source": "database",
+      "location": "header",
+      "modalLocation": "map",
+      "width": "100%",
+      "hide": false,
+      "showButtonText": "Filters",
+      "clearButtonText": "Clear all",
+      "clearButton": false,
+      "searchButton": false,
+      "searchButtonText": "Search",
+      "padding": ""
+    },
+    "detailsView": {
+      "location": "map",
+      "containerId": "",
+      "width": "100%",
+      "mobileFullscreen": true
+    },
+    "mobileView": {
+      "labelMap": "Map",
+      "labelList": "List",
+      "labelClose": "Close"
+    },
+    "actions": {
+      "map": {
+        "afterLoad": {
+          "selectRegion": true,
+          "selectMarker": true,
+          "loadPost": false
+        }
+      },
+      "region": {
+        "mouseover": {
+          "showTooltip": false,
+          "tooltipTemplate": "title"
+        },
+        "click": {
+          "addIdToUrl": false,
+          "showDetails": true,
+          "showDetailsFor": "region",
+          "detailsViewTemplate": "detailsViewRegion",
+          "filterDirectory": false,
+          "loadObjects": false,
+          "showPopover": false,
+          "showPopoverFor": "region",
+          "popoverTemplate": "default",
+          "goToLink": false,
+          "linkField": "Region.link"
+        },
+        "touch": {
+          "showPopover": false
+        }
+      },
+      "marker": {
+        "mouseover": {
+          "showTooltip": false,
+          "tooltipTemplate": "address"
+        },
+        "click": {
+          "addIdToUrl": false,
+          "showDetails": true,
+          "detailsViewTemplate": "default",
+          "showPopover": false,
+          "popoverTemplate": "default",
+          "goToLink": false,
+          "linkField": "Object.link"
+        },
+        "touch": {
+          "showPopover": false
+        }
+      },
+      "directoryItem": {
+        "click": {
+          "showDetails": true,
+          "detailsViewTemplate": "default",
+          "showPopover": false,
+          "goToLink": false,
+          "selectRegion": true,
+          "fireRegionOnClick": true,
+          "linkField": "Object.link"
+        },
+        "hover": {
+          "centerOnMarker": false
+        }
+      }
+    },
+    "templates": {
+      "list": "<div class=\"mapsvg-details-list\">\n            {{#each objects}}\n          <div class=\"mapsvg-details-list-item\">\n                  <div class=\"mapsvg-details-list-item-image\">\n                    <img src=\"{{images.0.thumbnail}}\" />\n                  </div>\n                <div class=\"mapsvg-details-list-item-info\">    m\t      \n                    <h6>{{title}}</h6>\n                    <p class=\"mapsvg-details-address\">{{location.address.formatted}}</p>   \n              <p class=\"mapsvg-details-category\">{{category_text}}</p>                                   \n                    <p>{{description}}</p>  \n                <div class=\"mapsvg-details-link\"><a href=\"{{link}}\">{{link}}</a></div>              \n                  </div>\t            \n              </div>\n            {{/each}}\n          </div>",
+      "default": "<div class=\"mapsvg-details-flex\">\n        \n        <div class=\"mapsvg-details-hero\">\n          <img src=\"{{images.0.full}}\" class=\"mapsvg-details-hero-image\"/>\n        </div>\n        <div class=\"mapsvg-details-info\">\n          <h4 class=\"mapsvg-details-header\">{{#if title}} {{title}} {{else}} {{id}} {{/if}}</h4>\n          {{description}}\n        </div>\n      </div>    \n    ",
+      "description": "<div class=\"mapsvg-details-info\">\n          <h4 class=\"mapsvg-details-header\">{{#if title}} {{title}} {{else}} {{id}} {{/if}}</h4>\n          <div class=\"mapsvg-details-description\">{{{description}}}</div>\n        </div>",
+      "post": "{{{post}}}",
+      "title": "{{title}}",
+      "imageTitle": "<div class=\"mapsvg-imageTitle-content\">\n  <div class=\"mapsvg-imageTitle-image\">\n    <img src=\"{{images.0.thumbnail}}\" />\n  </div>\n  <div class=\"mapsvg-imageTitle-title\">    \t      \n    {{title}}                                  \n  </div>\t            \n</div>",
+      "address": "{{#if location.address.formatted}}\n        {{location.address.formatted}}\n      {{else}}\n        {{#if location.geoPoint.lat}}\n          {{location.geoPoint.lat}}, {{location.geoPoint.lng}}\n        {{/if}}\n      {{/if}}",
+      "popoverRegion": "<div>\n  <p>This is the demo content of the <strong>Region Popover</strong>.</p>\n  <p>How to edit it: if you are in mapsvg control panel now, click on the following link to open the template editor for this view: <a href=\"#\" class=\"mapsvg-template-link\" data-template=\"popoverRegion\">Menu > Templates > Region Popover</a>.</p>\n  <p>More information about templates: <a href=\"https://mapsvg.com/docs/map-editor/templates\" target=\"_blank\">mapsvg.com/docs/map-editor/templates</a></p>\n</div>\n<hr />\n\n<!-- Region fields are available in this template -->\n<h5>{{#if title}} {{title}} {{else}} {{id}} {{/if}}</h5>\n<p>Status: {{status_text}}</p>\n\n<!-- Show all linked Database Objects: -->\n{{#each objects}}\n\n  <!-- DB Object are available inside of this block -->\n\n  <h5>{{title}}</h5>\n  <!-- When you need to render a field as HTML, use 3 curly braces instead of 2:-->\n  <p>{{{description}}}</p>\n  <p><em>{{location.address.formatted}}</em></p>\n\n  <!-- Show all images: -->\n  {{#each images}}\n    <!-- Image fields \"thumbnail\", \"medium\", \"full\" -->\n    <!-- are available in this block                -->\n    <img src=\"{{thumbnail}}\" />\n  {{/each}}\n\n{{/each}}",
+      "popoverMarker": "<div>\n  <p>This is the demo content of the <strong>DB Object Popover</strong>.</p>\n  <p>How to edit it: if you are in mapsvg control panel now, click on the following link to open the template editor for this view: <a href=\"#\" class=\"mapsvg-template-link\" data-template=\"popover\">Menu > Templates > DB Object Popover</a>.</p>\n  <p>More information about templates: <a href=\"https://mapsvg.com/docs/map-editor/templates\" target=\"_blank\">mapsvg.com/docs/map-editor/templates</a></p>\n</div>\n<hr />\n\n<!-- DB Object fields are available in this template. -->\n<h5>{{title}}</h5>\n<!-- When you need to render a fields as HTML, use 3 curly braces instead of 2:-->\n<p>{{{description}}}</p>\n<p><em>{{location.address.formatted}}</em></p>\n\n<!-- Show all images: -->\n{{#each images}}\n  <!-- Image fields \"thumbnail\", \"medium\", \"full\" -->\n  <!-- are available in this block                -->\n  <img src=\"{{thumbnail}}\" />\n{{/each}}\n\n<!-- Show all linked Regions, comma-separated: -->\n<p> Regions: \n  {{#each regions}}\n    <!-- Region fields are available in this block -->\n    {{#if title}}\n      {{title}}\n    {{else}}\n      {{id}}\n    {{/if}}{{#unless @last}}, {{/unless}}\n  {{/each}}\n</p>",
+      "tooltipRegion": "{{id}} - {{title}}",
+      "tooltipMarker": "{{title}}",
+      "detailsView": "<div>\n  <p>This is the demo content of the <strong>DB Object Details View</strong>.</p>\n  <p>How to edit it: if you are in mapsvg control panel now, click on the following link to open the template editor for this view: <a href=\"#\" class=\"mapsvg-template-link\" data-template=\"detailsView\">Menu > Templates > DB Object Details View</a>.</p>\n  <p>More information about templates: <a href=\"https://mapsvg.com/docs/map-editor/templates\" target=\"_blank\">mapsvg.com/docs/map-editor/templates</a></p>\n</div>\n<hr />\n\n<!-- DB Object fields are available in this template. -->\n<h5>{{title}}</h5>\n<!-- When you need to render a fields as HTML, use 3 curly braces instead of 2:-->\n<p>{{{description}}}</p>\n<p><em>{{location.address.formatted}}</em></p>\n\n<!-- Show all images: -->\n{{#each images}}\n  <!-- Image fields \"thumbnail\", \"medium\", \"full\" -->\n  <!-- are available in this block                -->\n  <img src=\"{{thumbnail}}\" />\n{{/each}}\n\n<!-- Show all linked Regions, comma-separated: -->\n<p> Regions: \n  {{#each regions}}\n    <!-- Region fields are available in this block -->\n    {{#if title}}\n      {{title}}\n    {{else}}\n      {{id}}\n    {{/if}}{{#unless @last}}, {{/unless}}\n  {{/each}}\n</p>",
+      "detailsViewRegion": "<div>\n  <p>This is the demo content of the <strong>Region Details View</strong>.</p>\n  <p>How to edit it: if you are in mapsvg control panel now, click on the following link to open the template editor for this view: <a href=\"#\" class=\"mapsvg-template-link\" data-template=\"detailsViewRegion\">Menu > Templates > Region Details View</a>.</p>\n  <p>More information about templates: <a href=\"https://mapsvg.com/docs/map-editor/templates\" target=\"_blank\">mapsvg.com/docs/map-editor/templates</a></p>\n</div>\n<hr />\n\n<!-- Region fields are available in this template -->\n<h5>{{#if title}} {{title}} {{else}} {{id}} {{/if}}</h5>\n<p>Status: {{status_text}}</p>\n\n<!-- Show all linked Database Objects: -->\n{{#each objects}}\n\n  <!-- DB Object are available inside of this block -->\n\n  <h5>{{title}}</h5>\n  <!-- When you need to render a field as HTML, use 3 curly braces instead of 2:-->\n  <p>{{{description}}}</p>\n  <p><em>{{location.address.formatted}}</em></p>\n\n  <!-- Show all images: -->\n  {{#each images}}\n    <!-- Image fields \"thumbnail\", \"medium\", \"full\" -->\n    <!-- are available in this block                -->\n    <img src=\"{{thumbnail}}\" />\n  {{/each}}\n\n{{/each}}",
+      "labelMarker": "{{#if location.address.formatted}}\n        {{location.address.formatted}}\n      {{else}}\n        {{#if location.geoPoint.lat}}\n          {{location.geoPoint.lat}}, {{location.geoPoint.lng}}\n        {{/if}}\n      {{/if}}",
+      "labelRegion": "{{title}}",
+      "labelLocation": "You are here!",
+      "directory": "{{#if categories}}\n  {{#each categories}}\n    {{>directoryCategoryItem}}\n  {{/each}}\n{{else}}  \n  {{#each items}}\n      {{>directoryItem}}      \n  {{/each}}\n  {{#unless items.length}}\n    <div class=\"mapsvg-no-results\">{{noResultsLabel}}</div>\n  {{/unless}}\n{{/if}}",
+      "directoryItem": "<div id=\"mapsvg-directory-item-{{toSnakeCase id}}\" class=\"mapsvg-directory-item\" data-object-id=\"{{id}}\">\n  {{title}} \n</div>",
+      "directoryCategoryItem": "<div id=\"mapsvg-category-item-{{value}}\" class=\"mapsvg-category-item\" data-category-value=\"{{value}}\">\n  <span class=\"mapsvg-category-label\">{{label}}</span>\n  <span class=\"mapsvg-category-counter\">{{counter}}</span>\n  <span class=\"mapsvg-chevron\"></span>\n</div>\n<div class=\"mapsvg-category-block\" data-category-id=\"{{value}}\">\n  {{#each items}}\n    {{>directoryItem}}\n  {{/each}}  \n</div>    \n    "
+    },
+    "tooltips": {
+      "on": false,
+      "position": "bottom-right",
+      "template": "",
+      "maxWidth": "",
+      "minWidth": 100
+    },
+    "popovers": {
+      "on": false,
+      "position": "top",
+      "template": "",
+      "centerOn": true,
+      "width": 300,
+      "maxWidth": 50,
+      "maxHeight": 50
+    },
+    "controls": {
+      "location": "right",
+      "zoom": true,
+      "zoomReset": false,
+      "userLocation": false,
+      "previousMap": false
+    },
+    "layersControl": {
+      "on": false,
+      "position": "top-left",
+      "label": "Show on map",
+      "expanded": true,
+      "maxHeight": "100%"
+    },
+    "choropleth": {
+      "on": false,
+      "source": "regions",
+      "sourceFieldSelect": {
+        "on": false,
+        "variants": []
+      },
+      "bubbleMode": false,
+      "bubbleSize": {
+        "min": 20,
+        "max": 40
+      },
+      "labels": {
+        "low": "low",
+        "high": "high"
+      },
+      "colors": {
+        "lowRGB": null,
+        "highRGB": null,
+        "low": "#550000",
+        "high": "#ee0000",
+        "noData": "#333333"
+      },
+      "min": 0,
+      "max": 0,
+      "coloring": {
+        "mode": "gradient",
+        "noData": {
+          "color": "#999999",
+          "description": "No data"
+        },
+        "gradient": {
+          "colors": {
+            "lowRGB": null,
+            "highRGB": null,
+            "diffRGB": null,
+            "low": "#550000",
+            "high": "#ee0000"
+          },
+          "labels": {
+            "low": "low",
+            "high": "high"
+          },
+          "values": {
+            "min": null,
+            "max": null,
+            "maxAdjusted": null
+          }
+        },
+        "palette": {
+          "outOfRange": {
+            "color": "#ececec",
+            "description": "Out of range"
+          },
+          "colors": [
+            {
+              "color": "#550000",
+              "valueFrom": 0,
+              "valueTo": 50,
+              "description": ""
+            }
+          ]
+        },
+        "legend": {
+          "on": true,
+          "layout": "vertical",
+          "container": "bottom-left",
+          "title": "Choropleth map",
+          "text": "",
+          "description": "",
+          "width": "20%",
+          "height": "20%"
+        }
+      }
+    },
+    "database": {
+      "on": true,
+      "loadOnStart": true,
+      "pagination": {
+        "on": true,
+        "perpage": 30,
+        "next": "Next",
+        "prev": "Prev.",
+        "showIn": "both"
+      }
+    }
+  }
+}

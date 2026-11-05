@@ -15,7 +15,6 @@ class MapsRepository extends Repository
 	{
 		parent::__construct($schema);
 		$this->updater = new MapUpdater();
-		$this->db = Database::get();
 	}
 
 
@@ -23,11 +22,6 @@ class MapsRepository extends Repository
 	 * Returns table name for the ObjectDynamic
 	 * @return string
 	 */
-	public function getTableName()
-	{
-		return $this->db->mapsvg_prefix . "maps";
-	}
-
 	/**
 	 * Returns short table name for the ObjectDynamic
 	 * @return string
@@ -81,6 +75,17 @@ class MapsRepository extends Repository
 		return $this->newObject($data);
 	}
 
+	protected function createObjectFromV2PublicData(array $data)
+	{
+		$this->updater->maybeUpdate($data);
+		// A projected row has no options; v2 may supply an empty default SVG path.
+		// Do not construct SVGFile from that placeholder in the sidebar list.
+		if (!isset($data['options']) && ($data['svgFilePath'] ?? null) === '') {
+			unset($data['svgFilePath']);
+		}
+		return $this->newObject($data);
+	}
+
 	//	/**
 	//	 * Formats Map parameters after retrieving from a database.
 	//	 *
@@ -101,9 +106,14 @@ class MapsRepository extends Repository
 	 * @param array $data - map options
 	 * @return Map
 	 */
+	public function create($data)
+	{
+		return AppSvgReferenceLock::run(Database::get(), function () use ($data) { return parent::create($data); });
+	}
+
 	public function update($map)
 	{
-		return parent::update($map);
+		return AppSvgReferenceLock::run(Database::get(), function () use ($map) { return parent::update($map); });
 	}
 
 	/**
@@ -114,7 +124,7 @@ class MapsRepository extends Repository
 	 */
 	public function updateFromSvg($map, $updateTitles = null)
 	{
-		parent::update($map);
+		$this->update($map);
 		$prefix = isset($map->options['regionPrefix']) ? $map->options['regionPrefix'] : '';
 
 		/** @var Map $map */
@@ -145,54 +155,9 @@ class MapsRepository extends Repository
 	 */
 	public function copy($id, $newData)
 	{
-
-		//		require_once MAPSVG_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'php' . DIRECTORY_SEPARATOR . 'Domain'. DIRECTORY_SEPARATOR . 'SVGFile' . DIRECTORY_SEPARATOR . 'SVGFile.php';
-
-		$newData['title'] = wp_strip_all_tags(wp_unslash($newData['title']));
-		$map = $this->findById($id);
-
-		// Copy SVG file
-		$filesRepo = new SVGFileRepository();
-		$file = new SVGFile(["relativeUrl" => $map->options['source']]);
-
-		try {
-			$newFile = $filesRepo->copy($file);
-			$map->options['source'] = $newFile->relativeUrl;
-			$map->setSvgFilePath($newFile->relativeUrl);
-		} catch (\Exception $err) {
-			throw new \Exception('Can\'t copy the SVG file.', 400);
-		}
-
-		// If SVG file was copied, create new map in DB
-		$newMapData = $map->getData();
-		$newMapData['options'] = Map::sanitizeOptionsForWrite($newMapData['options']);
-		$newMapData['title'] = $newData['title'];
-		$newMapData['options']['title'] = $newData['title'];
-		unset($newMapData['id']);
-
-		$newMap = $this->create($newMapData, true);
-		$mapUpdate = array('id' => $newMap->id, 'options' => $newMapData['options']);
-		$needUpdate = false;
-
-		if (isset($newMapData['options']['templates']) && isset($newMapData['options']['templates']['directory'])) {
-			$dirTemplate = $newMapData['options']['templates']['directory'];
-			$dirTemplate = str_replace('{{>directoryItem-' . $map->id . '}}', '{{>directoryItem}}', $dirTemplate);
-			$dirTemplate = str_replace('{{>directoryCategoryItem-' . $map->id . '}}', '{{>directoryCategoryItem}}', $dirTemplate);
-			$mapUpdate['options']['templates']['directory'] = $dirTemplate;
-			$needUpdate = true;
-		}
-
-		if (isset($newMapData['options']['css'])) {
-			$mapUpdate['options']['css'] = str_replace('#mapsvg-map-' . $map->id, '#mapsvg-map-' . $newMap->id, $newMapData['options']['css']);
-			$needUpdate = true;
-		}
-		if ($needUpdate) {
-			$newMap = $this->update($mapUpdate);
-		}
-
-		$this->copyTables($map, $newMap);
-
-		return $newMap;
+		return \MapSVG\DataLayer\Workflow\MapCopyServiceFactory::forRepository(
+			$this
+		)->copy($id, (array) $newData);
 	}
 
 	/**
@@ -205,71 +170,9 @@ class MapsRepository extends Repository
 	 */
 	public function copyTables($fromMap, $toMap)
 	{
-		// Copy regions table
-		$regionsSchemaData = $fromMap->getRegions()->getSchema()->getData();
-		unset($regionsSchemaData["id"]);
-		$regionsSchemaData['name'] = 'regions_' . $toMap->id;
-		$schemaRepo = new SchemaRepository();
-		$schema = new Schema($regionsSchemaData);
-		$newRegionsSchema = $schemaRepo->create($schema->getData());
-
-		$tableNameRegionsOld = $this->db->mapsvg_prefix . $fromMap->getRegions()->getSchema()->name;
-		$tableNameRegionsNew = $this->db->mapsvg_prefix . $newRegionsSchema->name;
-
-		$fields = $this->db->get_results("SHOW COLUMNS FROM " . $tableNameRegionsOld);
-
-		foreach ($fields as $field) {
-			$regionFieldNames[] = $field->Field;
-		}
-		$regionFieldNames = "`" . implode("`,`", $regionFieldNames) . "`";
-
-		$this->db->query("REPLACE INTO " . $tableNameRegionsNew . " (" . $regionFieldNames . ") SELECT " . $regionFieldNames . " FROM " . $tableNameRegionsOld);
-
-		// Copy objects table
-		$fromObjectsSchema = $fromMap->getObjects()->getSchema();
-		$objectsPkField = $fromObjectsSchema->getPrimaryKeyFieldName();
-		$objectsSchemaData = $fromObjectsSchema->getData();
-		unset($objectsSchemaData["id"]);
-		$objectsSchemaData['name'] = 'objects_' . $toMap->id;
-		// Fix missing auto_increment
-		foreach ($objectsSchemaData["fields"] as $key => $field) {
-			if ($field->name === $objectsPkField && (!isset($field->auto_increment) || $field->auto_increment !== true)) {
-				$field->auto_increment = true;
-				$objectsSchemaData["fields"][$key] = $field;
-			}
-		}
-		$schema = new Schema($objectsSchemaData);
-		$newObjectsSchema = $schemaRepo->create($schema->getData());
-
-		$tableNameObjectsOld = $this->db->mapsvg_prefix . $fromMap->getObjects()->getSchema()->name;
-		$tableNameObjectsNew = $this->db->mapsvg_prefix . $newObjectsSchema->name;
-
-		//        $this->db->query("ALTER TABLE ".$tableNameObjectsNew." CHANGE COLUMN `id` `id` INT(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT = 1");
-
-		$fields = $this->db->get_results("SHOW COLUMNS FROM " . $tableNameObjectsOld);
-		foreach ($fields as $field) {
-			$fieldNames[] = $field->Field;
-		}
-		$fieldNames = "`" . implode("`,`", $fieldNames) . "`";
-
-		$this->db->query("INSERT INTO " . $tableNameObjectsNew . " (" . $fieldNames . ") SELECT " . $fieldNames . " FROM " . $tableNameObjectsOld);
-		$this->db->query("UPDATE " . $tableNameObjectsNew . " SET regions = REPLACE(regions,'regions_" . $fromMap->id . "', 'regions_" . $toMap->id . "')");
-		$this->db->query("INSERT INTO " . $this->db->mapsvg_prefix . "r2o  (objects_table,regions_table,object_id,region_id) SELECT '" . $newObjectsSchema->name . "', '" . $newRegionsSchema->name . "', _r2o.object_id, _r2o.region_id FROM " . $this->db->mapsvg_prefix . "r2o _r2o WHERE _r2o.objects_table='" . $fromMap->objects->getSchema()->name . "' AND _r2o.regions_table='" . $fromMap->regions->getSchema()->name . "'");
-
-		$mapUpdate = array('id' => $toMap->id, 'options' => $toMap->options);
-		if (!isset($mapUpdate["options"]["database"])) {
-			$mapUpdate["options"]["database"] = [];
-		}
-		$mapUpdate["options"]["database"]["regionsTableName"] = $newRegionsSchema->name;
-		$mapUpdate["options"]["database"]["objectsTableName"] = $newObjectsSchema->name;
-		if (!isset($mapUpdate["options"]["database"]["schemas"])) {
-			$mapUpdate["options"]["database"]["schemas"] = [];
-		}
-		$mapUpdate["options"]["database"]["schemas"]["regions"] = ["name" => $newRegionsSchema->name];
-		$mapUpdate["options"]["database"]["schemas"]["objects"] = ["name" => $newObjectsSchema->name];
-		$this->update($mapUpdate);
-
-		return true;
+		return \MapSVG\DataLayer\Workflow\MapCopyServiceFactory::forRepository(
+			$this
+		)->copyTables($fromMap, $toMap);
 	}
 
 	function serializeCorrector($serialized_string)
@@ -289,13 +192,20 @@ class MapsRepository extends Repository
 	 */
 	public function delete($id)
 	{
-
-		return $this->db->delete($this->getTableName(), array('id' => $id));
+		return parent::delete($id);
 	}
 
 	public function deleteAllRemovedOneDayAgo()
 	{
+		$dataLayer = \MapSVG\DataLayer\DataLayerFactory::createV2(
+			null,
+			['force' => true, 'observe' => false]
+		);
+		$service = \MapSVG\DataLayer\Workflow\MapMaintenanceServiceFactory::forSchema(
+			$dataLayer,
+			$this->schema
+		);
 
-		return $this->db->query("DELETE FROM " . $this->getTableName() . " WHERE status=0 AND statusChangedAt <= DATE_SUB(NOW(), INTERVAL 2 DAY)");
+		return $service->deleteSoftRemovedOlderThanTwoDays();
 	}
 }

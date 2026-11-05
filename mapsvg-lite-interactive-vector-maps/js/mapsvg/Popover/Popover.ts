@@ -53,7 +53,9 @@ export class PopoverController extends Controller {
    */
   adjustScreenPosition(): void {
     if (this.point) {
-      const pos = this.map.converter.convertSVGToPixel(this.point)
+      const referenceX = this.screenPoint?.x ??
+        (this.mapObject.isMarker() ? this.mapObject.getInteractionScreenX() : undefined)
+      const pos = this.map.converter.convertSVGToPixel(this.point, referenceX)
 
       pos.y -= this.yShift
       pos.x = Math.round(pos.x)

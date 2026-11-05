@@ -1,4 +1,6 @@
+import { hasRuntimeFeature } from "./productFeatures"
 import { textElement } from "./textElement"
+import { acquireFullscreenDocument, releaseFullscreenDocument } from "./FullscreenPortal"
 /**
  * Abstract class. Creates a scrollable controller. Extended by {@link #mapsvgpopovercontroller|PopoverController} / {@link #mapsvgdetailscontroller|DetailsController} / {@link #mapsvgdirectorycontroller|DirectoryController}
  * @abstract
@@ -9,11 +11,12 @@ import { MapSVGMap } from "../Map/Map"
 import { BaseEventHandler, Events } from "./Events.js"
 import { Middleware, MiddlewareList, MiddlewareType } from "./Middleware"
 import { ResizeSensor } from "./ResizeSensor"
-import { deepMerge, isPhone, isTablet, parseBoolean, useId } from "./Utils"
+import { deepMerge, functionFromString, isPhone, isTablet, parseBoolean, useId } from "./Utils"
 import "./controller.css"
 const $ = jQuery
 import { mapsvgCore } from "@/Core/Mapsvg"
 import { ensureIconFontFace } from "@/Core/ensureIconFontFace"
+import { concatTemplateCss } from "../Map/templateCss"
 
 export enum ControllerEvent {
   RESIZE = "resize",
@@ -146,6 +149,9 @@ export class Controller implements BaseController {
   middlewares: MiddlewareList
   position?: "absolute" | "relative" | "fixed"
   openedFullscreen: boolean = false
+  private fullscreenDocument?: Document
+  private customCssMirror?: HTMLStyleElement
+  private templateCssMirror?: HTMLStyleElement
   noPadding?: boolean
 
   constructor(options: ControllerOptions) {
@@ -220,6 +226,7 @@ export class Controller implements BaseController {
       // iOSNativeScrolling: true,
     })
     setTimeout(function () {
+      if (_this.destroyed || !_this.scrollable) return
       $(_this.containers.contentWrap).nanoScroller({
         preventPageScrolling: true,
         // iOSNativeScrolling: true,
@@ -307,7 +314,8 @@ export class Controller implements BaseController {
   }
 
   setStyles(styles: Partial<CSSStyleDeclaration>): void {
-    Object.assign(this.containers.main.style, styles)
+    Object.assign(this.styles ??= {}, styles)
+    if (this.containers.main) Object.assign(this.containers.main.style, styles)
   }
 
   /**
@@ -319,9 +327,10 @@ export class Controller implements BaseController {
     }
     if (this.fullscreen) {
       this.classList.push(`mapsvg-fullscreen`)
-      this.containers.parent = document.body
+      this.fullscreenDocument = this.containers.parent.ownerDocument
+      this.containers.parent = this.fullscreenDocument.body
       this.openedFullscreen = true
-      document.body.classList.add("mapsvg-modal-fullscreen")
+      acquireFullscreenDocument(this.fullscreenDocument, this)
     }
 
     this.containers.main = $("<div />")[0]
@@ -393,19 +402,17 @@ export class Controller implements BaseController {
       const link = document.createElement("link")
       link.rel = "stylesheet"
       link.href =
-        mapsvgCore.routes.root + "themes/" + this.map.options.theme.name + "/assets/css/styles.css"
+        mapsvgCore.routes.root + "themes/" + this.map.options.theme.name + "/assets/css/styles.css?ver=" + mapsvgCore.version
       shadowRoot.appendChild(link)
 
-      // Add custom CSS
-      const style = document.createElement("style")
-      shadowRoot.appendChild(style)
-      const liveCss = style
-      liveCss.textContent = this.map.options.css
       this.containers.parent.appendChild(this.containers.shadowRoot)
+      this.map.mountTypography?.(this.containers.main)
+
+      this.refreshCustomCss()
     } else {
       this.containers.parent.appendChild(this.containers.main)
+      this.map.mountTypography?.(this.containers.main)
     }
-
     this.containers.main.setAttribute("data-mapsvg-theme", this.map.options.theme.name)
 
     if (this.autoresize) {
@@ -436,6 +443,24 @@ export class Controller implements BaseController {
     }, 1)
   }
 
+  /** Own only mirrors in this controller's separate ShadowRoot, never replace its content. */
+  refreshCustomCss(): void {
+    const root = this.containers.shadowRoot?.shadowRoot
+    if (!root || this.destroyed || !this.map) return
+    if (!this.customCssMirror) {
+      this.customCssMirror = root.ownerDocument.createElement("style")
+      this.customCssMirror.setAttribute("data-mapsvg-custom-css", String(this.map.id))
+      root.appendChild(this.customCssMirror)
+    }
+    if (!this.templateCssMirror) {
+      this.templateCssMirror = root.ownerDocument.createElement("style")
+      this.templateCssMirror.setAttribute("data-mapsvg-templates", String(this.map.id))
+      root.appendChild(this.templateCssMirror)
+    }
+    this.customCssMirror.textContent = this.map.options.css || ""
+    this.templateCssMirror.textContent = concatTemplateCss(this.map.options.templates || {}, this.map.id)
+  }
+
   setState(state?: { [key: string]: any }, overwrite: boolean = false): void {
     if (overwrite) {
       this.state = state
@@ -446,6 +471,23 @@ export class Controller implements BaseController {
     if (this.loaded) {
       this.redraw()
     }
+  }
+
+  /**
+   * Whether Woo add-to-cart markup is expected in this view (for SVG `<use>` inlining).
+   * Controllers often get a compiled Handlebars function as `this.template`, not the source string.
+   */
+  private shouldInlineWooSvgUses(): boolean {
+    if (typeof this.template === "string" && this.template.includes("add_to_cart_html")) {
+      return true
+    }
+    if (this.map.templatesUseAddToCartHtml()) {
+      return true
+    }
+    // Partials / compiled templates: cart already rendered into the view
+    return !!this.containers.contentView?.querySelector?.(
+      ".mapsvg-product-cart form.cart, .mapsvg-product-cart use, form.cart use",
+    )
   }
 
   /**
@@ -465,7 +507,7 @@ export class Controller implements BaseController {
     this.viewWillRedraw()
 
     try {
-      $(this.containers.contentView).html(this.templates.main(formattedData))
+      $(this.containers.contentView).html(this.templates.main(formattedData, { data: { mapsvg: this.map } }))
     } catch (err) {
       console.error("[CLIENT-022] Handlebars rendering error — Read more: https://mapsvg.com/docs/errors#CLIENT-022", err)
       $(this.containers.contentView).html("")
@@ -474,10 +516,64 @@ export class Controller implements BaseController {
     if (this.templates.toolbar)
       $(this.containers.toolbar).html(this.templates.toolbar(formattedData))
 
+    this.map.bindWooCart(this.containers.contentView)
+
+    // Shadow DOM: theme cart icons use <use href="#sprite-id"> which cannot
+    // resolve light-DOM sprites — inline them when Woo cart HTML is in use.
+    // Note: this.template is often a compiled Handlebars fn, so also check
+    // map.options.templates sources and the rendered DOM.
+    if (this.map.options.woocommerce && this.shouldInlineWooSvgUses()) {
+      this.map.inlineWooSvgUses(this.containers.contentView)
+    }
+
+    this.runTemplateJs(this.containers.contentView)
+
     this.resize()
 
     this.viewDidRedraw()
     this.events.trigger(ControllerEvent.AFTER_REDRAW, { controller: this })
+  }
+
+  /**
+   * Run per-template afterRender JS for nodes marked with data-mapsvg-partial.
+   */
+  runTemplateJs(root: HTMLElement | null | undefined): void {
+    if (!hasRuntimeFeature("javascript")) return
+    if (!root || !this.map || !this.map.options || !this.map.options.templates) {
+      return
+    }
+    const nodes = root.querySelectorAll
+      ? root.querySelectorAll("[data-mapsvg-partial]")
+      : []
+    Array.prototype.forEach.call(nodes, (el: HTMLElement) => {
+      const name = el.getAttribute("data-mapsvg-partial")
+      if (!name) {
+        return
+      }
+      const entry = this.map.options.templates[name]
+      const js = entry && typeof entry.js === "string" ? entry.js.trim() : ""
+      if (!js) {
+        return
+      }
+      const compiled: unknown = functionFromString(js)
+      if (
+        !compiled ||
+        typeof compiled !== "function" ||
+        compiled instanceof TypeError ||
+        compiled instanceof SyntaxError
+      ) {
+        return
+      }
+      try {
+        ;(compiled as (ctx: { el: HTMLElement; map: MapSVGMap; controller: Controller }) => void)({
+          el,
+          map: this.map,
+          controller: this,
+        })
+      } catch (err) {
+        console.error("[CLIENT-023] Template afterRender error", name, err)
+      }
+    })
   }
 
   resize(): void {
@@ -562,6 +658,7 @@ export class Controller implements BaseController {
     if (!this.closable && this.destroyed) {
       return
     }
+    if (this.openedFullscreen && this.fullscreenDocument) acquireFullscreenDocument(this.fullscreenDocument, this)
     this.events.trigger(ControllerEvent.BEFORE_SHOW, { controller: this })
     $(this.containers.main).toggleClass("mapsvg-invisible", false)
     this.opened = true
@@ -575,14 +672,16 @@ export class Controller implements BaseController {
    *
    */
   close(): void {
-    if (!this.closable || !this.canClose || !this.opened) {
+    // closable controls the close UI. Programmatic close/destroy still owns the
+    // lifecycle of nonclosable views, including hover-driven Tooltips.
+    if (!this.canClose || !this.opened) {
       return
     }
     if (this.viewWillClose() === false) {
       return
     }
     if (this.openedFullscreen) {
-      document.body.classList.remove("mapsvg-modal-fullscreen")
+      releaseFullscreenDocument(this.fullscreenDocument, this)
     }
 
     this.events.trigger(ControllerEvent.BEFORE_CLOSE, { controller: this })
@@ -632,6 +731,7 @@ export class Controller implements BaseController {
       this.containers.shadowRoot.remove()
     }
     this.close()
+    releaseFullscreenDocument(this.fullscreenDocument, this)
     this.viewWillGetDestroyed()
     this.resizeSensor && this.resizeSensor.destroy()
     delete this.resizeSensor

@@ -17,12 +17,12 @@ interface ToolbarControllerOptions extends ControllerOptions {
 
 const template = `
     <div class="mapsvg-mobile-buttons">    
-      <div class="mapsvg-button mapsvg-button-menu" data-controller="menu"><i class="mapsvg-icon-menu"></i>
+      <button type="button" class="mapsvg-button mapsvg-button-menu" data-controller="menu"><i class="mapsvg-icon-menu"></i>
           {{labelList}}
-      </div>
-      <div class="mapsvg-button mapsvg-button-map" data-controller="map"><i class="mapsvg-icon-map"></i>
+      </button>
+      <button type="button" class="mapsvg-button mapsvg-button-map" data-controller="map"><i class="mapsvg-icon-map"></i>
           {{labelMap}}
-      </div>
+      </button>
     </div>`
 
 export class ToolbarController extends Controller {
@@ -49,25 +49,29 @@ export class ToolbarController extends Controller {
     this.buttons = {}
     this.buttons.menu = $(this.containers.view).find(".mapsvg-button-menu")[0] as HTMLButtonElement
     this.buttons.map = $(this.containers.view).find(".mapsvg-button-map")[0] as HTMLButtonElement
+    this.setActive(this.state.active || "map")
   }
 
   setEventHandlers() {
     super.setEventHandlers()
     $(this.containers.view).on("click.toolbar.mapsvg", ".mapsvg-button", (e) => {
-      if (e.target.nodeName == "I") {
-        return
-      }
-
-      const buttonName = e.target.getAttribute("data-controller")
+      const buttonName = e.currentTarget.getAttribute("data-controller")
       const button = this.buttons[buttonName]
-      $(this.containers.view).find(".mapsvg-button").removeClass("active")
-      $(button).addClass("active")
+      this.setActive(buttonName)
 
       this.events.trigger("click", e, {
         target: button,
         buttonName,
       })
     })
+  }
+
+  setActive(controllerName: string) {
+    this.state.active = controllerName
+    for (const [name, button] of Object.entries(this.buttons || {})) {
+      button.classList.toggle("active", name === controllerName)
+      button.setAttribute("aria-pressed", String(name === controllerName))
+    }
   }
 
   show(controllerName: string) {

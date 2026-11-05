@@ -22,6 +22,18 @@ export interface PostTypeDetails {
   meta: PostTypeMeta[]
 }
 
+/**
+ * Known full value sets for popular meta keys. Used so status sync can offer every possible value
+ * even when the current database only contains a subset of them (e.g. only "outofstock" exists yet).
+ */
+const KNOWN_META_OPTIONS: { [key: string]: Array<{ label: string; value: string }> } = {
+  _stock_status: [
+    { label: "In stock", value: "instock" },
+    { label: "Out of stock", value: "outofstock" },
+    { label: "On backorder", value: "onbackorder" },
+  ],
+}
+
 export class PostTypesRepository extends Repository {
   baseUrl: string
 
@@ -51,6 +63,19 @@ export class PostTypesRepository extends Repository {
       const options = response.items
         .filter((value) => value !== null && typeof value !== "undefined")
         .map((value) => ({ label: value, value: value }))
+      const known = KNOWN_META_OPTIONS[fieldName]
+      if (known) {
+        const merged = known.slice()
+        const knownValues = known.map((k) => String(k.value))
+        options.forEach((o) => {
+          if (knownValues.indexOf(String(o.value)) === -1) {
+            merged.push(o)
+          }
+        })
+        return new Promise((resolve) => {
+          resolve(merged)
+        })
+      }
       return new Promise((resolve) => {
         resolve(options)
       })

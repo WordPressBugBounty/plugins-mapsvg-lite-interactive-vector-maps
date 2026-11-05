@@ -198,9 +198,10 @@ export class Server {
   }
 
   private addNonceHeader(xhr: JQueryXHR): void {
-    if (mapsvgCore.nonce) {
-      xhr.setRequestHeader("X-WP-Nonce", mapsvgCore.nonce)
-    }
+    // React renews its WordPress REST nonce without remounting the shared runtime.
+    const admin = window as Window & { mapsvgReactAdminParams?: { nonce?: string } }
+    const nonce = admin.mapsvgReactAdminParams?.nonce || mapsvgCore.nonce
+    if (nonce) xhr.setRequestHeader("X-WP-Nonce", nonce)
   }
 
   /**

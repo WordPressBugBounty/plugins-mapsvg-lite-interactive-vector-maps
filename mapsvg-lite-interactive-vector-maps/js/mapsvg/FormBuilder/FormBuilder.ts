@@ -6,7 +6,7 @@ import { ArrayIndexed } from "../Core/ArrayIndexed"
 import { EventWithData, Events } from "../Core/Events"
 import { ResizeSensor } from "../Core/ResizeSensor"
 import { Schema } from "../Infrastructure/Server/Schema"
-import { SchemaField } from "../Infrastructure/Server/SchemaField"
+import { isRelationFieldType, SchemaField } from "../Infrastructure/Server/SchemaField"
 import { GeoPoint, Location, SVGPoint } from "../Location/Location"
 import { MapSVGMap } from "../Map/Map"
 import { Marker } from "../Marker/Marker"
@@ -146,6 +146,7 @@ export class FormBuilder {
       "select",
       "image",
       "region",
+      "relation",
       "location",
       "post",
       "date",
@@ -352,11 +353,12 @@ export class FormBuilder {
               }
             } else if (reservedFields.indexOf(formElement.name) != -1) {
               // if reserved field name is for proper type of object then it's OK
-              if (
-                !reservedFieldsToTypes[formElement.name] ||
-                (reservedFieldsToTypes[formElement.name] &&
-                  reservedFieldsToTypes[formElement.name] != formElement.type)
-              ) {
+              const reservedType = reservedFieldsToTypes[formElement.name]
+              const typeOk =
+                reservedType === "region"
+                  ? isRelationFieldType(formElement.type)
+                  : reservedType === formElement.type
+              if (!reservedType || !typeOk) {
                 const msg =
                   'Field name "' + formElement.name + '" is reserved, please set another name'
                 errors.push(msg)
@@ -365,7 +367,11 @@ export class FormBuilder {
             }
           }
 
-          if (formElement.options && formElement.type != "region" && formElement.type != "marker") {
+          if (
+            formElement.options &&
+            !isRelationFieldType(formElement.type) &&
+            formElement.type != "marker"
+          ) {
             const vals = formElement.options.map(function (obj: { label: string; value: string }) {
               return obj.value
             })
@@ -462,6 +468,9 @@ export class FormBuilder {
   }
 
   getFormElementByType(type: string): FormElementTypes.FormElementInterface {
+    if (isRelationFieldType(type)) {
+      return this.formElements.find((el) => isRelationFieldType(el.type))
+    }
     return this.formElements.find((el) => el.type === type)
   }
   getFormElementByName(name: string): FormElementTypes.FormElementInterface {
@@ -547,7 +556,7 @@ export class FormBuilder {
           this.admin && this.admin.enableMarkersMode(true)
         } else if (field.type == "post") {
           field.post = this.data["post"]
-        } else if (field.type === "region") {
+        } else if (isRelationFieldType(field.type)) {
           field.options = new ArrayIndexed("id", this.getRegionsList())
         }
 
@@ -686,14 +695,12 @@ export class FormBuilder {
     const _this = this
 
     // Check if field can be added - some fields can be added only once:
-    if (
-      ["region", "marker", "post", "status", "distance", "location", "search"].indexOf(
-        formElement.type,
-      ) != -1
-    ) {
+    const onceTypes = ["region", "relation", "marker", "post", "status", "distance", "location", "search"]
+    if (onceTypes.indexOf(formElement.type) != -1) {
       let repeat = false
       _this.formElements.forEach(function (control) {
         if (control.type == formElement.type) repeat = true
+        if (isRelationFieldType(formElement.type) && isRelationFieldType(control.type)) repeat = true
       })
       if (repeat) {
         jQuery.growl.error({

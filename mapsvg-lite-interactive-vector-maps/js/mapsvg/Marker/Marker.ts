@@ -1,9 +1,10 @@
-import { getMouseCoords, safeURL, ucfirst } from "@/Core/Utils"
+import { getMouseCoords, ucfirst } from "@/Core/Utils"
 import { GeoPoint, Location, SVGPoint, ScreenPoint } from "../Location/Location"
 import { MapSVGMap } from "../Map/Map"
 import { ViewBox } from "../Map/ViewBox"
 import { MapObject, MapObjectType } from "../MapObject/MapObject"
 import { Model } from "../Model/Model"
+import { WorldCopies } from "./WorldCopies"
 import "./marker.css"
 const $ = jQuery
 
@@ -43,6 +44,8 @@ export class Marker extends MapObject {
   centered: boolean
   altAttr: string
   private svgPointBeforeDrag: SVGPoint
+  private worldCopies: WorldCopies
+  interactionElement?: HTMLElement
 
   mapped?: boolean
   needToRemove?: boolean
@@ -64,6 +67,7 @@ export class Marker extends MapObject {
     this.name = "marker"
     this.type = MapObjectType.MARKER
     this.element = $("<div />").addClass("mapsvg-marker")[0]
+    this.worldCopies = new WorldCopies(this.element)
     this.image = $('<img src="" />').addClass("mapsvg-marker-image")[0]
     this.image.style.visibility = "hidden"
 
@@ -187,15 +191,21 @@ export class Marker extends MapObject {
    * @param {string} src
    */
   setImage(src?: string, skipChangingLocationImage = false): void {
-    if (!src) {
+    if (this.mapsvg.options.markerDataRules) {
+      src = this.mapsvg.getMarkerImage(this.object, this.location)
+    } else if (!src) {
       src = this.getImagePath()
     }
-    this.src = safeURL(src)
+    // The resolved image can belong to a separate WordPress/CDN origin.
+    // Removing its host would make a native embed request the asset from its own site.
+    this.src = src
+    const requestedSrc = this.src
     const img = new Image()
 
     img.onload = () => {
-      if (this.image.getAttribute("src") !== "src") {
-        this.image.setAttribute("src", this.src)
+      if (this.src !== requestedSrc) return
+      if (this.image.getAttribute("src") !== requestedSrc) {
+        this.image.setAttribute("src", requestedSrc)
       }
       this.setSize((<HTMLImageElement>img).width, (<HTMLImageElement>img).height)
       this.image.style.visibility = "visible"
@@ -203,7 +213,7 @@ export class Marker extends MapObject {
     }
     img.src = this.src
 
-    this.events.trigger("change")
+    if (!skipChangingLocationImage) this.events.trigger("change")
   }
 
   /**
@@ -296,6 +306,7 @@ export class Marker extends MapObject {
    * @param {number} y
    */
   setScreenPosition(x: number, y: number): void {
+    x = this.mapsvg.converter.wrapPixelX(x + this.width / 2) - this.width / 2
     if (this.screenPoint instanceof ScreenPoint) {
       this.screenPoint.x = x
       this.screenPoint.y = y
@@ -310,6 +321,15 @@ export class Marker extends MapObject {
 
       this.adjustLabelScreenPosition()
     }
+    this.worldCopies.update(x, y, this.mapsvg.converter.getWorldWidth(),
+      this.mapsvg.containers.map.clientWidth, this.mapsvg.containers.map.clientHeight, this.width, this.height)
+  }
+
+  /** Initial popover anchor follows the actual representation hit by the pointer. */
+  getInteractionScreenX(): number {
+    const offset = this.interactionElement?.parentElement === this.element.parentElement
+      ? Number(this.interactionElement?.dataset.mapsvgWorldOffset || 0) : 0
+    return this.screenPoint.x + this.width / 2 + offset
   }
 
   /**
@@ -444,6 +464,7 @@ export class Marker extends MapObject {
    * Deletes the Marker
    */
   delete(): void {
+    this.worldCopies.destroy()
     if (this.label) {
       this.label.remove()
       this.label = null

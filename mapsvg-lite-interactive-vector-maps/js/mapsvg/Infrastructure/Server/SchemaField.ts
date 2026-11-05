@@ -11,6 +11,8 @@ export type SchemaFieldType =
   | "post"
   | "select"
   | "region"
+  /** Alias of `region` — object↔regions relation field */
+  | "relation"
   | "checkbox"
   | "checkboxes"
   | "image"
@@ -69,6 +71,16 @@ const defaultFieldProps = {
   searchable: false,
   readonly: false,
   protected: false,
+}
+
+/** Field types that store object↔regions links (`[{id, tableName}, …]`). Canonical name: relation (legacy alias: region). */
+export function isRelationFieldType(type: string | undefined | null): boolean {
+  return type === "region" || type === "relation"
+}
+
+/** @deprecated Prefer {@link isRelationFieldType} */
+export function isRegionsFieldType(type: string | undefined | null): boolean {
+  return isRelationFieldType(type)
 }
 
 /**

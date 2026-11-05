@@ -27,14 +27,20 @@
         <div class="tab-content" id="supportTabsContent">
           <div class="tab-pane fade show active" id="chat" role="tabpanel" aria-labelledby="chat-tab">
             <div id="mapsvg-enable-chat-section">
-              <div class="alert alert-info mt-4 mapsvg-premium-feature"><i class="bi bi-star-fill"></i> Premium feature: Log in to save conversation history, access chats on <a href="https://mapsvg.com/dashboard" target="_blank">mapsvg.com/dashboard</a>, and get faster response times. <a class="btn btn-xs mx-1 btn-outline-primary" target="_blank" href="https://mapsvg.com">Upgrade</a></div>
+              <!-- START gleap_auth -->
+              <!-- END REPLACE 
+                <div class="alert alert-info mt-4 mapsvg-premium-feature"><i class="bi bi-star-fill"></i> Premium feature: Log in to save conversation history, access chats on <a href="https://mapsvg.com/dashboard" target="_blank">mapsvg.com/dashboard</a>, and get faster response times. <a class="btn btn-xs mx-1 btn-outline-primary" target="_blank" href="https://mapsvg.com">Upgrade</a></div>               
+              -->
               <?php if (strpos(home_url(), 'demo.mapsvg.com') !== false) : ?>
                 <div class="alert alert-info mt-4" role="alert">
                   This feature is not available on the demo site!
                 </div>
               <?php endif; ?>
 
-              
+              <!-- START gleap_auth -->
+              <h5>Chat with support</h5>
+              <p>Activate your MapSVG license to connect support automatically. Each site has its own conversation history.</p>
+              <!-- END REPLACE -->
             </div>
 
             <div id="mapsvg-enabled-chat-section" style="display: none;">
@@ -42,6 +48,9 @@
                 Chat is enabled. You can now chat with support.
               </div>
             </div>
+            <!-- START gleap_auth -->
+            <button class="btn btn-primary" id="mapsvg-connect-support" <?php if (strpos(home_url(), 'demo.mapsvg.com') !== false) : ?>disabled="disabled" <?php endif; ?>>Open support chat</button>
+            <!-- END REPLACE
             <form class="form" id="mapsvg-chat-consent-form">
               <h5>Support Chat Consent</h5>
               <p>
@@ -59,9 +68,14 @@
               </div>
               <button type="submit" class="btn btn-primary" id="enableChatButton" data-loading-text="Enabling...">Enable chat</button>
             </form>
+
+            -->
           </div>
           <div class="tab-pane fade" id="access-tokens" role="tabpanel" aria-labelledby="access-tokens-tab">
-            <div class="alert alert-info mt-4 mapsvg-premium-feature"><i class="bi bi-star-fill"></i> Premium feature <a class="btn btn-xs mx-1 btn-outline-primary" target="_blank" href="https://mapsvg.com">Upgrade</a></div>
+            <!-- START tokens -->
+            <!-- END REPLACE 
+                <div class="alert alert-info mt-4 mapsvg-premium-feature"><i class="bi bi-star-fill"></i> Premium feature <a class="btn btn-xs mx-1 btn-outline-primary" target="_blank" href="https://mapsvg.com">Upgrade</a></div>                             
+              -->
 
 
 
@@ -107,7 +121,11 @@
                 <div class="alert alert-danger mapsvg-admin-only-feature hidden" role=" alert">
                   <i class="bi bi-lock"></i> This feature is for admins only.
                 </div>
+                <!-- START tokens -->
+                <button type="submit" class="btn btn-primary mapsvg-admin-only-button" id="mapsvg-create-token-button" <?php if (strpos(home_url(), 'demo.mapsvg.com') !== false) : ?>disabled="disabled" <?php endif; ?>>Create</button>
+                <!-- END REPLACE 
                 <button type="submit" class="btn btn-primary" disabled="disabled">Create</button>
+              -->
 
 
 

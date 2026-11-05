@@ -1,3 +1,4 @@
+import Sortable from "sortablejs"
 import { MapSVGMap } from "@/Map/Map"
 import { FormBuilder } from "../FormBuilder/FormBuilder"
 import { Query } from "../Infrastructure/Server/Query"
@@ -78,6 +79,13 @@ let mapsvgClient: MapsvgClient = null
  * @ignore
  */
 export const initGlobals = () => {
+  const extensions = window.MapSVG?.extensions
+  if (!extensions) {
+    throw new Error(
+      "[MapSVG] Shared extension host is missing. Ensure mapsvg-extension-host loads before mapsvg.",
+    )
+  }
+
   mapsvgClient = new MapsvgClient()
   window.mapsvg = mapsvgClient
   window.MapSVG = Object.assign(
@@ -87,6 +95,8 @@ export const initGlobals = () => {
 
   // Now add other properties or methods
   Object.assign(window.MapSVG, {
+    extensions,
+    Sortable: Sortable,
     mouseCoords: utils.env.getMouseCoords,
     isPhone: utils.env.isPhone,
     ...mapsvgCore,

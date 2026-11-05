@@ -86,12 +86,16 @@ export class RegionsFormElement extends FormElement {
   }
 
   setValue(regionIds: string[], updateInput = true) {
-    const regionsFromOtherTables = this.value.filter(
+    const current = Array.isArray(this.value) ? this.value : []
+    const regionsFromOtherTables = current.filter(
       (region) => region.tableName !== this.regionsTableName,
     )
     const regions = []
     regionIds.forEach((regionId: string) => {
       const region = this.formBuilder.mapsvg.getRegion(regionId)
+      if (!region) {
+        return
+      }
       regions.push({ id: region.id, title: region.title, tableName: this.regionsTableName })
     })
     this.value = regions.concat(regionsFromOtherTables)
@@ -100,5 +104,20 @@ export class RegionsFormElement extends FormElement {
     }
   }
 
-  // TODO add setInpuValue
+  setInputValue(regionIds: string[]): void {
+    if (!this.inputs?.select) {
+      return
+    }
+    const ids = Array.isArray(regionIds) ? regionIds.map(String) : []
+    const $select = $(this.inputs.select)
+
+    if ($select.length && $().mselect2 && $select.data("select2")) {
+      $select.val(ids.length ? ids : null).trigger("change.select2")
+      return
+    }
+
+    Array.from(this.inputs.select.options).forEach((option) => {
+      option.selected = ids.indexOf(option.value) !== -1
+    })
+  }
 }

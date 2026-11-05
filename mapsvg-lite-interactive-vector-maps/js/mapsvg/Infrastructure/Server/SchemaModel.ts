@@ -80,6 +80,22 @@ export const SchemaModelSchema = new Schema({
       name: "remote",
       type: "boolean",
     },
+    {
+      name: "regionSupport",
+      type: "boolean",
+    },
+    {
+      name: "markerSupport",
+      type: "boolean",
+    },
+    {
+      name: "bindings",
+      type: "text",
+    },
+    {
+      name: "zodSettings",
+      type: "json",
+    },
   ],
 })
 

@@ -2,29 +2,32 @@
 
 namespace MapSVG;
 
+use MapSVG\DataLayer\Store\PluginTableStore;
 
 /**
- * Сlass that manages global MapSVG settings in the database
+ * Class that manages global MapSVG settings in the database.
  * @package MapSVG
  */
 class Options
 {
-
     static $options;
-    static $protected = ["allowed_shortcodes"];
-    static $cache = [];
+    static $protected = array('allowed_shortcodes');
+    static $cache = array();
+
+    private static function store(): PluginTableStore
+    {
+        return new PluginTableStore('settings');
+    }
 
     private static function setCache($optionsOrKey, $value = null)
     {
         if (!isset(static::$options)) {
-            static::$options = [];
+            static::$options = array();
         }
         if (is_string($optionsOrKey) && isset($value)) {
             static::$options[$optionsOrKey] = $value;
-        } else {
-            if (is_array($optionsOrKey)) {
-                static::$options = $optionsOrKey;
-            }
+        } elseif (is_array($optionsOrKey)) {
+            static::$options = $optionsOrKey;
         }
     }
 
@@ -34,99 +37,82 @@ class Options
             return static::$options[$field];
         } elseif (!isset($field) && isset(static::$options)) {
             return static::$options;
-        } else {
-            return null;
         }
+        return null;
     }
 
-    /**
-     * Returns the list of all MapSVG options (key/value pairs).
-     * @return array
-     */
     public static function getAll()
     {
-        $db = Database::get();
-        $res = $db->get_results("SELECT * FROM " . $db->mapsvg_prefix . "settings", ARRAY_A);
         $response = array();
-        foreach ($res as $field) {
-            $response[$field['key']] = static::decodeValue($field['key'], $field['value']);
+        foreach (self::store()->all() as $field) {
+            $response[$field['key']] = static::decodeValue(
+                $field['key'],
+                $field['value']
+            );
         }
         static::setCache($response);
+        // Legacy account API tokens must not reach either admin bootstrap or REST responses.
+        unset($response['apiKey']);
         return $response;
     }
 
-    /**
-     * Returns an option value by its name
-     * @return mixed
-     */
     public static function get($field)
     {
         if (isset(static::$options) && is_array(static::$options) && array_key_exists($field, static::$options)) {
             return static::$options[$field];
         }
-        $db = Database::get();
-        $value = $db->get_var("SELECT value FROM " . $db->mapsvg_prefix . "settings WHERE `key`='" . esc_sql($field) . "'");
+
+        $row = self::store()->findOne(array('key' => $field));
+        $value = $row === null ? null : $row['value'];
         $value = static::decodeValue($field, $value);
         static::setCache($field, $value);
         return $value;
     }
 
-    /**
-     * Sets an option value
-     * @return void
-     */
     public static function set($field, $value)
     {
-        if (static::hasAccessTo($field)) {
-            $db = Database::get();
-            $encoded = static::encodeValue($field, $value);
-            $db->replace($db->mapsvg_prefix . "settings", ["key" => $field, "value" => $encoded]);
-            static::setCache($field, $value);
+        if (!static::hasAccessTo($field)) {
+            return;
         }
+
+        $store = self::store();
+        $encoded = static::encodeValue($field, $value);
+        if ($store->findOne(array('key' => $field)) !== null) {
+            $store->update(
+                array('value' => $encoded),
+                array('key' => $field)
+            );
+        } else {
+            $store->insert(array(
+                'key' => $field,
+                'value' => $encoded,
+            ));
+        }
+        static::setCache($field, $value);
     }
 
-    /**
-     * Sets an option value
-     * @param array $fields
-     * @return void
-     */
     public static function setAll($fields)
     {
-        $db = Database::get();
         foreach ($fields as $key => $value) {
             static::set($key, $value);
         }
     }
 
-    /**
-     * Deletes an option from the database
-     * @param string $field The name of the option to delete
-     * @return bool True if the option was successfully deleted, false otherwise
-     */
     public static function delete($field)
     {
-        if (static::hasAccessTo($field)) {
-            $db = Database::get();
-            $result = $db->delete(
-                $db->mapsvg_prefix . "settings",
-                ['key' => $field]
-            );
-            if ($result !== false) {
-                static::clearCache($field);
-                return true;
-            }
+        if (!static::hasAccessTo($field)) {
+            return false;
         }
-        return false;
+
+        self::store()->delete(array('key' => $field));
+        static::clearCache($field);
+        return true;
     }
 
-    /**
-     * Clears the cache for a specific field or all fields
-     * @param string|null $field The field to clear from cache, or null to clear all
-     */
     private static function clearCache($field = null)
     {
         if ($field === null) {
-            static::$cache = [];
+            static::$cache = array();
         } else {
             unset(static::$cache[$field]);
         }
@@ -134,42 +120,60 @@ class Options
 
     public static function decodeValue($field, $value)
     {
-        if (in_array($field, ['seen_whats_new', 'debug', 'chatConsentAccepted'])) {
-            $value = (bool)$value;
-            return $value;
-        } elseif (in_array($field, ['mappable_post_types', 'allowed_shortcodes'])) {
+        if (in_array(
+            $field,
+            array('seen_whats_new', 'debug', 'chatConsentAccepted')
+        )) {
+            return (bool) $value;
+        }
+
+        if (in_array(
+            $field,
+            array(
+                'mappable_post_types',
+                'allowed_shortcodes',
+                'post_editor_last_map',
+            )
+        )) {
             $decoded = $value === null ? null : json_decode($value, true);
             if (is_array($decoded)) {
                 return $decoded;
-            } else {
-                return $decoded !== null ? [$decoded] : [];
             }
-        } else {
-            return $value;
+            return $decoded !== null ? array($decoded) : array();
         }
+
+        return $value;
     }
+
     public static function encodeValue($field, $value)
     {
-        if (is_array($value) && ($field === 'mappable_post_types' || $field === 'allowed_shortcodes')) {
-            // Trim each value and remove duplicates
-            foreach ($value as &$v) {
-                $v = trim($v);
+        if (is_array($value) && in_array(
+            $field,
+            array(
+                'mappable_post_types',
+                'allowed_shortcodes',
+                'post_editor_last_map',
+            )
+        )) {
+            if (in_array(
+                $field,
+                array('mappable_post_types', 'allowed_shortcodes')
+            )) {
+                foreach ($value as &$item) {
+                    $item = trim($item);
+                }
+                unset($item);
+                $value = array_unique($value);
             }
-            unset($v); // break reference
-            $value = array_unique($value);
             return wp_json_encode($value, JSON_UNESCAPED_UNICODE);
-        } else {
-            return $value;
         }
+
+        return $value;
     }
 
     public static function hasAccessTo($fieldName)
     {
         $isProtected = in_array($fieldName, static::$protected);
-        if ($isProtected) {
-            return current_user_can("create_users"); // is admin
-        } else {
-            return true;
-        }
+        return $isProtected ? current_user_can('create_users') : true;
     }
 }

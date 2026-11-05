@@ -82,8 +82,11 @@ export class FormElementFactory {
       post: FormElementTypes.PostFormElement,
       radio: FormElementTypes.RadioFormElement,
       region: FormElementTypes.RegionsFormElement,
+      relation: FormElementTypes.RegionsFormElement,
       save: FormElementTypes.SaveFormElement,
-      
+      // START filters
+      search: FormElementTypes.SearchFormElement,
+      // END
       select: FormElementTypes.SelectFormElement,
       status: FormElementTypes.StatusFormElement,
       text: FormElementTypes.TextFormElement,

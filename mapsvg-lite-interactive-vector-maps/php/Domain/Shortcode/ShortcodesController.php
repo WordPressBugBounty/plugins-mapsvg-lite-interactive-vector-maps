@@ -7,11 +7,6 @@ class ShortcodesController extends Controller
     public static function get($request)
     {
 
-        $allowedShortcodes = Options::get('allowed_shortcodes');
-        if (!$allowedShortcodes) {
-            $allowedShortcodes = array();
-        }
-
         $shortcode = stripslashes(urldecode($request['shortcode']));
 
         if (empty($shortcode)) {
@@ -20,7 +15,7 @@ class ShortcodesController extends Controller
 
         $shortcodeName = Shortcode::getName($shortcode);
 
-        if (!in_array($shortcodeName, $allowedShortcodes)) {
+        if (!Shortcode::isAllowed($shortcode)) {
             return self::render("Add \"$shortcodeName\" to the allowed shortcodes in the MapSVG settings.", 200, "text");
         } else {
             $shortcode = do_shortcode($shortcode);

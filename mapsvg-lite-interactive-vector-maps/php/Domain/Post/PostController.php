@@ -14,6 +14,7 @@ class PostController extends Controller
 	 */
 	public static function index($request)
 	{
+        if (!\MapSVG\Core\PostDataFeature::isEnabled()) return self::render(['error' => 'WordPress data sources require a paid MapSVG add-on.'], 403);
 		$query = new Query($request->get_params());
 		$postsRepo = new PostsRepository();
 		$posts = $postsRepo->find($query);

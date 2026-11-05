@@ -1,4 +1,4 @@
-import { deepMerge, fixColorHash, parseBoolean } from "@/Core/Utils"
+import { deepMerge } from "@/Core/Utils"
 import { SchemaField } from "../../../Infrastructure/Server/SchemaField"
 import { FormBuilder } from "../../FormBuilder"
 import { FormElement } from "../FormElement"
@@ -6,7 +6,8 @@ import { FormElement } from "../FormElement"
 const $ = jQuery
 
 /**
- *
+ * Status field editor: data only ({ label, value }).
+ * SVG color / disabled live in map options.regionStatuses (Components → Region).
  */
 export class StatusFormElement extends FormElement {
   declare inputs: { select: HTMLSelectElement }
@@ -44,49 +45,16 @@ export class StatusFormElement extends FormElement {
 
   initEditor() {
     super.initEditor()
-    const _this = this
-    $(_this.domElements.edit)
-      .find(".cpicker")
-      .colorpicker()
-      .on("changeColor.colorpicker", function (event) {
-        const input = $(this).find("input")
-        const index = $(this).closest("tr").index()
-        if (input.val() == "") $(this).find("i").css({ "background-color": "" })
-        _this.options[index] = _this.options[index] || {
-          label: "",
-          value: "",
-          color: "",
-          disabled: false,
-        }
-        input[0].value = fixColorHash(input.val())
-        _this.options[index]["color"] = input.val()
-      })
-    _this.mayBeAddStatusRow()
+    this.mayBeAddStatusRow()
   }
 
   mayBeAddStatusRow(): void {
     const _this = this
     const editStatusRow = $($("#mapsvg-edit-status-row").html())
-    // if there's something in the last status edit field, add +1 status row
     const z = $(_this.domElements.edit).find(".mapsvg-edit-status-label:last-child")
     if (z && z.last() && z.last().val() && (z.last().val() + "").trim().length) {
       const newRow = editStatusRow.clone()
       newRow.insertAfter($(_this.domElements.edit).find(".mapsvg-edit-status-row:last-child"))
-      newRow
-        .find(".cpicker")
-        .colorpicker()
-        .on("changeColor.colorpicker", function (event) {
-          const input = $(this).find("input")
-          const index = $(this).closest("tr").index()
-          if (input.val() == "") $(this).find("i").css({ "background-color": "" })
-          _this.options[index] = _this.options[index] || {
-            label: "",
-            value: "",
-            color: "",
-            disabled: false,
-          }
-          _this.options[index]["color"] = input.val()
-        })
     }
     const rows = $(_this.domElements.edit).find(".mapsvg-edit-status-row")
     const row1 = rows.eq(rows.length - 2)
@@ -97,13 +65,11 @@ export class StatusFormElement extends FormElement {
       row2.length &&
       !(
         row1.find("input:eq(0)").val().toString().trim() ||
-        row1.find("input:eq(1)").val().toString().trim() ||
-        row1.find("input:eq(2)").val().toString().trim()
+        row1.find("input:eq(1)").val().toString().trim()
       ) &&
       !(
         row2.find("input:eq(0)").val().toString().trim() ||
-        row2.find("input:eq(1)").val().toString().trim() ||
-        row2.find("input:eq(2)").val().toString().trim()
+        row2.find("input:eq(1)").val().toString().trim()
       )
     ) {
       row2.remove()
@@ -122,16 +88,15 @@ export class StatusFormElement extends FormElement {
     const schema = super.getSchema()
 
     const opts = deepMerge({}, { options: this.options })
-    schema.options = opts.options
+    schema.options = (opts.options || [])
+      .filter((option) => option && option.value !== "" && option.value != null)
+      .map((option) => ({
+        label: option.label,
+        value: option.value,
+      }))
     schema.optionsDict = {}
-
-    schema.options.forEach(function (option, index) {
-      if (schema.options[index].value === "") {
-        schema.options.splice(index, 1)
-      } else {
-        schema.options[index].disabled = parseBoolean(schema.options[index].disabled)
-        schema.optionsDict[option.value] = option
-      }
+    schema.options.forEach(function (option) {
+      schema.optionsDict[option.value] = option
     })
 
     return schema

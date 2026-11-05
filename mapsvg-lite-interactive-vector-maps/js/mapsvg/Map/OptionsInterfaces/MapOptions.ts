@@ -1,5 +1,11 @@
+import type { MapSettingsBase } from "./MapOptionsContract"
+import type { TypographyOptions } from "../../Core/typography"
+import type { RegionDataRules } from "../../Region/dataRules"
+import type { MarkerDataRules } from "../../Marker/dataRules"
+import type { GalleryOptions } from "../../Gallery/gallery-options"
 import { MiddlewareType } from "@/Core/Middleware"
 import { SchemaOptions } from "@/Infrastructure/Server/Schema"
+import type { MapSvgNode, SceneNode } from "@/Components/NodesRegistry"
 import { ArrayIndexed } from "../../Core/ArrayIndexed"
 import { SchemaField } from "../../Infrastructure/Server/SchemaField"
 import { GeoPoint } from "../../Location/Location"
@@ -18,45 +24,48 @@ export type RegionStatusOptionsCollection = Record<string, RegionStatusOptions>
 /**
  * MapOptions interface is used to control the correct types of map options, passed during the initialization of the map or updating it.
  */
-export interface MapOptions {
-  useShadowRoot?: boolean
+export interface MapOptions extends MapSettingsBase {
+  showPagination?: boolean
+  typography?: Partial<TypographyOptions>
   theme?: {
     name: string
   }
   id: number
-  title?: string
   backend?: boolean // passed from admin
+  /** Runtime flag from PHP: WooCommerce plugin is installed and active. */
+  woocommerce?: boolean
   db_map_id?: number | string
-  source?: string
   // Contents of an SVG file if it was preloaded
   svgData?: string
   regionsDynamicStatus?: {
     filtered?: string | number | undefined
     noObjects?: string | number | undefined
   }
-  regionPrefix?: string
+  /** Priority order of the dynamic-status rules (top = highest priority, wins on conflict). */
+  regionsDynamicStatusOrder?: string[]
+  /** When true, front sets region status from a synced field via statusSyncMap. */
+  statusSyncOn?: boolean
+  /**
+   * Where statusSyncField is read from.
+   * "objects" — linked DB objects (default); "regions" — the region row itself.
+   */
+  statusSyncSource?: "objects" | "regions"
+  /** Full field path with type prefix, e.g. "Object.post.meta._stock_status" or "Region.title". */
+  statusSyncField?: string
+  /**
+   * Strategy when several linked objects have different values for statusSyncField.
+   * "priority" — first matching statusSyncMap row (top = highest) wins.
+   * "special" — use the map entry with value "__multiple__".
+   */
+  statusSyncMultiStrategy?: "priority" | "special"
+  /** Field value → region status id. Empty status = leave region status unchanged. */
+  statusSyncMap?: Array<{ value: string; status: string }>
   groups?: ArrayIndexed<GroupOptionsInterface>
-  galleries?: ArrayIndexed<GalleryOptionsInterface>
+  galleries?: GalleryOptions[]
   layersControl?: LayersControlOptionsInterface
-  disableAll?: boolean
-  responsive?: boolean
-  loadingText?: string
-  width?: number
-  height?: number
-  viewBox?: number[]
-  lockAspectRatio?: boolean
-  padding?: { top: number; left: number; right: number; bottom: number }
-  cursor?: string
-  multiSelect?: boolean
-  colorsIgnore?: boolean
   inBackend?: boolean
-  defaultMarkerImage?: string
-  fitMarkers?: boolean
-  fitMarkersOnStart?: boolean
-  fitSingleMarkerZoom?: number
   menu?: DirectoryOptions
   colors?: ColorsOptions
-  clustering?: { on: boolean; maxZoom: number }
   /**
    * Zoom
    */
@@ -64,15 +73,14 @@ export interface MapOptions {
   scroll?: ScrollOptions
   tooltips?: TooltipsOptions
   popovers?: PopoversOptions
+  regionDataRules?: RegionDataRules
+  markerDataRules?: MarkerDataRules
   regionStatuses?: RegionStatusOptionsCollection
   events?: { [key: string]: string }
   middlewares?: { [K in MiddlewareType]: string }
   choropleth?: ChoroplethOptions
-  regionChoroplethField?: string
   regions?: RegionOptionsCollection
   database?: DatabaseOptions
-  labelsMarkers?: { on: boolean }
-  labelsRegions?: { on: boolean }
   googleMaps?: {
     on: boolean
     apiKey: string
@@ -84,6 +92,21 @@ export interface MapOptions {
     language: string
   }
   css?: string
+  layout?: {
+    /** Suppress legacy automatic Map/Toolbar seeding after explicit deletion. */
+    deletedNodeTypes?: string[]
+    mountMode?: "tree"
+    column?: number
+    gap?: number
+    cellHeight?: number
+    grids?: {
+      desktop?: Array<{ id: string; x: number; y: number; w: number; h: number }>
+      tablet?: Array<{ id: string; x: number; y: number; w: number; h: number }>
+      mobile?: Array<{ id: string; x: number; y: number; w: number; h: number }>
+    }
+  }
+  nodes?: Array<MapSvgNode> | ArrayIndexed<MapSvgNode>
+  scenes?: Array<SceneNode> | ArrayIndexed<SceneNode>
   containers?: {
     leftSidebar: { on: boolean; width: string; height: string }
     rightSidebar: { on: boolean; width: string; height: string }
@@ -99,21 +122,30 @@ export interface MapOptions {
     containerId: string
     margin: string
     autoresize: boolean
+    borderRadius?: number
+    padding?: {
+      top?: number
+      right?: number
+      bottom?: number
+      left?: number
+    }
+    boxShadow?: {
+      on?: boolean
+      value?: number
+    }
   }
   mobileView?: {
     [key: string]: any
   }
-  templates?: {
-    directory: string
-    directoryItem: string
-    labelRegion: string
-    popoverRegion: string
-    popoverMarker: string
-    tooltipRegion: string
-    tooltipMarker: string
-    detailsViewRegion: string
-    detailsView: string
-  }
+  templates?: Record<
+    string,
+    {
+      html: string
+      css: string
+      js: string
+      type: "default" | "partial"
+    }
+  >
   controls?: ControlsOptions
   actions?: {
     region: {
@@ -158,13 +190,26 @@ export interface PaginationOptions {
   next: string
 }
 
+export type AutoRefetchUnit = "s" | "m" | "h"
+
+export interface AutoRefetchOptions {
+  on: boolean
+  value: number
+  unit: AutoRefetchUnit
+}
+
 export interface DatabaseOptions {
   pagination: PaginationOptions
   loadOnStart: boolean
   noFiltersNoLoad: boolean
+  autoRefetch: AutoRefetchOptions
+  regionsAutoRefetch: AutoRefetchOptions
+  /** @deprecated v8 source fallback; named Page bindings resolve their Query's source. */
   regionsTableName: string
+  /** @deprecated v8 source fallback; named Page bindings resolve their Query's source. */
   objectsTableName: string
   on: boolean
+  /** @deprecated Runtime v8 defaults only. Omitted from new Query-bound App documents. */
   schemas: {
     regions: SchemaOptions
     objects: SchemaOptions
@@ -203,12 +248,7 @@ export interface GroupOptionsInterface {
   objects: Array<{ label: string; value: string }>
   visible: boolean
 }
-export interface GalleryOptionsInterface {
-  id: string
-  title: string
-  objects: Array<{ label: string; value: string }>
-  visible: boolean
-}
+export type GalleryOptionsInterface = GalleryOptions
 export interface LayersControlOptionsInterface {
   on: boolean
   label: string
@@ -226,6 +266,7 @@ export interface ControlsOptions {
 }
 
 export interface DirectoryOptions {
+  showPagination?: boolean
   showFirst: string
   showMapOnClick: boolean
   noResultsText: string

@@ -11,7 +11,11 @@
              {{#unless editMode}}
                  <div class="mapsvg-marker-image-selector" style="display: none;">
                      <div class="mapsvg-marker-images"></div>
-                     {{premiumFeatureAlert "Upload a custom marker image"}}
+                     <!-- START marker_upload -->
+                     <div class="btn btn-outline-secondary  btn-file" data-loading-text="Uploading..." style="margin: 5px 0;">
+                         Upload <input type="file" name="marker" class="marker-file-uploader" />
+                     </div>
+                     <!-- END REPLACE {{premiumFeatureAlert "Upload a custom marker image"}} -->
                  </div>
              {{/unless}}
          </div>

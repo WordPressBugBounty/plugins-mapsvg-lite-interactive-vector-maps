@@ -5,6 +5,11 @@
   -o-transition: transform 0.4s;
   transition: transform 0.4s;
 }
+.mapsvg.mapsvg-hide-marker-node .mapsvg-marker,
+.mapsvg.mapsvg-hide-marker-node .mapsvg-marker-label,
+.mapsvg.mapsvg-hide-marker-node .mapsvg-marker-bubble {
+  display: none !important;
+}
 .no-transitions-markers .mapsvg-marker,
 .no-transitions-markers .mapsvg-marker-cluster {
   -webkit-transition: none;
@@ -66,7 +71,7 @@
   margin-top: 3px;
   transform: translateX(-50%);
   pointer-events: none;
-  font-family: "Helvetica", sans-serif;
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
 }
 
 .mapsvg-marker-label {

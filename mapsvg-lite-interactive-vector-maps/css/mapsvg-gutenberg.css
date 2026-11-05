@@ -1,7 +1,13 @@
 @import url("../js/vendor/bootstrap-icons/font/bootstrap-icons.min.css");
 
 .mapsvg-data-form-view {
-  flex-direction: column;
+  flex-direction: column !important;
+}
+#mapsvg_location_meta_box {
+  overflow: visible;
+}
+.mapsvg-sidebar-right {
+  overflow: visible;
 }
 .mapsvg-form-builder .btn {
   display: inline-block;
@@ -182,25 +188,70 @@ input.typeahead.form-control.tt-input {
   width: 100%;
 }
 
-#mapsvg-classic-editor-container {
-  display: flex;
-  flex-direction: row;
-}
-#mapsvg-classic-editor-container .mapsvg-shadow-root {
-  flex-grow: 1;
-}
-#mapsvg-classic-editor-container #mapsvg-filters {
-  width: 400px;
-  margin-left: 10px;
+/* —— Post editor Location panel (host shadow) —— */
+.mapsvg-location-host {
+  display: block;
+  width: 100%;
+  min-height: 200px;
 }
 
+.mapsvg-location-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Gutenberg plugin sidebar is narrow — always stack */
+.mapsvg-location-layout--sidebar {
+  flex-direction: column;
+}
+
+#mapsvg-preview,
+#mapsvg-form-container {
+  flex: 1 1 50%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+#mapsvg-preview {
+  /* min-height: 280px; */
+  position: relative;
+}
+
+#mapsvg-preview .mapsvg-wrap-all,
+#mapsvg-preview .mapsvg,
+#mapsvg-preview #mapsvg {
+  width: 100%;
+  height: 100%;
+  /* min-height: 280px; */
+}
+
+#mapsvg-form-container {
+  padding: 4px 0;
+  overflow: auto;
+}
+
+#mapsvg-form-container:empty {
+  display: none;
+}
+
+/* Classic metabox: tablet / mobile stack */
 @media screen and (max-width: 782px) {
-  #mapsvg-classic-editor-container {
+  .mapsvg-location-layout--classic {
     flex-direction: column;
   }
-  #mapsvg-classic-editor-container #mapsvg-filters {
+
+  .mapsvg-location-layout--classic #mapsvg-preview,
+  .mapsvg-location-layout--classic #mapsvg-form-container {
+    flex: 1 1 auto;
     width: 100%;
-    margin-left: 0;
-    margin-top: 10px;
+    max-width: 100%;
+  }
+
+  .mapsvg-location-layout--classic #mapsvg-preview {
+    min-height: 220px;
   }
 }

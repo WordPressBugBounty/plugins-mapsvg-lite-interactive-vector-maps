@@ -11,6 +11,7 @@ class PostTypesRepository
    */
   public function find(): array
   {
+    if (!\MapSVG\Core\PostDataFeature::isEnabled()) return [];
     $args = array(
       '_builtin' => false
     );
@@ -39,6 +40,7 @@ class PostTypesRepository
    */
   public function get(string $post_type): array
   {
+        \MapSVG\Core\PostDataFeature::assertEnabled();
     // Get taxonomies for the post type
     $taxonomies = [];
     $tax_objs = get_object_taxonomies($post_type, 'objects');
@@ -95,6 +97,34 @@ class PostTypesRepository
       }
     }
 
+    // Add real meta keys stored in wp_postmeta (incl. plugin/WooCommerce meta such as
+    // "_stock_status" that are not registered via register_meta). Underscore-prefixed keys are
+    // kept — the field picker uses select2 with search, so a long list is fine.
+    if (Utils::isSafeSlug($post_type)) {
+      $db  = Database::get();
+      $sql = $db->prepare(
+        "SELECT DISTINCT pm.meta_key FROM {$db->postmeta} pm
+                INNER JOIN {$db->posts} p ON pm.post_id = p.ID
+                WHERE p.post_type = %s AND pm.meta_key != ''",
+        $post_type
+      );
+      $meta_keys = $db->get_col($sql, 0);
+      if (is_array($meta_keys)) {
+        $existing = array_column($meta, 'name');
+        foreach ($meta_keys as $meta_key) {
+          if ($meta_key === null || $meta_key === '' || in_array($meta_key, $existing, true)) {
+            continue;
+          }
+          $meta[]     = [
+            'name'  => $meta_key,
+            'type'  => 'string',
+            'label' => ucfirst($meta_key),
+          ];
+          $existing[] = $meta_key;
+        }
+      }
+    }
+
     return [
       'postType'  => $post_type,
       'taxonomy' => $taxonomies,
@@ -114,6 +144,7 @@ class PostTypesRepository
    */
   public function getFieldValues($fieldName, $post_type)
   {
+        \MapSVG\Core\PostDataFeature::assertEnabled();
     $column = PublicPostColumns::canonicalName($fieldName);
     if ($column === null || !Utils::isSafeSlug($post_type)) {
       return [];
@@ -143,6 +174,7 @@ class PostTypesRepository
    */
   public function getTaxonomyValues($name, $post_type)
   {
+        \MapSVG\Core\PostDataFeature::assertEnabled();
     if (!Utils::isSafeSlug($name) || !Utils::isSafeSlug($post_type)) {
       return [];
     }
@@ -170,6 +202,7 @@ class PostTypesRepository
    */
   public function getMetaValues($name, $post_type)
   {
+        \MapSVG\Core\PostDataFeature::assertEnabled();
     if (!Utils::isSafeSlug($name) || !Utils::isSafeSlug($post_type)) {
       return [];
     }

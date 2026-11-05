@@ -23,7 +23,112 @@
     </div>
 </div>
 
+<!-- START purchase_code -->
+<?php
+$licenseUi = isset($data['licenseUi']) && is_array($data['licenseUi']) ? $data['licenseUi'] : ['enabled' => false];
+if (!empty($licenseUi['enabled'])) :
+?>
+    <div class="modal fade" id="mapsvg-license-modal" tabindex="-1" role="dialog"
+        aria-labelledby="mapsvg-license-modal-title" aria-hidden="true"
+        data-has-code="<?php echo !empty($licenseUi['hasCode']) ? '1' : '0'; ?>"
+        data-license-ok="<?php echo !empty($licenseUi['licenseOk']) ? '1' : '0'; ?>"
+        data-license-key="<?php echo esc_attr($licenseUi['purchaseCode'] ?? ''); ?>"
+        data-current-domain="<?php echo esc_attr($licenseUi['currentDomain'] ?? ''); ?>">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header flex-column align-items-stretch">
+                    <div class="d-flex w-100 align-items-center justify-content-between">
+                        <h4 class="modal-title mb-0" id="mapsvg-license-modal-title">License</h4>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="alert alert-danger mb-0 mt-3" role="alert" id="mapsvg-modal-license-error"
+                        data-error-persistent="<?php echo !empty($licenseUi['showLicenseError']) ? '1' : '0'; ?>"
+                        <?php echo !empty($licenseUi['showLicenseError']) ? '' : "style='display:none'"; ?>>
+                        <div class="mapsvg-license-error-message<?php echo (!empty($licenseUi['showDomainRecheck']) || !empty($licenseUi['showCancelledCta'])) ? ' mb-2' : ''; ?>">
+                            <?php
+                            if (!empty($licenseUi['showLicenseError']) && !empty($licenseUi['modalErrorHtml'])) {
+                                echo $licenseUi['modalErrorHtml']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- LicenseStatus::formatModalAlertHtml()
+                            }
+                            ?>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary mapsvg-btn-recheck-license"
+                            data-loading-text="Checking..."
+                            <?php echo (!empty($licenseUi['showLicenseError']) && !empty($licenseUi['showDomainRecheck'])) ? '' : "style='display:none'"; ?>>
+                            I updated domain settings
+                        </button>
+                    </div>
+                    <div class="alert alert-warning mb-0 mt-3" role="alert" id="mapsvg-modal-license-warning"
+                        data-warning-persistent="<?php echo !empty($licenseUi['showLicenseWarning']) ? '1' : '0'; ?>"
+                        <?php echo !empty($licenseUi['showLicenseWarning']) ? '' : "style='display:none'"; ?>>
+                        <div class="mapsvg-license-warning-message">
+                            <?php
+                            if (!empty($licenseUi['showLicenseWarning']) && !empty($licenseUi['modalWarningHtml'])) {
+                                echo $licenseUi['modalWarningHtml']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- LicenseStatus::formatDomainLimitSoftModalAlertHtml()
+                            }
+                            ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div id="mapsvg-license-status"
+                        <?php echo !empty($licenseUi['showStatusPanel']) ? '' : "style='display:none'"; ?>>
+                        <div class="mb-3 d-flex flex-wrap align-items-center gap-2" id="mapsvg-license-current"
+                            <?php echo !empty($licenseUi['hasCode']) ? '' : "style='display:none'"; ?>>
+                            <span>This site is using license
+                                <code id="mapsvg-license-masked"><?php echo esc_html($licenseUi['maskedKey'] ?? ''); ?></code></span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mapsvg-copy-license-key"
+                                title="Copy to clipboard" aria-label="Copy license key">
+                                <i class="bi bi-copy" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="mb-3" id="mapsvg-license-registered-domain"
+                            <?php echo !empty($licenseUi['hasCode']) && !empty($licenseUi['currentDomain']) ? '' : "style='display:none'"; ?>>
+                            Registered for domain
+                            <code id="mapsvg-license-domain"><?php echo esc_html($licenseUi['currentDomain'] ?? ''); ?></code>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-outline-secondary" id="mapsvg-btn-change-license"
+                                <?php echo !empty($licenseUi['hasCode']) ? '' : "style='display:none'"; ?>>
+                                Change license key
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" id="mapsvg-btn-deactivate-license"
+                                data-loading-text="Deactivating..."
+                                <?php echo !empty($licenseUi['hasCode']) ? '' : "style='display:none'"; ?>>
+                                Deactivate
+                            </button>
+                        </div>
+                    </div>
 
+                    <div id="mapsvg-alert-activate"
+                        <?php echo !empty($licenseUi['showFormPanel']) ? '' : "style='display:none'"; ?>>
+                        <div class="mb-3" id="mapsvg-license-form-intro">
+                            Enter your license key to enable automatic updates.
+                            Get your license key from
+                            <a href="https://mapsvg.com/dashboard" target="_blank" rel="noopener noreferrer">MapSVG Dashboard <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>.
+                        </div>
+                        <form class="form" id="mapsvg-purchase-code-form">
+                            <div class="mb-2">
+                                <input type="text" class="form-control w-100" name="purchase_code" autocomplete="off"
+                                    value="" placeholder="XXXX-XXXX-XXXX-XXXX" />
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-primary" id="mapsvg-btn-activate"
+                                    data-loading-text="Checking...">
+                                    Activate
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="mapsvg-btn-cancel-change-license"
+                                    <?php echo !empty($licenseUi['hasCode']) ? '' : "style='display:none'"; ?>>
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+<!-- END REPLACE -->
 
 <?php if (isset($data['mapsvg_error'])) { ?>
     <div class="alert alert-danger">

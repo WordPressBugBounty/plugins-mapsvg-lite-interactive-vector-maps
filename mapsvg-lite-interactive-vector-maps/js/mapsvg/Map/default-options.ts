@@ -1,3 +1,8 @@
+import { PRODUCT_EMBED_HTML as defProductEmbedHtml } from "./productEmbedDefault"
+import { BUILTIN_TEMPLATE_HTML } from "./templatePresets"
+import { DEFAULT_TYPOGRAPHY } from "../Core/typography"
+import { toTemplateEntry } from "./templateEntry"
+
 const defRegionTemplate =
   "<div>\n" +
   "  <p>This is the demo content of the <strong>Region %templateType%</strong>.</p>\n" +
@@ -53,12 +58,291 @@ const defDBTemplate =
   "  {{/each}}\n" +
   "</p>"
 
+const defProductCardHtml = `<!--
+  ProductCard — WooCommerce product card (inline fields).
+
+  Recommended: Details View + style preset "Card".
+
+  Usage as partial (e.g. in Region Details):
+  [[>ProductCard product=objects.0.post]]
+
+  Replace [] symbols in the example with {}
+
+  Buttons:
+  - Add to cart — optional: replace the Book now block with [[[product.add_to_cart_html]]]
+    (Woo form HTML for simple purchasable products; use triple braces so HTML is not escaped).
+  - Book now — shown when product.book_now_url is set (checkout URL that adds the product).
+  - View product — fallback link to product.url when book_now_url is empty.
+  - Variable/grouped/external products: when product.use_product_embed is true, the full
+    Woo embed [[[product]]] is used instead of this card.
+-->
+{{#if product}}
+  {{#if product.use_product_embed}}
+    {{product}}
+  {{else}}
+    <article class="mapsvg-product-simple">
+      <div class="mapsvg-product-gallery">
+        {{#if product.gallery.0.full}}
+          <img src="{{product.gallery.0.full}}" alt="{{product.post_title}}" class="mapsvg-product-image" loading="lazy" />
+        {{/if}}
+      </div>
+
+      <div class="mapsvg-product-body">
+        <h2 class="mapsvg-product-title">{{product.post_title}}</h2>
+
+        {{#if product.sku}}
+          <div class="mapsvg-product-badges">
+            <span class="mapsvg-product-badge">{{product.sku}}</span>
+            {{#if product.is_on_sale}}
+              <span class="mapsvg-product-badge">Sale</span>
+            {{/if}}
+          </div>
+        {{else}}
+          {{#if product.is_on_sale}}
+            <div class="mapsvg-product-badges">
+              <span class="mapsvg-product-badge">Sale</span>
+            </div>
+          {{/if}}
+        {{/if}}
+
+        {{#if product.short_description}}
+          <div class="mapsvg-product-excerpt">{{{product.short_description}}}</div>
+        {{/if}}
+
+        <div class="mapsvg-product-footer">
+          {{#if product.price_html}}
+            <div class="mapsvg-product-price-wrap">
+              <span class="mapsvg-product-price-label">Price</span>
+              <div class="mapsvg-product-price">{{{product.price_html}}}</div>
+            </div>
+          {{/if}}
+
+          {{#if product.book_now_url}}
+            <div class="mapsvg-product-cart">
+              <a class="mapsvg-product-cart-link" href="{{product.book_now_url}}">Book now</a>
+            </div>
+          {{else}}
+            <div class="mapsvg-product-cart">
+              <a class="mapsvg-product-cart-link" href="{{product.url}}" target="_blank" rel="noopener">View product</a>
+            </div>
+          {{/if}}
+        </div>
+      </div>
+    </article>
+  {{/if}}
+{{/if}}`
+
+const defProductCardCss = `.mapsvg-product-simple {
+  --ms-text: #111;
+  --ms-muted: #8a8a8e;
+  --ms-desc: #5c5c62;
+  --ms-line: #e4e4ea;
+  --ms-bg: #fff;
+  --ms-accent: #5c5890;
+  --ms-accent-hover: #4f4b7e;
+  --ms-grad-from: #c4c0ff;
+  --ms-grad-to: #6b6698;
+  --ms-btn-radius: 12px;
+
+  background: var(--ms-bg);
+  overflow: hidden;
+  color: var(--ms-text);
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  width: 100%;
+}
+
+.mapsvg-product-gallery {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  height: fit-content;
+  display: block;
+  overflow: hidden;
+}
+
+.mapsvg-product-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}
+
+.mapsvg-product-body {
+  padding: 10px 20px 20px 15px;
+}
+
+.mapsvg-product-title {
+  margin: 0 0 10px;
+  font-size: 1.35rem;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.mapsvg-product-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.mapsvg-product-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid var(--ms-line);
+  border-radius: 6px;
+  color: var(--ms-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.mapsvg-product-excerpt {
+  margin: 0 0 18px;
+  color: var(--ms-desc);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.mapsvg-product-excerpt p {
+  margin: 0;
+}
+
+.mapsvg-product-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mapsvg-product-price-wrap {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.mapsvg-product-price-label {
+  display: block;
+  margin: 0 0 2px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+}
+
+.mapsvg-product-price {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--ms-text);
+}
+
+.mapsvg-product-price del {
+  color: var(--ms-muted);
+  font-weight: 500;
+  font-size: 0.85em;
+  margin-right: 0.35em;
+}
+
+.mapsvg-product-price ins {
+  text-decoration: none;
+  color: var(--ms-text);
+  font-weight: 700;
+}
+
+.mapsvg-product-price .amount {
+  white-space: nowrap;
+}
+
+.mapsvg-product-cart {
+  flex: 1 1 auto;
+  margin: 0;
+  max-width: 62%;
+}
+
+.mapsvg-product-cart form.cart {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  margin: 0;
+}
+
+.mapsvg-product-cart .quantity,
+.mapsvg-product-cart input.qty {
+  display: none !important;
+}
+
+.mapsvg-product-cart button,
+.mapsvg-product-cart .single_add_to_cart_button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: var(--ms-btn-radius);
+  padding: 0 18px;
+  background: var(--ms-accent);
+  color: #fff !important;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.mapsvg-product-cart button svg,
+.mapsvg-product-cart .single_add_to_cart_button svg {
+  display: block;
+  flex-shrink: 0;
+  width: 1.15em;
+  height: 1.15em;
+  stroke: currentColor;
+}
+
+.mapsvg-product-cart button:hover,
+.mapsvg-product-cart .single_add_to_cart_button:hover {
+  background: var(--ms-accent-hover);
+}
+
+.mapsvg-product-cart-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 46px;
+  border-radius: var(--ms-btn-radius);
+  padding: 0 18px;
+  background: var(--ms-accent);
+  color: #fff !important;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none !important;
+}
+
+.mapsvg-product-cart-link:hover {
+  background: var(--ms-accent-hover);
+  color: #fff !important;
+}
+`
+
+
+
 /**
  * @ignore
  */
 const DefaultOptions = {
   source: "",
   useShadowRoot: true,
+  typography: DEFAULT_TYPOGRAPHY,
   theme: {
     name: "default",
   },
@@ -104,6 +388,12 @@ const DefaultOptions = {
     filtered: undefined,
     noObjects: undefined,
   },
+  regionsDynamicStatusOrder: ["statusSync", "noObjects", "filtered"],
+  statusSyncOn: false,
+  statusSyncSource: "objects",
+  statusSyncField: "",
+  statusSyncMultiStrategy: "priority",
+  statusSyncMap: [],
   clustering: { on: false, maxZoom: 17 },
   viewBox: [],
   cursor: "default",
@@ -375,21 +665,6 @@ const DefaultOptions = {
   
 }`,
     /**
-     * Directory
-     */
-    "click.directoryItem": `function(event) {
-  const { map, data: { region, object, directoryItem } } = event      
-  
-}`,
-    "mouseover.directoryItem": `function(event) {
-  const { map, data: { region, object, directoryItem } } = event      
-  
-}`,
-    "mouseout.directoryItem": `function(event) {
-  const { map, data: { region, object, directoryItem } } = event        
-  
-}`,
-    /**
      * Popover
      */
     "beforeRedraw.popover": `function(event) {
@@ -482,99 +757,46 @@ const DefaultOptions = {
     "#mapsvg-map-%id% .mapsvg-filters-wrap {\n\n}\n" +
     "\n\n\n\n\n\n",
   templates: {
-    list: `<div class="mapsvg-details-list">
-            {{#each objects}}
-          <div class="mapsvg-details-list-item">
-                  <div class="mapsvg-details-list-item-image">
-                    <img src="{{images.0.thumbnail}}" />
-                  </div>
-                <div class="mapsvg-details-list-item-info">    m	      
-                    <h6>{{title}}</h6>
-                    <p class="mapsvg-details-address">{{location.address.formatted}}</p>   
-              <p class="mapsvg-details-category">{{category_text}}</p>                                   
-                    <p>{{description}}</p>  
-                <div class="mapsvg-details-link"><a href="{{link}}">{{link}}</a></div>              
-                  </div>	            
-              </div>
-            {{/each}}
-          </div>`,
-    default: `<div class="mapsvg-details-flex">
-        
-        <div class="mapsvg-details-hero">
-          <img src="{{images.0.full}}" class="mapsvg-details-hero-image"/>
-        </div>
-        <div class="mapsvg-details-info">
-          <h4 class="mapsvg-details-header">{{#if title}} {{title}} {{else}} {{id}} {{/if}}</h4>
-          {{description}}
-        </div>
-      </div>    
-    `,
-    post: `{{{post}}}`,
-    title: `{{title}}`,
-    imageTitle: `<div class="mapsvg-imageTitle-content">
-  <div class="mapsvg-imageTitle-image">
-    <img src="{{images.0.thumbnail}}" />
-  </div>
-  <div class="mapsvg-imageTitle-title">    	      
-    {{title}}                                  
-  </div>	            
-</div>`,
-    address: `{{#if location.address.formatted}}
+    list: toTemplateEntry(BUILTIN_TEMPLATE_HTML.list),
+    default: toTemplateEntry(BUILTIN_TEMPLATE_HTML.default),
+    post: toTemplateEntry(BUILTIN_TEMPLATE_HTML.post),
+    ProductCard: toTemplateEntry(defProductCardHtml, "default", defProductCardCss),
+    ProductEmbed: toTemplateEntry(defProductEmbedHtml),
+    title: toTemplateEntry(BUILTIN_TEMPLATE_HTML.title),
+    description: toTemplateEntry(BUILTIN_TEMPLATE_HTML.description),
+    imageTitle: toTemplateEntry(BUILTIN_TEMPLATE_HTML.imageTitle),
+    address: toTemplateEntry(BUILTIN_TEMPLATE_HTML.address),
+    popoverRegion: toTemplateEntry(
+      defRegionTemplate
+        .replace(/%templateType%/g, "Popover")
+        .replace(/%templateTypeSnake%/g, "popover"),
+    ),
+    popoverMarker: toTemplateEntry(
+      defDBTemplate
+        .replace(/%templateType%/g, "Popover")
+        .replace(/%templateTypeSnake%/g, "popover"),
+    ),
+    tooltipRegion: toTemplateEntry("{{id}} - {{title}}"),
+    tooltipMarker: toTemplateEntry("{{title}}"),
+    detailsView: toTemplateEntry(
+      defDBTemplate
+        .replace(/%templateType%/g, "Details View")
+        .replace(/%templateTypeSnake%/g, "detailsView"),
+    ),
+    detailsViewRegion: toTemplateEntry(
+      defRegionTemplate
+        .replace(/%templateType%/g, "Details View")
+        .replace(/%templateTypeSnake%/g, "detailsView"),
+    ),
+    labelMarker: toTemplateEntry(`{{#if location.address.formatted}}
         {{location.address.formatted}}
       {{else}}
         {{#if location.geoPoint.lat}}
           {{location.geoPoint.lat}}, {{location.geoPoint.lng}}
         {{/if}}
-      {{/if}}`,
-    popoverRegion: defRegionTemplate
-      .replace(/%templateType%/g, "Popover")
-      .replace(/%templateTypeSnake%/g, "popover"),
-    popoverMarker: defDBTemplate
-      .replace(/%templateType%/g, "Popover")
-      .replace(/%templateTypeSnake%/g, "popover"),
-    tooltipRegion: "{{id}} - {{title}}",
-    tooltipMarker: "{{title}}",
-    detailsView: defDBTemplate
-      .replace(/%templateType%/g, "Details View")
-      .replace(/%templateTypeSnake%/g, "detailsView"),
-    detailsViewRegion: defRegionTemplate
-      .replace(/%templateType%/g, "Details View")
-      .replace(/%templateTypeSnake%/g, "detailsView"),
-    labelMarker: `{{#if location.address.formatted}}
-        {{location.address.formatted}}
-      {{else}}
-        {{#if location.geoPoint.lat}}
-          {{location.geoPoint.lat}}, {{location.geoPoint.lng}}
-        {{/if}}
-      {{/if}}`,
-    labelRegion: "{{title}}",
-    labelLocation: "You are here!",
-    directory: `{{#if categories}}
-  {{#each categories}}
-    {{>directoryCategoryItem}}
-  {{/each}}
-{{else}}  
-  {{#each items}}
-      {{>directoryItem}}      
-  {{/each}}
-  {{#unless items.length}}
-    <div class="mapsvg-no-results">{{noResultsLabel}}</div>
-  {{/unless}}
-{{/if}}`,
-    directoryItem: `<div id="mapsvg-directory-item-{{toSnakeCase id}}" class="mapsvg-directory-item" data-object-id="{{id}}">
-  {{title}} 
-</div>`,
-    directoryCategoryItem: `<div id="mapsvg-category-item-{{value}}" class="mapsvg-category-item" data-category-value="{{value}}">
-  <span class="mapsvg-category-label">{{label}}</span>
-  <span class="mapsvg-category-counter">{{counter}}</span>
-  <span class="mapsvg-chevron"></span>
-</div>
-<div class="mapsvg-category-block" data-category-id="{{value}}">
-  {{#each items}}
-    {{>directoryItem}}
-  {{/each}}  
-</div>    
-    `,
+      {{/if}}`),
+    labelRegion: toTemplateEntry("{{title}}"),
+    labelLocation: toTemplateEntry("You are here!"),
   },
   choropleth: {
     on: false,
@@ -703,6 +925,16 @@ const DefaultOptions = {
       showIn: "both",
     },
     loadOnStart: true,
+    autoRefetch: {
+      on: false,
+      value: 5,
+      unit: "s",
+    },
+    regionsAutoRefetch: {
+      on: false,
+      value: 5,
+      unit: "s",
+    },
     table: "",
     schemas: {
       regions: {
@@ -750,8 +982,11 @@ const DefaultOptions = {
         addIdToUrl: false,
         showDetails: true,
         showDetailsFor: "region",
-        detailsViewTemplate: "default",
-        
+        // START templates
+        detailsViewTemplate: "detailsViewRegion",
+        // REPLACE
+        // detailsViewTemplate: "default",
+        // END
         filterDirectory: false,
         loadObjects: false,
         showPopover: false,
@@ -802,6 +1037,17 @@ const DefaultOptions = {
     containerId: "",
     width: "100%",
     mobileFullscreen: true,
+    borderRadius: 0,
+    padding: {
+      top: 15,
+      right: 15,
+      bottom: 15,
+      left: 15,
+    },
+    boxShadow: {
+      on: false,
+      value: 20,
+    },
   },
   mobileView: {
     labelMap: "Map",
@@ -854,6 +1100,8 @@ const DefaultOptions = {
     userLocation: false,
     previousMap: false,
   },
+  nodes: [],
+  scenes: [],
   previousMapsIds: [],
 }
 

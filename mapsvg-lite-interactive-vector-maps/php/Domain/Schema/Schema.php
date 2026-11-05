@@ -63,6 +63,24 @@ class Schema extends Model
 	/** @var string Primary key column name, defaults to 'id' */
 	public $primaryKeyField = 'id';
 
+	/** @var int Whether region linking UI/field is enabled (post schemas) */
+	public $regionSupport = 0;
+
+	/** @var int Whether location/marker UI is enabled (post schemas) */
+	public $markerSupport = 1;
+
+	/**
+	 * Explicit bindings (e.g. SVG elementId ↔ primary key for region schemas).
+	 * @var array|null
+	 */
+	public $bindings;
+
+	/**
+	 * Portable record-validation contract using the zod/json@1 params shape.
+	 * @var array|null
+	 */
+	public $zodSettings;
+
 	private $prevFields = array();
 
 	public function __construct($data)
@@ -72,6 +90,16 @@ class Schema extends Model
 		if (!isset($data["type"])) {
 			$name = static::getTypeByName($data["name"]);
 			$this->setType($name);
+		}
+		// Retained catalogs may contain the old private template token. Repair
+		// only known local DTO endpoints after all setters/type inference ran.
+		if (in_array($this->type, ['region', 'object'], true)
+			&& is_string($this->name) && preg_match('/\A(?:regions|objects)_[1-9][0-9]*\z/', $this->name)
+			&& empty($this->remote) && is_array($this->apiEndpoints)) {
+			$materialized = \MapSVG\DataLayer\Schema\MapPrivateApiEndpoints::repair(
+				$this->getData(), $this->getDefaultApiBaseUrl()
+			);
+			$this->apiEndpoints = $materialized['apiEndpoints'];
 		}
 	}
 
@@ -140,6 +168,7 @@ class Schema extends Model
 					['url' => "/regions/%name%/[:id]/import", 'method' => "POST", 'name' => "import"],
 					['url' => "/regions/%name%/[:id]", 'method' => "DELETE", 'name' => "delete"],
 				];
+				$this->ensureSvgBinding();
 			}
 
 			foreach ($defaultApiEndpoints as &$endpoint) {
@@ -153,54 +182,7 @@ class Schema extends Model
 
 	private function getDefaultApiBaseUrl()
 	{
-		return self::resolveRestUrl('mapsvg/v1/');
-	}
-
-	/**
-	 * REST URL that does not call rewrite-dependent APIs before $wp_rewrite exists.
-	 *
-	 * With pretty permalinks, get_rest_url() calls $wp_rewrite->using_index_permalinks().
-	 * WordPress creates that object after plugin files are included, so a call during
-	 * plugin load is a fatal error. Plain permalinks never touch $wp_rewrite.
-	 *
-	 * @param string $path Route relative to the REST namespace, slashes optional.
-	 * @return string
-	 */
-	public static function resolveRestUrl($path)
-	{
-		$path = ltrim((string) $path, '/');
-		if (self::canResolveRestUrl()) {
-			return get_rest_url(null, $path);
-		}
-
-		$home = function_exists('home_url') ? home_url('/') : '/';
-		return rtrim($home, '/') . '/wp-json/' . $path;
-	}
-
-	/**
-	 * Whether get_rest_url() can run without an uninitialized $wp_rewrite.
-	 *
-	 * @return bool
-	 */
-	public static function canResolveRestUrl()
-	{
-		global $wp_rewrite;
-
-		if (is_object($wp_rewrite)) {
-			return function_exists('get_rest_url');
-		}
-
-		// Direct tests stub get_rest_url() and do not boot WordPress.
-		if (!function_exists('get_option')) {
-			return function_exists('get_rest_url') || function_exists(__NAMESPACE__ . '\\get_rest_url');
-		}
-
-		// Non-empty permalink_structure takes the $wp_rewrite branch inside get_rest_url().
-		if (!empty(get_option('permalink_structure'))) {
-			return false;
-		}
-
-		return function_exists('get_rest_url') || function_exists(__NAMESPACE__ . '\\get_rest_url');
+		return get_rest_url(null, 'mapsvg/v1/');
 	}
 
 
@@ -272,6 +254,152 @@ class Schema extends Model
 	{
 		return $this->name;
 	}
+	public function setRegionSupport($value): void
+	{
+		$this->regionSupport = (int) (bool) $value;
+	}
+
+	public function setMarkerSupport($value): void
+	{
+		$this->markerSupport = (int) (bool) $value;
+	}
+
+	/**
+	 * Default SVG binding for region schemas: match SVG element id to primary key.
+	 *
+	 * @return array
+	 */
+	public static function defaultSvgBindings()
+	{
+		return [
+			'svg' => [
+				'match' => 'elementId',
+				'source' => 'primaryKey',
+			],
+		];
+	}
+
+	/**
+	 * @param array|object|string|null $value
+	 */
+	public function setBindings($value): void
+	{
+		if ($value === null || $value === '') {
+			$this->bindings = null;
+			return;
+		}
+		if (is_string($value)) {
+			$decoded = json_decode($value, true);
+			$value = is_array($decoded) ? $decoded : null;
+		} elseif (is_object($value)) {
+			$value = json_decode(wp_json_encode($value), true);
+		}
+		if (!is_array($value)) {
+			$this->bindings = null;
+			return;
+		}
+		$this->bindings = $value;
+	}
+
+	/**
+	 * @param array|object|string|null $value
+	 */
+	public function setZodSettings($value): void
+	{
+		$this->zodSettings = self::normalizeZodSettings($value);
+	}
+
+	/**
+	 * Validate and normalize the portable zod/json@1 metadata envelope.
+	 *
+	 * @param array|object|string|null $value
+	 * @return array|null
+	 */
+	public static function normalizeZodSettings($value): ?array
+	{
+		if ($value === null || $value === '') {
+			return null;
+		}
+
+		if (is_string($value)) {
+			$decoded = json_decode($value, true);
+			if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+				throw new \InvalidArgumentException(
+					'Invalid zodSettings: expected a JSON object.'
+				);
+			}
+			$value = $decoded;
+		} elseif (is_object($value)) {
+			$value = json_decode(json_encode($value), true);
+		}
+
+		if (!is_array($value)) {
+			throw new \InvalidArgumentException(
+				'Invalid zodSettings: expected an object.'
+			);
+		}
+		if (!array_key_exists('version', $value) || $value['version'] !== 1) {
+			throw new \InvalidArgumentException(
+				'Invalid zodSettings: version must be 1.'
+			);
+		}
+		if (!isset($value['jsonSchema']) || !is_string($value['jsonSchema'])) {
+			throw new \InvalidArgumentException(
+				'Invalid zodSettings: jsonSchema must be a JSON string.'
+			);
+		}
+
+		$jsonSchema = json_decode($value['jsonSchema']);
+		if (json_last_error() !== JSON_ERROR_NONE || !is_object($jsonSchema)) {
+			throw new \InvalidArgumentException(
+				'Invalid zodSettings: jsonSchema must contain a JSON Schema object.'
+			);
+		}
+		if (isset($value['writeValidation']) && $value['writeValidation'] !== 'off') {
+			throw new \InvalidArgumentException(
+				'Invalid zodSettings: writeValidation may only be "off".'
+			);
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Ensure region schemas have bindings.svg (idempotent).
+	 */
+	public function ensureSvgBinding(): void
+	{
+		if ($this->hasExplicitSvgBinding()) {
+			return;
+		}
+		$bindings = is_array($this->bindings) ? $this->bindings : [];
+		$bindings['svg'] = static::defaultSvgBindings()['svg'];
+		$this->bindings = $bindings;
+	}
+
+	/**
+	 * Whether this schema declares an SVG binding (no type fallback).
+	 */
+	public function hasExplicitSvgBinding(): bool
+	{
+		if (!is_array($this->bindings)) {
+			return false;
+		}
+		return !empty($this->bindings['svg']);
+	}
+
+	/**
+	 * Whether this schema is SVG-bound (regions table sync).
+	 * Prefer bindings.svg; fall back to type === region for legacy rows.
+	 */
+	public function hasSvgBinding(): bool
+	{
+		if ($this->hasExplicitSvgBinding()) {
+			return true;
+		}
+		return $this->type === 'region';
+	}
+
 	public function setPostType($postType)
 	{
 		$this->postType = $postType;
@@ -346,22 +474,25 @@ class Schema extends Model
 		return true;
 	}
 
-	/** Internal region fields are part of storage, even though absent from the editor. */
+	/** Hidden system fields belong to region storage, regardless of editor input. */
 	public function ensureInternalFields(): void
 	{
 		if ($this->type !== 'region') return;
 		$defaults = json_decode(file_get_contents(__DIR__ . '/../../Core/schema/region.json'), true);
 		foreach ($defaults['fields'] as $definition) {
-			if (empty($definition['protected']) || !isset($definition['visible']) || $definition['visible'] !== false) continue;
+			if (empty($definition['protected']) || ($definition['visible'] ?? null) !== false) continue;
+			$fields = array();
 			$found = false;
-			foreach ($this->fields as $index => $field) {
+			foreach ($this->fields as $field) {
 				if ($field->name === $definition['name']) {
-					$this->fields[$index] = $this->formatField((object) $definition);
+					if (!$found) $fields[] = $this->formatField((object) $definition);
 					$found = true;
-					break;
+				} else {
+					$fields[] = $field;
 				}
 			}
-			if (!$found) $this->fields[] = $this->formatField((object) $definition);
+			if (!$found) $fields[] = $this->formatField((object) $definition);
+			$this->fields = $fields;
 		}
 	}
 
@@ -422,13 +553,53 @@ class Schema extends Model
 		return null;
 	}
 
+	/**
+	 * Whether a schema field type stores object↔regions links.
+	 * Canonical type is `relation`; `region` is a legacy alias.
+	 */
+	public static function isRelationFieldType($type): bool
+	{
+		return $type === 'region' || $type === 'relation';
+	}
+
+	/**
+	 * @deprecated Prefer {@see isRelationFieldType()}
+	 */
+	public static function isRegionsFieldType($type): bool
+	{
+		return self::isRelationFieldType($type);
+	}
+
+	/**
+	 * Schema fields that store object↔regions links (`[{id, tableName}, …]`).
+	 *
+	 * @return array<object>
+	 */
+	public function getRelationFields(): array
+	{
+		$out = [];
+		if (empty($this->fields)) {
+			return $out;
+		}
+		foreach ($this->fields as $field) {
+			if (self::isRelationFieldType($field->type ?? null)) {
+				$out[] = $field;
+			}
+		}
+		return $out;
+	}
+
 	public function getFieldByType($type)
 	{
 		if (empty($this->fields)) {
 			return null;
 		}
+		$matchRelationAlias = self::isRelationFieldType($type);
 		foreach ($this->fields as $field) {
 			if ($field->type === $type) {
+				return $field;
+			}
+			if ($matchRelationAlias && self::isRelationFieldType($field->type ?? null)) {
 				return $field;
 			}
 		}
@@ -450,17 +621,18 @@ class Schema extends Model
 			return $locationField->language;
 		}
 
-		// Fallback: check maps that use this schema for their Google Maps language setting.
-		$db         = Database::get();
-		$mapsTable  = $db->mapsvg_prefix . 'maps';
-
-		if (!$db->get_var("SHOW TABLES LIKE '{$mapsTable}'")) {
+		$maps = new \MapSVG\DataLayer\Store\PluginTableStore('maps');
+		if (!$maps->exists()) {
 			return 'en';
 		}
 
-		$rows = $db->get_results("SELECT `options` FROM `{$mapsTable}`", ARRAY_A);
-		foreach ((array) $rows as $row) {
-			$opts = is_string($row['options']) ? json_decode($row['options'], true) : (array) $row['options'];
+		$rows = $maps->query(
+			'SELECT options FROM ' . $maps->quotedTable()
+		);
+		foreach ($rows as $row) {
+			$opts = is_string($row['options'])
+				? json_decode($row['options'], true)
+				: (array) $row['options'];
 			if (!is_array($opts)) {
 				continue;
 			}

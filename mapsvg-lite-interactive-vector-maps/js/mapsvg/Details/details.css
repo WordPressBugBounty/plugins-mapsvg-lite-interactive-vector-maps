@@ -29,7 +29,7 @@
   right: 0;
   overflow: hidden;
   max-height: 100%;
-  z-index: 3;
+  z-index: 30;
 }
 
 .mapsvg-details-container.mapsvg-absolute {
@@ -53,9 +53,24 @@
 .mapsvg-details-container.mapsvg-relative .mapsvg-controller-view {
   position: relative !important;
 }
+.mapsvg-layout-component > .mapsvg-details-container.mapsvg-relative {
+  /* The Layout host owns bounded scrolling; keep the full document measurable. */
+  max-height: none;
+  overflow: visible;
+}
+.mapsvg-layout-component > .mapsvg-details-container.mapsvg-relative::after {
+  /* The legacy overlay gutter extends 15px beyond the controller. Tree Details
+     already scrolls in its Layout host, so that gutter would add a horizontal
+     scrollbar to every otherwise correctly sized document. */
+  content: none;
+}
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-details-container.mapsvg-relative {
+  /* Paint the full scroll document instead of shrinking its background to the viewport. */
+  flex-shrink: 0;
+}
 
 .mapsvg-details-container.top {
-  z-index: 3;
+  z-index: 30;
   pointer-events: none;
 }
 .mapsvg-details-container:empty {

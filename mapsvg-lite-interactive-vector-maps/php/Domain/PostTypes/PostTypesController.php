@@ -17,6 +17,7 @@ class PostTypesController extends Controller
 	 */
 	public static function index($request)
 	{
+        if (!\MapSVG\Core\PostDataFeature::isEnabled()) return self::render(['error' => 'WordPress data sources require a paid MapSVG add-on.'], 403);
 		/** @var \MapSVG\PostTypesRepository $repo */
 		$repo = RepositoryFactory::get('postType');
 
@@ -32,6 +33,7 @@ class PostTypesController extends Controller
 	 */
 	public static function get($request)
 	{
+        if (!\MapSVG\Core\PostDataFeature::isEnabled()) return self::render(['error' => 'WordPress data sources require a paid MapSVG add-on.'], 403);
 		$post_type = isset($request['_post_type']) ? $request['_post_type'] : null;
 		if (!$post_type) {
 			return self::render(['error' => 'No post_type specified.']);
@@ -50,6 +52,7 @@ class PostTypesController extends Controller
 	 */
 	public static function getFieldValues($request)
 	{
+        if (!\MapSVG\Core\PostDataFeature::isEnabled()) return self::render(['error' => 'WordPress data sources require a paid MapSVG add-on.'], 403);
 		$post_type = isset($request['_post_type']) ? $request['_post_type'] : null;
 		$field = isset($request['_field_name']) ? $request['_field_name'] : null;
 		if (!$post_type || !$field) {
@@ -71,6 +74,7 @@ class PostTypesController extends Controller
 	 */
 	public static function getTaxonomyValues($request)
 	{
+        if (!\MapSVG\Core\PostDataFeature::isEnabled()) return self::render(['error' => 'WordPress data sources require a paid MapSVG add-on.'], 403);
 		$post_type = isset($request['_post_type']) ? $request['_post_type'] : null;
 		$taxonomy = isset($request['_taxonomy_name']) ? $request['_taxonomy_name'] : null;
 		if (!$post_type || !$taxonomy) {
@@ -89,6 +93,7 @@ class PostTypesController extends Controller
 	 */
 	public static function getMetaValues($request)
 	{
+        if (!\MapSVG\Core\PostDataFeature::isEnabled()) return self::render(['error' => 'WordPress data sources require a paid MapSVG add-on.'], 403);
 		$post_type = isset($request['_post_type']) ? $request['_post_type'] : null;
 		$meta = isset($request['_meta_name']) ? $request['_meta_name'] : null;
 		if (!$post_type || !$meta) {

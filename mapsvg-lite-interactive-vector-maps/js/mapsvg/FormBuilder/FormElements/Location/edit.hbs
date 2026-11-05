@@ -15,7 +15,11 @@
 
       <div class="mapsvg-marker-image-selector">
           <div class="mapsvg-marker-images"></div>
-          {{premiumFeatureAlert "Upload a custom marker image"}}
+          <!-- START marker_upload -->
+          <div class="btn btn-outline-secondary  btn-file" data-loading-text="Uploading..." style="margin: 5px 0;">
+              Upload <input type="file" name="marker" class="marker-file-uploader" />
+          </div>
+          <!-- END REPLACE {{premiumFeatureAlert "Upload a custom marker image"}} -->
       </div>
       <p class="form-text">Click on an image to set it as a default marker</p>
 
@@ -31,7 +35,20 @@
 
   <div class="form-group mb-3">
       <label class="form-label">Markers by field value</label>
-      {{premiumFeatureAlert "Set marker image by field value"}}
+      <!-- START marker_upload -->
+      <div style="margin-bottom: 20px;" class="form-switch form-switch-md">
+          <input type="checkbox" class="form-check-input" name="markersByFieldEnabled" {{#if markersByFieldEnabled}}checked{{/if}} />
+      </div>
+      <select class="form-control mapsvg-select2" name="markerField" data-live="change">
+          <option value="">Choose a field...</option>
+          {{#if external.databaseFieldsFilterable}}
+              {{#each external.databaseFieldsFilterable}}
+                  <option {{#ifeq ../markerField this}}selected{{/ifeq}}>{{this}}</option>
+              {{/each}}
+          {{/if}}
+      </select>
+      <p class="form-text">Choose a field that you want to connect to marker images</p>
+      <!-- END REPLACE {{premiumFeatureAlert "Set marker image by field value"}} -->
 
 
       <table class="" id="markers-by-field" style="margin-top: 20px;">

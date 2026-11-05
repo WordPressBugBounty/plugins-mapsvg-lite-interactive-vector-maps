@@ -1,6 +1,6 @@
 import { DetailsController } from "@/Details/Details"
 import type { Marker } from "@/Marker/Marker"
-import { MarkerCluster } from "@/MarkerCluster/MarkerCluster"
+import type { MarkerCluster } from "@/MarkerCluster/MarkerCluster"
 import { PopoverController } from "@/Popover/Popover"
 import type { Region } from "@/Region/Region"
 import { Tooltip } from "@/Tooltips/Tooltip"

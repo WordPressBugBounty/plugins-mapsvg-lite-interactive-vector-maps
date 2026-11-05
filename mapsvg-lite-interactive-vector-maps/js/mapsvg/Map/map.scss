@@ -110,8 +110,7 @@
 .mapsvg-with-google-map .mapsvg-scrollpane,
 .mapsvg-with-google-map svg,
 .mapsvg-with-google-map .mapsvg-popover,
-.mapsvg-with-google-map .mapsvg-marker,
-.mapsvg-with-google-map .mapsvg-marker-cluster
+.mapsvg-with-google-map .mapsvg-marker
 {
     /*-webkit-transition: transform .00s ease-out;*/
     /*-moz-transition: transform .00s ease-out;*/
@@ -196,7 +195,7 @@
     font-size: 12px !important;
     line-height: 1;
     color: #999;
-    font-family: 'Helvetica', sans-serif;
+    font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
 }
 .mapsvg-loading-text:empty {
     display: none;
@@ -342,7 +341,7 @@
     line-height: 15px !important;
     color: #666666;
     padding: 0px 0px;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
     font-weight: normal;
     -webkit-box-shadow: 0px 0px 8px 0px rgba(0,0,0,0.5);
     -moz-box-shadow: 0px 0px 8px 0px rgba(0,0,0,0.5);
@@ -354,6 +353,9 @@
 .mapsvg-wrap-all{
     /*max-width: 100% !important;*/
     text-align: left;
+}
+.mapsvg-layout-slot-content {
+    position: relative;
 }
 .mapsvg-wrap {
     display: flex;
@@ -465,7 +467,7 @@
     border-radius: 5px;
     font-size: 13px;
     margin-right: 4px;
-    font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
+    font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
@@ -529,7 +531,7 @@
     display: inline-block;
     padding: 5px 14px;
     line-height: 1.5;
-    font-family: Helvetica;
+    font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
     box-shadow: none;
     text-decoration: none;
     font-size: 13px;
@@ -623,7 +625,7 @@
     height: 23px;
     line-height: 23px;
     background: rgba(255,255,255,0.7);
-    font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
+    font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
     padding: 0 7px;
     cursor: pointer;
     -webkit-user-select: none;
@@ -783,7 +785,7 @@
 .mapsvg-no-results {
     padding: 10px;
     color: #666;
-    font-family: 'Helvetica', 'sans-serif';
+    font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
     font-size: 14px;
     font-weight: normal;
 }
@@ -959,6 +961,22 @@ iframe.mapsvg-iframe-post
     overflow: hidden;
 }
 
+/* Thin fallback if ProductCard template CSS is empty / not injected yet. */
+.mapsvg-product-simple
+{
+    .mapsvg-product-image
+    {
+        max-width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .mapsvg-product-title
+    {
+        margin: 0 0 0.5rem;
+    }
+}
+
 .mapsvg-hidden {
     display: none !important;
 }
@@ -1036,7 +1054,7 @@ iframe.mapsvg-iframe-post
     line-height: 15px !important;
     color: #666666;
     padding: 0px 0px;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
     font-weight: normal;
     -webkit-box-shadow: 0px 0px 8px 0px rgb(0 0 0 / 50%);
     -moz-box-shadow: 0px 0px 8px 0px rgba(0,0,0,0.5);
@@ -1221,7 +1239,7 @@ iframe.mapsvg-iframe-post
     line-height: 15px !important;
     color: #666666;
     padding: 0px 0px;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
     font-weight: normal;
     -webkit-box-shadow: 0px 0px 8px 0px rgba(0,0,0,0.5);
     -moz-box-shadow: 0px 0px 8px 0px rgba(0,0,0,0.5);

@@ -12,7 +12,7 @@ class Converter {
   private mapLatBottomDegree: number
   private worldMapRadius: number
   private worldMapWidth: number
-  private worldShift: boolean
+  private googleMapsOn: boolean
   private yShift: number
 
   constructor(
@@ -53,8 +53,8 @@ class Converter {
     this.setYShift()
   }
 
-  setWorldShift(on: boolean) {
-    this.worldShift = on
+  setGoogleMaps(on: boolean) {
+    this.googleMapsOn = on
   }
 
   getScale() {
@@ -64,24 +64,30 @@ class Converter {
   /**
    * Converts SVG coordinates to pixel coordinates relative to the map container
    */
-  convertSVGToPixel(svgPoint: SVGPoint): ScreenPoint {
+  convertSVGToPixel(svgPoint: SVGPoint, referenceX = this.mapElement.clientWidth / 2): ScreenPoint {
     const scale = this.getScale()
-
-    let shiftXByGM = 0
-    const shiftYByGM = 0
-
-    if (this.worldShift) {
-      if (this.viewBox.x - this.defViewBox.x > this.defViewBox.width) {
-        shiftXByGM =
-          this.worldMapWidth *
-          Math.floor((this.viewBox.x - this.defViewBox.x) / this.defViewBox.width)
-      }
+    const projection = this.googleMapsOn && this.map.googleMaps?.overlay?.getProjection()
+    if (projection && this.geoViewBox) {
+      const geo = this.convertSVGToGeo(svgPoint, false)
+      const point = projection.fromLatLngToContainerPixel({ lat: geo.lat, lng: geo.lng })
+      if (point) return new ScreenPoint(this.wrapPixelX(point.x, referenceX), point.y)
     }
-
     return new ScreenPoint(
-      (svgPoint.x - this.viewBox.x + shiftXByGM) * scale,
-      (svgPoint.y - this.viewBox.y + shiftYByGM) * scale,
+      this.wrapPixelX((svgPoint.x - this.viewBox.x) * scale, referenceX),
+      (svgPoint.y - this.viewBox.y) * scale,
     )
+  }
+
+  /** Horizontal period in screen pixels; undefined for ordinary SVG/image maps. */
+  getWorldWidth(): number | undefined {
+    if (!this.googleMapsOn || !this.geoViewBox) return
+    const width = this.map.googleMaps?.overlay?.getProjection()?.getWorldWidth() ?? this.worldMapWidth * this.getScale()
+    return width > 0 && Number.isFinite(width) ? width : undefined
+  }
+
+  wrapPixelX(x: number, referenceX = this.mapElement.clientWidth / 2): number {
+    const width = this.getWorldWidth()
+    return width ? x + Math.round((referenceX - x) / width) * width : x
   }
   /**
    * Converts pixel coordinates (relative to map container) to SVG coordinates
@@ -133,12 +139,12 @@ class Converter {
   /**
    * Converts SVG coordinates to geo-coordinates (latitude/lognitude).
    */
-  convertSVGToGeo(svgPoint: SVGPoint): GeoPoint {
+  convertSVGToGeo(svgPoint: SVGPoint, round = true): GeoPoint {
     if (!this.geoViewBox) {
       throw new Error("Can't do convertSVGToGeo() - geoViewBox is not provided.")
     }
     const tx = svgPoint.x - this.defViewBox.x
-    const ty = svgPoint.y - this.defViewBox.y
+    const ty = svgPoint.y - this.defViewBox.y + this.yShift
 
     const mapOffsetY =
       (this.worldMapRadius / 2) *
@@ -147,8 +153,10 @@ class Converter {
     const a = (equatorY - ty) / this.worldMapRadius
     let lat = (180 / Math.PI) * (2 * Math.atan(Math.exp(a)) - Math.PI / 2)
     let lng = this.geoViewBox.sw.lng + (tx / this.defViewBox.width) * this.mapLonDelta
-    lat = parseFloat(lat.toFixed(6))
-    lng = parseFloat(lng.toFixed(6))
+    if (round) {
+      lat = parseFloat(lat.toFixed(6))
+      lng = parseFloat(lng.toFixed(6))
+    }
     return new GeoPoint(lat, lng)
   }
 

@@ -2,7 +2,7 @@
 
 namespace MapSVG;
 
-class ApiDataSource implements DataSourceInterface
+class ApiDataSource
 {
   private $apiClient;
   private $apiEndpoints;

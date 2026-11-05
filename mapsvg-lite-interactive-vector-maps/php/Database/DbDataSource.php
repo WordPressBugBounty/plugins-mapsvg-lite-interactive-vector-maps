@@ -2,7 +2,7 @@
 
 namespace MapSVG;
 
-class DbDataSource implements DataSourceInterface
+class DbDataSource
 {
   /**
    * @var Database
@@ -18,6 +18,10 @@ class DbDataSource implements DataSourceInterface
    */
   private $schema;
   private $source;
+  /** Count from the same last query, only for authenticated Collection metadata. */
+  private ?int $lastCount = null;
+
+  public function getLastCount(): ?int { return $this->lastCount; }
 
   public function __construct($schema)
   {
@@ -44,6 +48,7 @@ class DbDataSource implements DataSourceInterface
 
   public function find($query)
   {
+    $this->lastCount = null;
     // return $this->db->get_results($this->getTableName(), $criteria);
     $filters_sql = array();
     $filters_sql_fields = array();
@@ -183,8 +188,6 @@ class DbDataSource implements DataSourceInterface
           $args['s'] = $postFilter['post_title'];
         }
 
-        error_log(print_r($args, true));
-
         $wpQuery = new \WP_Query($args);
 
         $postIds = $wpQuery->posts;
@@ -228,7 +231,7 @@ class DbDataSource implements DataSourceInterface
             continue;
           }
 
-          if ($field->type === 'region') {
+          if (\MapSVG\Schema::isRelationFieldType($field->type ?? null)) {
             $regions_table = $fieldValue["table_name"];
             $regions_array = $fieldValue["region_ids"];
 
@@ -365,7 +368,7 @@ class DbDataSource implements DataSourceInterface
             if ($f['type'] === 'post' && count($postTextSearchIds) > 0) {
               $like_fields[] = 'post IN (' . implode(',', $postTextSearchIds) . ')';
               $like_fields_values = array_merge($like_fields_values, $postTextSearchIds);
-            } elseif ((isset($f['type']) && $f['type'] == 'region') || (isset($f['multiselect']) && $f['multiselect'] === true)) {
+            } elseif ((isset($f['type']) && \MapSVG\Schema::isRelationFieldType($f['type'])) || (isset($f['multiselect']) && $f['multiselect'] === true)) {
               $like_fields[] = "`{$f['name']}` LIKE %s";
               $like_fields_values[] = "%{$this->db->esc_like($query->search)}%";
             } else {
@@ -521,6 +524,15 @@ class DbDataSource implements DataSourceInterface
 
     try {
       $data = $this->db->get_results($query_sql, ARRAY_A);
+      if ($query->withCount) {
+        // Reuse this exact legacy selection, including joins/distance HAVING,
+        // while excluding sorting and pagination from the matching row count.
+        $countSelection = "SELECT {$fields}{$select_distance} FROM `{$this->getTableName()}` {$filter_regions} {$filters_sql} {$having}";
+        $countParams = array_merge($select_distance_fields, $filter_regions_fields, $filters_sql_fields, $having_fields);
+        if ($countParams) $countSelection = $this->db->prepare($countSelection, $countParams);
+        $count = $this->db->get_var("SELECT COUNT(*) FROM ({$countSelection}) AS mapsvg_collection_count");
+        if ($count !== null && ctype_digit((string) $count)) $this->lastCount = (int) $count;
+      }
     } catch (\Exception $e) {
       Logger::error("[SERVER-002] " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-002");
       $data = [];
@@ -681,10 +693,7 @@ class DbDataSource implements DataSourceInterface
       );
     }
 
-    if ($this->db->query($query) === false) {
-      // Database logs the SQL error; callers must not count a rejected batch as imported.
-      throw new \RuntimeException('Could not save imported rows to the database. See the server error log for details.');
-    }
+    $this->db->query($query);
 
     return $data;
   }

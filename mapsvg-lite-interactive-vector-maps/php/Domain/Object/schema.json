@@ -39,7 +39,7 @@
     {
       "name": "regions",
       "label": "Regions",
-      "type": "region",
+      "type": "relation",
       "db_type": "text",
       "visible": true
     },

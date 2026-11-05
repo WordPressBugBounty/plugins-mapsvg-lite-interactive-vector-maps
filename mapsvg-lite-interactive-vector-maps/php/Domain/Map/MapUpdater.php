@@ -9,13 +9,8 @@ namespace MapSVG;
 class MapUpdater
 {
 
-	protected $db;
-
-
-	public function __construct()
-	{
-		$this->db = Database::get();
-	}
+	/** @var array<string, bool> Complete maps currently being migrated in this request. */
+	private static $updatingMaps = [];
 
 	/**
 	 * Checks the map version and upgrades it if necessary
@@ -25,6 +20,10 @@ class MapUpdater
 	 */
 	function maybeUpdate(&$map)
 	{
+		// Projected list rows must never be migrated or persisted.
+		if (!isset($map['version']) || !isset($map['options'])) return $map;
+		$mapKey = isset($map['id']) ? (string) $map['id'] : null;
+		if ($mapKey !== null && isset(self::$updatingMaps[$mapKey])) return $map;
 		$originalMap = $map;
 		$currentVersion = isset($map["version"]) ? (string) $map["version"] : '0.0.0';
 		if (version_compare($currentVersion, MAPSVG_VERSION, '>')) {
@@ -39,6 +38,8 @@ class MapUpdater
 			return $map;
 		}
 
+		if ($mapKey !== null) self::$updatingMaps[$mapKey] = true;
+		$persisting = false;
 		try {
 			$options = Map::fixJsonOptions($options);
 			if (!is_array($options) || !isset($options['source']) || !is_string($options['source']) || $options['source'] === '') {
@@ -55,10 +56,22 @@ class MapUpdater
 				}
 			}
 			$map['version'] = MAPSVG_VERSION;
-			RepositoryFactory::get('map')->update($map);
+			// The v2 write boundary accepts public options and a validated integer ID.
+			// Validation reads the same row through a fresh repository; the per-map
+			// guard prevents that read from starting this migration again.
+			$publicMap = $map;
+			if (isset($publicMap['id']) && is_string($publicMap['id'])) {
+				$id = filter_var($publicMap['id'], FILTER_VALIDATE_INT);
+				if ($id !== false && $id > 0) $publicMap['id'] = $id;
+			}
+			$persisting = true;
+			RepositoryFactory::get('map')->update($publicMap);
 		} catch (\Throwable $e) {
 			$map = $originalMap;
+			if ($persisting) throw $e;
 			Logger::error("[SERVER-013] Migration failed: " . $e->getMessage() . " — Read more: https://mapsvg.com/docs/errors#SERVER-013");
+		} finally {
+			if ($mapKey !== null) unset(self::$updatingMaps[$mapKey]);
 		}
 		return $map;
 	}

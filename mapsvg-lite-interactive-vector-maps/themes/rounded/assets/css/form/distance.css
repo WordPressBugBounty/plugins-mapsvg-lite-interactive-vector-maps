@@ -197,13 +197,13 @@
   border: var(--mapsvg-border);
 }
 
-.mapsvg-filters-wrap
+.mapsvg-form-field-distance
   .select2-container--default
   .select2-selection--single
   .select2-selection__rendered {
   line-height: var(--mapsvg-input-line-height);
 }
-.mapsvg-filters-wrap
+.mapsvg-form-field-distance
   .select2-container--default
   .select2-selection--single
   .select2-selection__arrow {

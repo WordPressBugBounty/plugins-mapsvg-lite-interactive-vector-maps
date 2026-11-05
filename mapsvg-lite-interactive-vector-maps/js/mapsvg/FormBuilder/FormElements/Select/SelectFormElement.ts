@@ -33,6 +33,14 @@ export class SelectFormElement extends FormElement {
     if (this.multiselect) {
       $(this.domElements.main).addClass("mapsvg-form-field-select-multiple")
     }
+    // super.setDomElements() already ran FormElement.addSelect2(); re-init with select options.
+    if ($().mselect2 && this.inputs.select) {
+      const existing = $(this.inputs.select).data("select2")
+      if (existing) {
+        $(this.inputs.select).mselect2("destroy")
+      }
+    }
+    this.addSelect2()
   }
 
   getSchema(): { [p: string]: any } {
@@ -102,7 +110,10 @@ export class SelectFormElement extends FormElement {
         if (!this.multiselect) {
           select2Options.allowClear = true
         }
-        select2Options.dropdownParent = $(this.formBuilder.form)
+      }
+      const dropdownParent = this.getSelect2DropdownParent()
+      if (dropdownParent) {
+        select2Options.dropdownParent = dropdownParent
       }
       this.select2 = $(this.domElements.main)
         .find("select")

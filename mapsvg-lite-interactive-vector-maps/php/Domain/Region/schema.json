@@ -2,7 +2,13 @@
   "name": "regions_%MAP_ID%",
   "objectNameSingular": "region",
   "objectNamePlural": "regions",
-  "type": "object",
+  "type": "region",
+  "bindings": {
+    "svg": {
+      "match": "elementId",
+      "source": "primaryKey"
+    }
+  },
   "fields": [
     {
       "name": "id",
@@ -30,15 +36,11 @@
       "options": [
         {
           "label": "Enabled",
-          "value": 1,
-          "disabled": false,
-          "color": ""
+          "value": 1
         },
         {
           "label": "Disabled",
-          "value": 0,
-          "disabled": true,
-          "color": ""
+          "value": 0
         }
       ],
       "db_default": 1

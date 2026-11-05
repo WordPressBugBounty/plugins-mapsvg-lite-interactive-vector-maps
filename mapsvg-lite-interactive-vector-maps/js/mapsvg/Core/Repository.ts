@@ -1,4 +1,7 @@
+import { hasRuntimeFeature, schemaUsesPostData } from "./productFeatures"
 import { Query } from "../Infrastructure/Server/Query"
+import { hasBindingFilters, readPageBinding, initialBindingPageId, type BindingRole } from "../Map/pageBindings"
+import { withDraftPreview } from "../Map/draftPreviewTransport"
 import {
   ApiEndpoint,
   ApiEndpointName,
@@ -34,7 +37,19 @@ export enum RepositoryEvent {
   AFTER_UPDATE_IMPORT_SETTTINGS = "afterUpdateImportSettings",
 }
 
+/** Options for find/reload. silent skips loading UI on the map. */
+export type FindOptions = {
+  silent?: boolean
+  /** First read of a Page/binding, including editor preview. */
+  initial?: boolean
+  /** Polling/schema refresh must not start a binding waiting for interaction. */
+  automatic?: boolean
+}
+
 export type MapsvgRequest = {
+  sourceRead?: boolean
+  bindingRead?: boolean
+  schemaOnly?: boolean
   repository: RepositoryInterface<Model>
   action: string
   url: string
@@ -77,14 +92,14 @@ export interface RepositoryInterface<T extends Model = Model> {
   getLoaded(): ArrayIndexed<T>
   getLoadedAsArray(): ArrayIndexed<T>
   create(object: any): JQueryDeferred<T>
-  find(params?: Query): JQueryDeferred<any>
+  find(params?: Query | { [key: string]: any }, options?: FindOptions): JQueryDeferred<any>
   findById(id: number | string): JQueryDeferred<T>
   getLoadedObject(id: number | string): T
   update(object: any): JQueryDeferred<T>
   delete(id: string | number): JQueryDeferred<void>
 
   loadDataFromResponse(data: string | Record<string, any>, ctx: MapsvgCtx): void
-  reload(): void
+  reload(options?: FindOptions): JQueryPromise<any>
 
   encodeData(params: any): { [key: string]: any }
   defaultResponseMiddleware(data: unknown, ctx: MapsvgCtx): Record<string, unknown>
@@ -177,7 +192,7 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
   setSchema(schema: Schema | string): void {
     if (schema instanceof Schema) {
       this.schema = schema
-      this.schema.events.on(SchemaEventType.UPDATE, () => this.find())
+      this.schema.events.on(SchemaEventType.UPDATE, () => this.find(undefined, { automatic: true }))
     } else {
       const load = async () => {
         const { useRepository } = await import("@/Core/useRepository")
@@ -209,6 +224,12 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     ])
 
     const dataFormatted = this.defaultResponseMiddleware(data, ctx)
+    if (!hasRuntimeFeature("data_source_posts") && schemaUsesPostData(dataFormatted.schema ?? this.schema)) {
+      dataFormatted.items = []
+      dataFormatted.hasMore = false
+      dataFormatted.count = 0
+      delete dataFormatted[this.schema.objectNameSingular]
+    }
     this.objects.clear()
 
     const keyPlural = this.schema.objectNamePlural
@@ -220,6 +241,10 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
         this.objects.push(obj)
       })
       this.hasMore = dataFormatted.hasMore
+      if (ctx?.request?.bindingRead && !ctx.request.sourceRead) {
+        if (Number.isInteger(dataFormatted.perpage)) this.query.perpage = dataFormatted.perpage
+        if (Number.isInteger(dataFormatted.page)) this.query.page = dataFormatted.page
+      }
     } else {
       this.hasMore = false
     }
@@ -228,8 +253,8 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
 
     this.events.trigger(RepositoryEvent.AFTER_LOAD, { data, repository: this })
   }
-  reload(): JQueryPromise<any> {
-    const request = this.find()
+  reload(options?: FindOptions): JQueryPromise<any> {
+    const request = this.find(undefined, options)
     // Filter changes call reload() without a fail handler. Attach one so a
     // rejected request is not an uncaught promise after FAILED_LOAD fires.
     request.fail(() => undefined)
@@ -273,6 +298,7 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     const defer = jQuery.Deferred()
     defer.promise()
 
+    if (schemaUsesPostData(this.schema) && !hasRuntimeFeature("data_source_posts")) return defer.reject({ status: 403, message: "WordPress data sources require a paid add-on." })
     const request = this.getRequest("show", { id })
     let object
 
@@ -281,6 +307,13 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     }
     if (!nocache && object) {
       defer.resolve(object)
+    } else if (this.usesPageBindingTransport()) {
+      this.readSourcePage({ filters: { id }, page: 1, perpage: 1 })
+        .then(data => {
+          const row = data.items?.find(item => String(item.id) === String(id))
+          if (row) defer.resolve(row)
+          else defer.reject({ error: "Object is not available in this Query." })
+        }).catch(error => defer.reject(error))
     } else {
       this.server
         .get(request.url, request.data)
@@ -346,23 +379,138 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     return response
   }
 
-  find(query?: Query | { [key: string]: any }): JQueryDeferred<any> {
+  /** Fetch an adapted page without replacing this repository's live query or rows. */
+  async readSourcePage(query: Record<string, any>): Promise<Record<string, any>> {
+    const request = { ...this.getRequest("index", null, query), sourceRead: true }
+    const { rpcRequest } = this.readTransport(request, request.data)
+    const data = await rpcRequest
+    return this.getResponse(data, request).data as Record<string, any>
+  }
+
+  private bindingSchemaRevision?: string
+  private initialLoadDeferred = false
+
+  private usesPageBindingTransport(): boolean {
+    const role = this.map?.objectsRepository === this ? "objects" : this.map?.regionsRepository === this ? "regions" : null
+    if (!role || !this.map?.globalQueriesEnabled) return false
+    const binding = readPageBinding(this.map.options, role, this.map.activePageId)
+    return !(this.schema?.type === "api" && ["getObjects", "getRegions"].includes(binding.queryId))
+  }
+
+  private readTransport(request: MapsvgRequest, query: Record<string, any>, optionsField?: string) {
+    const role: BindingRole | null = this.map?.objectsRepository === this ? "objects" : this.map?.regionsRepository === this ? "regions" : null
+    if (!role || !this.usesPageBindingTransport()) {
+      return { rpcRequest: this.server.get(request.url, request.data) }
+    }
+    request.bindingRead = true
+    const pageId = this.map.activePageId || initialBindingPageId(this.map.options)
+    const binding = readPageBinding(this.map.options, role, pageId)
+    const page = Math.max(1, Number(query.page) || 1)
+    const params: Record<string, unknown> = {
+      mapId: Number(this.map.id), pageId, role, page,
+      withSchema: request.sourceRead === true || query.withSchema === true || !this.bindingSchemaRevision,
+      ...(request.schemaOnly ? { schemaOnly: true } : {}),
+      ...(this.bindingSchemaRevision ? { schemaRevision: this.bindingSchemaRevision } : {}),
+      ...(optionsField ? { field: optionsField } : {}),
+      runtime: { filters: query.filters || {}, search: query.search || "", searchField: query.searchField || "", searchFallback: Boolean(query.searchFallback) },
+      ...(this.map.inBackend ? { editorBinding: binding } : {}),
+      ...(!this.map.inBackend && this.map.extras.publishedVersionId !== undefined ? { versionId: this.map.extras.publishedVersionId } : {}),
+    }
+    // Detached domain/facet reads can request their own bounded page without
+    // changing the live binding's pagination or current results.
+    if (request.sourceRead && this.map.inBackend) params.editorBinding = {
+      ...binding, perPage: Math.min(5000, Math.max(1, Number(query.perpage) || 5000)),
+      pagination: { ...binding.pagination, on: true, perpage: Math.min(5000, Math.max(1, Number(query.perpage) || 5000)) },
+    }
+    const rpcUrl = this.server.getUrl("rpc").replace(/\/v1\//, "/v9/").replace(/([?&]rest_route=[^&]*)/, match => match.replace(/%2[Ff]v1%2[Ff]|\/v1\//, "/v9/"))
+    const url = !this.map.inBackend ? withDraftPreview(rpcUrl, window.location.search, Number(this.map.id)) : rpcUrl
+    const transportRevision = this.readRevision
+    const identity = this.bindingIdentity()
+    const rpcRequest = jQuery.Deferred((deferred) => {
+      const rows: Record<string, any>[] = []
+      const ids = new Set<string>()
+      let first: any
+      const read = (pageNumber: number) => this.server.post(url, {
+        query: "getPageBinding", params: { ...params, page: pageNumber,
+          ...(first ? { withSchema: false, schemaRevision: first.schemaRevision } : {}) },
+      }, "json")
+        .done((outcome: any) => {
+          if (transportRevision !== this.readRevision || identity !== this.bindingIdentity()) { deferred.reject({ stale: true }); return }
+          if (outcome.error) { deferred.reject(outcome.error); return }
+          const result = outcome.result
+          if (optionsField) { deferred.resolve(result.options); return }
+          if (!request.sourceRead && result.page.paginated === false) {
+            // Unpaged Regions still use bounded RPC chunks. Publish one complete
+            // repository result; never briefly apply a truncated region dataset.
+            if (!first && result.page.skip !== 0) { read(1); return }
+            first ??= result
+            if (result.bindingRevision !== first.bindingRevision || result.schemaRevision !== first.schemaRevision
+              || result.count !== first.count || result.page.skip !== rows.length
+              || (result.page.hasMore && result.rows.length === 0)) {
+              deferred.reject({ code: "query_changed", message: "Region data changed while loading. Please reload." }); return
+            }
+            for (const row of result.rows) {
+              const id = String(row.id)
+              if (ids.has(id)) { deferred.reject({ code: "query_changed" }); return }
+              ids.add(id); rows.push(row)
+            }
+            if (result.page.hasMore) { read(pageNumber + 1); return }
+            if (rows.length !== result.count) { deferred.reject({ code: "query_changed" }); return }
+            deferred.resolve({ items: rows, count: result.count, hasMore: false,
+              page: 1, perpage: rows.length, ...(first.schema ? { schema: first.schema } : {}),
+              schemaRevision: first.schemaRevision })
+            return
+          }
+          if (first) { deferred.reject({ code: "query_changed" }); return }
+          deferred.resolve({ items: result.rows, count: result.count, hasMore: result.page.hasMore,
+            page, perpage: result.page.take, ...(result.schema ? { schema: result.schema } : {}),
+            ...(result.schemaRevision ? { schemaRevision: result.schemaRevision } : {}) })
+        }).fail(error => deferred.reject(error))
+      read(page)
+    }).promise()
+    return { rpcRequest }
+  }
+
+  private readRevision = 0
+  invalidateReads(resetSchema = false): void {
+    this.readRevision++
+    if (resetSchema) {
+      this.bindingSchemaRevision = undefined
+      if (this.usesPageBindingTransport()) this.schema.setFields([])
+    }
+  }
+  private bindingIdentity(): string {
+    const map = this.map
+    if (!map?.globalQueriesEnabled) return "legacy"
+    const role = map.objectsRepository === this ? "objects" : "regions"
+    return JSON.stringify([map.activePageId, readPageBinding(map.options, role, map.activePageId)])
+  }
+
+  find(query?: Query | { [key: string]: any }, options?: FindOptions): JQueryDeferred<any> {
     const defer = jQuery.Deferred()
     defer.promise()
+    const revision = ++this.readRevision
+    const bindingIdentity = this.bindingIdentity()
 
     if (typeof query !== "undefined") {
       this.query.update(query)
     }
 
     const request = this.getRequest("index", null, this.query)
+    if (schemaUsesPostData(this.schema) && !hasRuntimeFeature("data_source_posts")) {
+      const response: MapsvgResponse = { data: { items: [], count: 0, hasMore: false } }
+      this.loadDataFromResponse(response.data, { request, response })
+      return defer.resolve(this.getLoaded())
+    }
 
     if (request.data !== this.query) {
       this.query.update(request.data)
     }
 
-    const eventData = { query: this.query, repository: this }
+    const silent = !!options?.silent
+    const eventData = { query: this.query, repository: this, silent }
 
-    this.events.trigger(RepositoryEvent.BEFORE_LOAD, { query: this.query, repository: this })
+    this.events.trigger(RepositoryEvent.BEFORE_LOAD, eventData)
 
     // Update query if reference was changed
     if (eventData.query !== this.query) {
@@ -372,9 +520,28 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
       this.query = eventData.query
     }
 
-    if (this.noFiltersNoLoad && !this.query.hasFilters()) {
+    const role = this.map?.objectsRepository === this ? "objects" : "regions"
+    const bindingTransport = this.usesPageBindingTransport()
+    if (bindingTransport) {
+      const binding = readPageBinding(this.map.options, role, this.map.activePageId)
+      if (options?.initial) this.initialLoadDeferred = binding.disableOn.initialLoad
+      else if (!options?.automatic) this.initialLoadDeferred = false
+      if (this.initialLoadDeferred || (binding.disableOn.emptyFilters && !hasBindingFilters(this.query))) {
+        // The result schema is needed even while rows are disabled. Once known,
+        // filter clears/polling can publish an empty result without another RPC.
+        request.schemaOnly = true
+        if (this.bindingSchemaRevision) {
+          request.bindingRead = true
+          const response = { data: { items: [], count: 0, hasMore: false, page: 1 } }
+          this.loadDataFromResponse(response.data, { request, response })
+          defer.resolve(this.getLoaded())
+          return defer
+        }
+      }
+    }
+    if (this.noFiltersNoLoad && !bindingTransport && !this.query.hasFilters()) {
       this.objects.clear()
-      this.events.trigger(RepositoryEvent.AFTER_LOAD, { data: {}, repository: this })
+      this.events.trigger(RepositoryEvent.AFTER_LOAD, { data: {}, repository: this, silent })
       defer.resolve(this.getLoaded())
       return defer
     }
@@ -385,19 +552,20 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
       schemaRequested = true
     }
 
-    this.server
-      .get(request.url, request.data)
+    const { rpcRequest } = this.readTransport(request, this.query)
+
+    rpcRequest
       .done((serverResponse: string) => {
+        if (revision !== this.readRevision || bindingIdentity !== this.bindingIdentity()) { defer.reject({ stale: true }); return }
         if (schemaRequested) {
           this.query.update({ withSchema: false })
         }
-        const response: MapsvgResponse = {
-          data: serverResponse,
-        }
+        const response: MapsvgResponse = { data: serverResponse }
         this.loadDataFromResponse(response.data, { request, response })
         defer.resolve(this.getLoaded())
       })
       .fail((response) => {
+        if (revision !== this.readRevision || bindingIdentity !== this.bindingIdentity()) { defer.reject({ stale: true }); return }
         this.events.trigger(RepositoryEvent.FAILED_LOAD, { response, repository: this })
         defer.reject(response)
       })
@@ -521,15 +689,22 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
 
     if ("items" in dataRaw && "hasMore" in dataRaw) {
       const { items, schema, hasMore } = dataRaw
+      let rowSchema = this.schema
       if (schema) {
-        this.schema.update(schema)
+        if (ctx?.request?.bindingRead) {
+          rowSchema = new Schema(schema)
+          if (!ctx.request.sourceRead) {
+            this.setSchema(rowSchema)
+            this.bindingSchemaRevision = dataRaw.schemaRevision
+          }
+        } else if (!ctx?.request?.sourceRead) this.schema.update(schema)
       }
       if (items && Array.isArray(items) && items.length > 0) {
         const testItem = items[0]
         if ("objectNamePlural" in testItem) {
           dataRaw.items = items.map((obj) => new Schema(obj))
         } else {
-          dataRaw.items = items.map((obj) => new Model(obj, this.schema))
+          dataRaw.items = items.map((obj) => new Model(obj, rowSchema))
         }
       }
     } else {
@@ -547,60 +722,22 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     return dataRaw
   }
 
-  getImportSettings(force = false): JQueryDeferred<any> {
-    const defer = jQuery.Deferred()
-    defer.promise()
-
-    this.importSettings = {}
-this.importSettingsLoaded = true
-defer.resolve(this.importSettings)
-return defer
-    
+  /** Optional module API retained for legacy consumers; no import implementation in core. */
+  private importModuleMethod(name: string, args: unknown[]) {
+    const module = window.MapSVG?.extensions?.get<Record<string, (...args: any[]) => any>>("runtime.component", "collection-import")
+    if (!module?.[name]) throw new Error("Collection Import module is unavailable")
+    return module[name].apply(this, args)
   }
 
-  updateImportSettings(fields: Record<string, any>): JQueryDeferred<any> {
-    const defer = jQuery.Deferred()
-    defer.promise()
+  getImportSettings(force = false): JQueryDeferred<any> { return this.importModuleMethod("getImportSettings", [force]) }
 
-    if (!this.schema || !this.schema.id) {
-      defer.reject()
-      return defer
-    }
-
-    const route = `schemas/${this.schema.id}/import-settings`
-    this.server
-      .put(route, fields)
-      .done((body: any) => {
-        this.importSettings = (body && body.importSettings) || {}
-        this.importSettingsLoaded = true
-        this.events?.trigger(RepositoryEvent.AFTER_UPDATE_IMPORT_SETTTINGS, {
-          repository: this,
-          importSettings: this.importSettings,
-        })
-        defer.resolve(this.importSettings)
-      })
-      .fail((response: any) => {
-        defer.reject(response)
-      })
-
-    return defer
-  }
+  updateImportSettings(fields: Record<string, any>): JQueryDeferred<any> { return this.importModuleMethod("updateImportSettings", [fields]) }
 
   /**
    * Sends one batch of CSV rows to the server.
    * Chunking and sequencing are handled by the controller (pause/resume on PapaParse parser).
    */
-  import(data: { [key: string]: any }, convertLatlngToAddress: boolean, map: MapSVGMap) {
-    const locationField = this.schema.getFieldByType("location")
-    const language = locationField?.language ?? "en"
-
-    const formatted = this.formatCSV(data, map)
-
-    const postData: { [key: string]: any } = { language, convertLatlngToAddress }
-    postData[this.schema.objectNamePlural] = JSON.stringify(formatted)
-
-    return this.server.post(`collection/${this.schema.name}/import`, postData)
-  }
+  import(data: { [key: string]: any }, convertLatlngToAddress: boolean, map: MapSVGMap) { return this.importModuleMethod("import", [data, convertLatlngToAddress, map]) }
 
   /**
    * Tells the server to download a remote CSV and enqueue it as an import job.
@@ -613,152 +750,22 @@ return defer
       convertAddressToLatLng?: number
       paidGeocoding?: number
     },
-  ): JQueryPromise<any> {
-    return this.server.post(`collection/${this.schema.name}/import-csv-url`, {
-      csvUrl,
-      ...options,
-    })
-  }
+  ): JQueryPromise<any> { return this.importModuleMethod("importFromUrl", [csvUrl, options]) }
 
   /**
    * Processes one chunk of an in-progress import job.
    * Returns a jQuery Promise resolving to { status, processed, total, errors?, error_count?, geocoding_queued? }.
    */
-  importCsvProcess(token: string): JQueryPromise<any> {
-    return this.server.post(`collection/${this.schema.name}/import-csv/process`, { token })
-  }
+  importCsvProcess(token: string): JQueryPromise<any> { return this.importModuleMethod("importCsvProcess", [token]) }
 
-  formatCSV(data: { [key: string]: any }, map: MapSVGMap) {
-    const _this = this
-    const newdata = []
-    const latLngRegex =
-      /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)[\s]?[,\s]?[\s]?[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/g
-
-    const regionsTable = map.regionsRepository.getSchema().name
-
-    data.forEach(function (object, index) {
-      const newObject = {}
-      for (const key in object) {
-        const field = _this.schema.getField(key)
-        if (field !== undefined) {
-          switch (field.type) {
-            case "region":
-              newObject[key] = {}
-              newObject[key] = object[key]
-                .split(",")
-                .map(function (regionId) {
-                  return regionId.trim()
-                })
-                .filter(function (rId) {
-                  return (
-                    map.getRegion(rId) !== undefined ||
-                    map.regions.find(function (item) {
-                      return item.title === rId
-                    }) !== undefined
-                  )
-                })
-                .map(function (rId) {
-                  let r = map.getRegion(rId)
-                  if (typeof r === "undefined") {
-                    r = map.regions.find(function (item) {
-                      return item.title === rId
-                    })
-                  }
-                  return { id: r.id, title: r.title, tableName: regionsTable }
-                })
-              break
-            case "location":
-              if (object[key].match(latLngRegex)) {
-                let delimiter = ","
-                if (object[key].indexOf(",") !== -1) {
-                  delimiter = ","
-                } else if (object[key].indexOf(" ") !== -1) {
-                  delimiter = " "
-                }
-                const coords = object[key].split(delimiter).map(function (n) {
-                  return parseFloat(n)
-                })
-                if (
-                  coords.length == 2 &&
-                  coords[0] > -90 &&
-                  coords[0] < 90 &&
-                  coords[1] > -180 &&
-                  coords[1] < 180
-                ) {
-                  newObject[key] = {
-                    geoPoint: { lat: coords[0], lng: coords[1] },
-                  }
-                } else {
-                  newObject[key] = ""
-                }
-              } else if (object[key]) {
-                newObject[key] = { address: object[key] }
-              }
-
-              if (typeof newObject[key] == "object") {
-                newObject[key].img = map.options.defaultMarkerImage
-              }
-
-              break
-            case "select": {
-              const field = _this.schema.getField(key)
-              if (field.multiselect) {
-                const labels = _this.schema.getField(key).options.map(function (f) {
-                  return f.label
-                })
-                newObject[key] = object[key]
-                  .split(",")
-                  .map(function (label) {
-                    return label.trim()
-                  })
-                  .filter(function (label) {
-                    return labels.indexOf(label) !== -1
-                  })
-                  .map(function (label) {
-                    return _this.schema.getField(key).options.filter(function (option) {
-                      return option.label == label
-                    })[0]
-                  })
-                if (newObject[key].length === 0) {
-                  const values = _this.schema.getField(key).options.map(function (f) {
-                    return f.value + ""
-                  })
-                  newObject[key] = object[key]
-                    .split(",")
-                    .map(function (value) {
-                      return value.trim()
-                    })
-                    .filter(function (value) {
-                      return values.indexOf(value) !== -1
-                    })
-                    .map(function (value) {
-                      return _this.schema.getField(key).options.filter(function (option) {
-                        return option.value == value
-                      })[0]
-                    })
-                }
-              } else {
-                newObject[key] = object[key]
-              }
-              break
-            }
-            case "radio":
-            case "text":
-            case "textarea":
-            case "status":
-            default:
-              newObject[key] = object[key]
-              break
-          }
-        }
-      }
-      data[index] = newObject
-    })
-
-    return data
-  }
+  formatCSV(data: { [key: string]: any }, map: MapSVGMap) { return this.importModuleMethod("formatCSV", [data, map]) }
 
   async getOptionsByField(fieldName: string): Promise<any> {
+    if (this.map?.globalQueriesEnabled && this.map.inBackend && (this.map.objectsRepository === this || this.map.regionsRepository === this)) {
+      const request = this.getRequest("index", null, {})
+      const { rpcRequest } = this.readTransport(request, {}, fieldName)
+      return await rpcRequest
+    }
     const [parentFieldName, ...nestedFields] = fieldName.split(".")
     const schemaField = this.schema.getField(parentFieldName)
     if (!schemaField) {
@@ -767,7 +774,8 @@ return defer
       })
     }
     switch (schemaField.type) {
-      case "region": {
+      case "region":
+      case "relation": {
         const options = schemaField.options
           .sort(function (a, b) {
             if (a.title < b.title) return -1

@@ -36,6 +36,10 @@ export class TextFormElement extends FormElement {
     this.inputs.text = <HTMLInputElement>(
       $(this.domElements.main).find('input[name="' + this.name + '"]')[0]
     )
+    if (this.filtersMode && this.filterOperator) {
+      this.inputs.text.type = "number"
+      this.inputs.text.step = "any"
+    }
   }
 
   getSchema(): { [p: string]: any } {

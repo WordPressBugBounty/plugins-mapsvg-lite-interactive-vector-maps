@@ -36,6 +36,13 @@
       "visible": true
     },
     {
+      "name": "type",
+      "label": "Type",
+      "type": "text",
+      "db_type": "varchar(50)",
+      "visible": false
+    },
+    {
       "name": "fields",
       "label": "Fields",
       "type": "text",
@@ -74,6 +81,48 @@
       "name": "apiEndpoints",
       "label": "API Endpoints",
       "type": "text",
+      "db_type": "longtext",
+      "visible": false
+    },
+    {
+      "name": "apiBaseUrl",
+      "label": "API Base URL",
+      "type": "text",
+      "db_type": "varchar(255)",
+      "visible": false
+    },
+    {
+      "name": "apiAuthorization",
+      "label": "API Authorization",
+      "type": "text",
+      "db_type": "varchar(255)",
+      "visible": false
+    },
+    {
+      "name": "regionSupport",
+      "label": "Region Support",
+      "type": "boolean",
+      "db_type": "tinyint(1)",
+      "visible": false
+    },
+    {
+      "name": "markerSupport",
+      "label": "Marker Support",
+      "type": "boolean",
+      "db_type": "tinyint(1)",
+      "visible": false
+    },
+    {
+      "name": "bindings",
+      "label": "Bindings",
+      "type": "text",
+      "db_type": "longtext",
+      "visible": false
+    },
+    {
+      "name": "zodSettings",
+      "label": "Zod Settings",
+      "type": "json",
       "db_type": "longtext",
       "visible": false
     }

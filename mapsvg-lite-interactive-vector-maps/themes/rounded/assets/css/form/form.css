@@ -1,9 +1,10 @@
-@import url(./select.css);
+@import url(./select.css?v=1.1.1);
 @import url(./search.css);
-@import url(./distance.css);
+@import url(./distance.css?v=1.1.0);
 
 .mapsvg-filters-wrap .mapsvg-data-form-view > .form-group.mapsvg-form-field-distance,
 .mapsvg-filters-wrap .mapsvg-data-form-view > .form-group.mapsvg-form-field-search,
+.mapsvg-filters-wrap .mapsvg-data-form-view > .form-group.mapsvg-form-field-text,
 .mapsvg-filters-wrap .mapsvg-data-form-view > .form-group.mapsvg-form-field-select {
   height: var(--mapsvg-input-height);
   font-family: var(--mapsvg-font-family);
@@ -15,6 +16,13 @@
   padding: 14px 30px;
   outline: none;
   min-width: 150px;
+}
+.mapsvg-filters-wrap .mapsvg-data-form-view > .form-group.mapsvg-form-field-search,
+.mapsvg-filters-wrap .mapsvg-data-form-view > .form-group.mapsvg-form-field-text,
+.mapsvg-filters-wrap .mapsvg-data-form-view > .form-group.mapsvg-form-field-select {
+  min-height: var(--mapsvg-input-height);
+  height: auto;
+  padding: 12px 30px 10px;
 }
 .mapsvg-filters-wrap .btn {
   padding: 10px 20px;
@@ -44,6 +52,10 @@
 .mapsvg-map-container
   .mapsvg-filters-wrap
   .mapsvg-data-form-view
+  > .form-group.mapsvg-form-field-text,
+.mapsvg-map-container
+  .mapsvg-filters-wrap
+  .mapsvg-data-form-view
   > .form-group.mapsvg-form-field-select,
 .mapsvg-map-container .mapsvg-filters-wrap .btn {
   background-color: var(--mapsvg-bg-glass-white);
@@ -51,12 +63,15 @@
   border: var(--mapsvg-bg-glass-border);
 }
 
-.mapsvg-filters-wrap .mapsvg-data-form-view > .form-group > label {
-  margin: 0 0 7px;
+.mapsvg-filters-wrap .mapsvg-data-form-view > .form-group .mapsvg-filter-label {
+  margin: 0 0 4px;
+  padding: 0;
+  line-height: 14px;
   color: #222;
 }
 
-.mapsvg-form-builder input[type="text"] {
+.mapsvg-form-builder input[type="text"],
+.mapsvg-form-builder input[type="number"] {
   height: 22px;
   line-height: 24px;
   background-color: transparent;
@@ -66,7 +81,9 @@
   outline: none;
 }
 .mapsvg-filters-wrap input[type="text"]:focus,
-.mapsvg-filters-wrap input[type="text"]:active {
+.mapsvg-filters-wrap input[type="text"]:active,
+.mapsvg-filters-wrap input[type="number"]:focus,
+.mapsvg-filters-wrap input[type="number"]:active {
   border: none !important;
   outline: 0 !important;
   -webkit-appearance: none !important;

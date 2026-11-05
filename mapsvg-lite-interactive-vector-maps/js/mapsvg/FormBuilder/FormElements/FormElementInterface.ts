@@ -37,6 +37,7 @@ export interface FormElementInterface {
   placeholder?: string
   parameterName?: string
   parameterNameShort?: string
+  filterOperator?: "gt" | "gte" | "lt" | "lte"
   nameChanged: boolean
   visible?: boolean
   readonly?: boolean

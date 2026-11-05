@@ -9,8 +9,7 @@ namespace MapSVG;
  */
 class PostDataOrphanCleanup
 {
-	/** Rows read per query. Tests may lower this; values below 1 use the default. */
-	public static $batchSize = 200;
+    private const BATCH_SIZE = 200;
 
 	/**
 	 * MapSVG row IDs whose `post` is empty or no longer a WordPress post.
@@ -61,9 +60,7 @@ class PostDataOrphanCleanup
 		}
 
 		$columnRows = $db->get_results("SHOW COLUMNS FROM `{$schemaTable}`");
-		if (!is_array($columnRows)) {
-			return 0;
-		}
+		if (!is_array($columnRows)) return 0;
 		$columns = array_column($columnRows, 'Field');
 		if (!in_array('type', $columns, true) || !in_array('name', $columns, true)) {
 			return 0;
@@ -79,10 +76,8 @@ class PostDataOrphanCleanup
 
 		$deleted = 0;
 		foreach ($schemas as $schema) {
-			if (!is_array($schema)) {
-				continue;
-			}
-			$name = isset($schema['name']) ? (string) $schema['name'] : '';
+			if (!is_array($schema) || !isset($schema['name']) || !is_string($schema['name'])) continue;
+			$name = $schema['name'];
 			$deleted += self::cleanupTableByName($db, $name);
 		}
 
@@ -110,9 +105,7 @@ class PostDataOrphanCleanup
 		}
 
 		$columnRows = $db->get_results("SHOW COLUMNS FROM `{$table}`");
-		if (!is_array($columnRows)) {
-			return 0;
-		}
+		if (!is_array($columnRows)) return 0;
 		$columns = array_column($columnRows, 'Field');
 		if (!in_array('post', $columns, true) || !in_array('id', $columns, true)) {
 			return 0;
@@ -120,26 +113,16 @@ class PostDataOrphanCleanup
 
 		$r2oTable = $db->mapsvg_prefix . 'r2o';
 		$r2oExists = (bool) $db->get_var("SHOW TABLES LIKE '{$r2oTable}'");
-		$batchSize = (int) self::$batchSize;
-		if ($batchSize < 1) {
-			$batchSize = 200;
-		}
-
 		$deleted = 0;
 		$lastId = 0;
 		while (true) {
-			$sql = $db->prepare(
+			$rows = $db->get_results($db->prepare(
 				"SELECT `id`, `post` FROM `{$table}` WHERE `id` > %d ORDER BY `id` ASC LIMIT %d",
-				$lastId,
-				$batchSize
-			);
-			$rows = $db->get_results($sql);
-			if (!is_array($rows) || empty($rows)) {
-				break;
-			}
+				$lastId, self::BATCH_SIZE
+			));
+			if (!is_array($rows) || empty($rows)) break;
 
-			$ids = self::orphanRowIds($rows, array(self::class, 'postExists'));
-			foreach ($ids as $id) {
+			foreach (self::orphanRowIds($rows, array(self::class, 'postExists')) as $id) {
 				$db->delete($table, array('id' => $id));
 				if ($r2oExists) {
 					$db->delete($r2oTable, array(
@@ -149,35 +132,14 @@ class PostDataOrphanCleanup
 				}
 				$deleted++;
 			}
-
-			$batchLastId = self::rowId(end($rows));
-			if ($batchLastId === null || $batchLastId <= $lastId) {
-				break;
-			}
-			$lastId = $batchLastId;
-			if (count($rows) < $batchSize) {
-				break;
-			}
+			$lastRow = end($rows);
+			$nextId = is_object($lastRow) ? ($lastRow->id ?? null) : (is_array($lastRow) ? ($lastRow['id'] ?? null) : null);
+			if (!is_numeric($nextId) || (int) $nextId <= $lastId) break;
+			$lastId = (int) $nextId;
+			if (count($rows) < self::BATCH_SIZE) break;
 		}
 
 		return $deleted;
-	}
-
-	/**
-	 * Numeric id from a SELECT row, used as the next batch cursor.
-	 *
-	 * @param mixed $row
-	 * @return int|null
-	 */
-	private static function rowId($row)
-	{
-		if (is_object($row) && isset($row->id) && is_numeric($row->id)) {
-			return (int) $row->id;
-		}
-		if (is_array($row) && isset($row['id']) && is_numeric($row['id'])) {
-			return (int) $row['id'];
-		}
-		return null;
 	}
 
 	/**

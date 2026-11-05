@@ -59,13 +59,16 @@ class ShortcodePage
 				$post->post_content = $this->postContent;
 			}
 
+			// The synthetic page is valid even when the original URL matched no WP post.
+			$query->is_404 = false;
+			unset($query->query_vars['error'], $wp->query_vars['error']);
+
 			// Remove the filter so it doesn't affect other queries
 			remove_filter('the_posts', [$this, 'renderPage'], 10);
 			return [$post];
 		}
 
-		// Remove the filter for all other queries as well
-		remove_filter('the_posts', [$this, 'renderPage'], 10);
+		// Theme/plugin queries may run before the main query; keep waiting for our page.
 		return $posts;
 	}
 

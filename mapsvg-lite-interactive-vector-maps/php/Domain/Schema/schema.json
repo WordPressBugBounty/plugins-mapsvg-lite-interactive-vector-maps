@@ -31,6 +31,13 @@
       "type": "text",
       "db_type": "longtext",
       "visible": true
+    },
+    {
+      "name": "zodSettings",
+      "label": "Zod Settings",
+      "type": "json",
+      "db_type": "longtext",
+      "visible": false
     }
   ]
 }

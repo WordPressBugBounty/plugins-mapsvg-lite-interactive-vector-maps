@@ -1,0 +1,15 @@
+/* Shared by the App and controllers mounted in their own document/ShadowRoot. */
+.mapsvg-wrap-all,
+.mapsvg-controller-container,
+.mapsvg-form-builder {
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
+  font-size: var(--mapsvg-font-size, 14px);
+  line-height: var(--mapsvg-line-height, 1.5);
+}
+
+/* Native controls otherwise keep the browser or WordPress theme font. */
+.mapsvg-wrap-all :where(button, input, select, textarea),
+.mapsvg-controller-container :where(button, input, select, textarea),
+.mapsvg-form-builder :where(button, input, select, textarea) {
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
+}

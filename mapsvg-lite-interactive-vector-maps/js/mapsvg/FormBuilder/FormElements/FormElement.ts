@@ -1,11 +1,12 @@
 import { Server } from "@/Infrastructure/Server/Server"
 import { Events } from "../../Core/Events"
-import { SchemaField } from "../../Infrastructure/Server/SchemaField"
+import { isRelationFieldType, SchemaField } from "../../Infrastructure/Server/SchemaField"
 import { FormBuilder } from "../FormBuilder"
 import { FormElementInterface } from "./FormElementInterface"
 import { mapsvgCore } from "@/Core/Mapsvg"
 import { useRepository } from "@/Core/useRepository"
 import { ArrayIndexed } from "@/Core/ArrayIndexed"
+import { isFilterOperator, type FilterOperator } from "../../Filters/filterValue"
 
 const $ = jQuery
 
@@ -62,6 +63,7 @@ export class FormElement implements FormElementInterface {
   placeholder?: string
   parameterName?: string
   parameterNameShort?: string
+  filterOperator?: FilterOperator
   nameChanged: boolean
   visible?: boolean
   hiddenOnTable?: boolean
@@ -107,10 +109,12 @@ export class FormElement implements FormElementInterface {
     this.name = this.name || options.name || "label"
     this.help = options.help || ""
     this.placeholder = options.placeholder
+    this.filterOperator = isFilterOperator(options.filterOperator) ? options.filterOperator : undefined
 
     this.setExternal(external)
 
-    let t = this.type
+    // Relation is the persisted field name; legacy templates retain the region alias.
+    let t = isRelationFieldType(this.type) ? "region" : this.type
     if (t === "marker" && this.mapIsGeo) {
       t = "marker-geo"
     }
@@ -179,12 +183,53 @@ export class FormElement implements FormElementInterface {
     }
   }
 
+  /**
+   * Keep Select2 dropdown inside the form (required when form lives in a ShadowRoot).
+   */
+  getSelect2DropdownParent(): JQuery | null {
+    const fb = this.formBuilder
+    if (!fb) {
+      return null
+    }
+
+    // Prefer container — it is connected before FormBuilder.redraw() builds fields.
+    // form/view may still be detached when addSelect2() runs during field init.
+    const anchor: Node | null | undefined =
+      fb.container || fb.form || this.domElements?.main || null
+
+    if (!anchor || typeof anchor.getRootNode !== "function") {
+      return null
+    }
+
+    const rootNode = anchor.getRootNode()
+    const inShadow =
+      (rootNode as ShadowRoot).host instanceof HTMLElement ||
+      (rootNode !== anchor.ownerDocument && rootNode !== anchor)
+
+    if (inShadow) {
+      return $(fb.container || fb.form) as JQuery
+    }
+
+    if (fb.mapsvg && fb.mapsvg.useShadowRoot) {
+      return $(fb.form) as JQuery
+    }
+    if (fb.filtersMode) {
+      return $(fb.form) as JQuery
+    }
+    return null
+  }
+
   addSelect2() {
     if ($().mselect2) {
+      const select2Options: { dropdownParent?: any } = {}
+      const dropdownParent = this.getSelect2DropdownParent()
+      if (dropdownParent) {
+        select2Options.dropdownParent = dropdownParent
+      }
       $(this.domElements.main)
         .find("select")
         .css({ width: "100%", display: "block" })
-        .mselect2()
+        .mselect2(select2Options)
         .on("select2:focus", function () {
           $(this).mselect2("open")
         })
@@ -284,7 +329,7 @@ export class FormElement implements FormElementInterface {
         _this.label = $(this).val() + ""
         if (
           _this.renamable !== false &&
-          _this.type != "region" &&
+          !isRelationFieldType(_this.type) &&
           _this.type != "location" &&
           _this.type != "title"
         ) {
@@ -315,7 +360,7 @@ export class FormElement implements FormElementInterface {
           $(e.target).trigger("change")
         }
       }
-      if (_this.type != "region") _this.name = e.target.value
+      if (!isRelationFieldType(_this.type)) _this.name = e.target.value
       $(_this.domElements.main)
         .find("label")
         .html(_this.label + '<div class="field-name">' + _this.name + "</div>")
@@ -395,6 +440,7 @@ export class FormElement implements FormElementInterface {
         ? {
             parameterName: this.parameterName,
             parameterNameShort: this.parameterNameShort,
+            filterOperator: this.filterOperator,
           }
         : undefined),
     }
@@ -416,6 +462,20 @@ export class FormElement implements FormElementInterface {
 
   getDataForTemplate(): { [key: string]: any } {
     const data = this.getSchema()
+
+    if (this.filtersMode && !this.formBuilder.editMode &&
+      /^(Object|Region)\.post\.taxonomy\.[^.]+$/.test(this.parameterName || "") &&
+      Array.isArray(data.options)) {
+      // WordPress term names already contain entities. Decode only the detached
+      // display label once; stored options and taxonomy slug values stay intact.
+      const decoder = document.createElement("textarea")
+      data.options = data.options.map((option) => {
+        if (typeof option.label !== "string") return option
+        // Keep markup inert even for literal closing tags in a term name.
+        decoder.innerHTML = option.label.replace(/</g, "&lt;")
+        return { ...option, label: decoder.value }
+      })
+    }
 
     // Add namespace to names
     data._name = data.name
@@ -466,18 +526,23 @@ export class FormElement implements FormElementInterface {
     const newView = $(this.templates.main(this.getDataForTemplate()))
     $(this.domElements.main).html(newView.html())
     if ($().mselect2) {
+      const select2Options: { dropdownParent?: JQuery } = {}
+      const dropdownParent = this.getSelect2DropdownParent()
+      if (dropdownParent) {
+        select2Options.dropdownParent = dropdownParent
+      }
       if (this.type !== "distance") {
         $(this.domElements.main)
           .find("select")
           .css({ width: "100%", display: "block" })
-          .mselect2()
+          .mselect2(select2Options)
           .on("select2:focus", function () {
             $(this).mselect2("open")
           })
       } else {
         $(this.domElements.main)
           .find("select")
-          .mselect2()
+          .mselect2(select2Options)
           .on("select2:focus", function () {
             $(this).mselect2("open")
           })

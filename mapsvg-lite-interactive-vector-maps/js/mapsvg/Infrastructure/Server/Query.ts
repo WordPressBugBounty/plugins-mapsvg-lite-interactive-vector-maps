@@ -2,6 +2,7 @@ import { cleanObject, deepMerge } from "@/Core/Utils"
 
 interface QueryInterface {
   sort?: Array<{ field: string; order: string }>
+  fields?: string[]
   sortBy?: string
   sortDir?: string
   page?: number
@@ -20,6 +21,7 @@ interface QueryInterface {
  */
 export class Query implements QueryInterface {
   sort?: Array<{ field: string; order: string }>
+  fields?: string[]
   sortBy?: string
   sortDir?: string
   page?: number
@@ -78,6 +80,7 @@ export class Query implements QueryInterface {
       filterout: this.filterout,
       page: this.page,
       sort: this.sort,
+      fields: this.fields,
       perpage: this.perpage,
       lastpage: this.lastpage,
     }

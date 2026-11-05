@@ -13,6 +13,16 @@ export class MapsRepository extends Repository {
       // An ordinary settings save must not submit default or stored code for a restricted editor.
       const options = { ...params.options }
       if ((window as any).mapsvgBackendParams?.user?.canEditJavaScript === false) {
+        if (options.templates && typeof options.templates === "object") {
+          options.templates = Object.fromEntries(Object.entries(options.templates).map(([key, value]) => {
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+              const template = { ...value as Record<string, unknown> }
+              delete template.js
+              return [key, template]
+            }
+            return [key, value]
+          }))
+        }
         for (const key of [
           "events",
           "middlewares",

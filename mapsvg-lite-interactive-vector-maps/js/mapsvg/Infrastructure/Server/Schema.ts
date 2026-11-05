@@ -2,7 +2,7 @@ import { mapsvgCore } from "@/Core/Mapsvg"
 import { throttle, ucfirst } from "@/Core/Utils"
 import { ArrayIndexed } from "../../Core/ArrayIndexed"
 import { Events } from "../../Core/Events"
-import { SchemaField, SchemaFieldProps } from "./SchemaField"
+import { isRelationFieldType, SchemaField, SchemaFieldProps } from "./SchemaField"
 import { SchemaModel } from "./SchemaModel"
 
 export type HTTPMethod = "POST" | "GET" | "DELETE" | "PUT"
@@ -41,6 +41,26 @@ export interface SchemaOptions {
   remote?: boolean
   primaryKeyField?: string
   postType?: string
+  regionSupport?: number
+  markerSupport?: number
+  bindings?: SchemaBindings | null
+  zodSettings?: ZodSettings | null
+}
+
+export type ZodSettings = {
+  version: 1
+  jsonSchema: string
+  writeValidation?: "off"
+  [key: string]: unknown
+}
+
+export type SchemaSvgBinding = {
+  match: "elementId"
+  source: "primaryKey"
+}
+
+export type SchemaBindings = {
+  svg?: SchemaSvgBinding
 }
 
 export enum SchemaEventType {
@@ -99,6 +119,10 @@ export class Schema {
   model: SchemaModel
   primaryKeyField?: string
   postType?: string
+  regionSupport?: number
+  markerSupport?: number
+  bindings?: SchemaBindings | null
+  zodSettings?: ZodSettings | null
   constructor(options: SchemaOptions) {
     this.fields = new ArrayIndexed("name")
     this.apiEndpoints = new ArrayIndexed("name")
@@ -157,6 +181,106 @@ export class Schema {
     this.postType = postType
   }
 
+  setRegionSupport(value: number | boolean) {
+    this.regionSupport = value ? 1 : 0
+  }
+
+  setMarkerSupport(value: number | boolean) {
+    this.markerSupport = value ? 1 : 0
+  }
+
+  static defaultSvgBindings(): SchemaBindings {
+    return {
+      svg: {
+        match: "elementId",
+        source: "primaryKey",
+      },
+    }
+  }
+
+  setBindings(value: SchemaBindings | string | null | undefined) {
+    if (value == null || value === "") {
+      this.bindings = null
+      return
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value)
+        this.bindings = parsed && typeof parsed === "object" ? parsed : null
+      } catch {
+        this.bindings = null
+      }
+      return
+    }
+    this.bindings = value
+  }
+
+  setZodSettings(value: ZodSettings | string | null | undefined) {
+    if (value == null || value === "") {
+      this.zodSettings = null
+      return
+    }
+
+    let parsed: unknown = value
+    if (typeof value === "string") {
+      try {
+        parsed = JSON.parse(value)
+      } catch {
+        throw new Error("Invalid zodSettings: expected a JSON object.")
+      }
+    }
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Invalid zodSettings: expected an object.")
+    }
+
+    const settings = parsed as Record<string, unknown>
+    if (settings.version !== 1) {
+      throw new Error("Invalid zodSettings: version must be 1.")
+    }
+    if (typeof settings.jsonSchema !== "string") {
+      throw new Error("Invalid zodSettings: jsonSchema must be a JSON string.")
+    }
+
+    let jsonSchema: unknown
+    try {
+      jsonSchema = JSON.parse(settings.jsonSchema)
+    } catch {
+      throw new Error("Invalid zodSettings: jsonSchema must contain a JSON Schema object.")
+    }
+    if (!jsonSchema || typeof jsonSchema !== "object" || Array.isArray(jsonSchema)) {
+      throw new Error("Invalid zodSettings: jsonSchema must contain a JSON Schema object.")
+    }
+    if (settings.writeValidation !== undefined && settings.writeValidation !== "off") {
+      throw new Error('Invalid zodSettings: writeValidation may only be "off".')
+    }
+
+    this.zodSettings = { ...(settings as ZodSettings) }
+  }
+
+  ensureSvgBinding() {
+    if (this.hasExplicitSvgBinding()) {
+      return
+    }
+    const bindings = this.bindings && typeof this.bindings === "object" ? { ...this.bindings } : {}
+    bindings.svg = Schema.defaultSvgBindings().svg
+    this.bindings = bindings
+  }
+
+  hasExplicitSvgBinding(): boolean {
+    return !!(this.bindings && this.bindings.svg)
+  }
+
+  /**
+   * Prefer bindings.svg; fall back to type === "region" for legacy schemas.
+   */
+  hasSvgBinding(): boolean {
+    if (this.hasExplicitSvgBinding()) {
+      return true
+    }
+    return this.type === "region"
+  }
+
   setType(val: SchemaType) {
     this.type = val
 
@@ -169,6 +293,9 @@ export class Schema {
       }))
       this.setApiEndpoints(endpoints)
       this.setApiBaseUrl(mapsvgCore.routes.api.replace(/\/+$/, ""))
+    }
+    if (this.type === "region") {
+      this.ensureSvgBinding()
     }
   }
 
@@ -240,10 +367,18 @@ export class Schema {
   }
   getFieldByType(type) {
     let f = null
+    const matchRelationAlias = isRelationFieldType(type)
     this.fields.forEach(function (field) {
-      if (field.type === type) f = field
+      if (field.type === type) {
+        f = field
+      } else if (matchRelationAlias && isRelationFieldType(field.type)) {
+        f = field
+      }
     })
     return f
+  }
+  getRelationFields() {
+    return this.fields.filter((field) => isRelationFieldType(field.type))
   }
   getColumns(filters) {
     filters = filters || {}
@@ -284,6 +419,10 @@ export class Schema {
       remote: this.remote,
       primaryKeyField: this.primaryKeyField,
       postType: this.postType,
+      regionSupport: this.regionSupport,
+      markerSupport: this.markerSupport,
+      bindings: this.bindings,
+      zodSettings: this.zodSettings,
     }
     return data
   }

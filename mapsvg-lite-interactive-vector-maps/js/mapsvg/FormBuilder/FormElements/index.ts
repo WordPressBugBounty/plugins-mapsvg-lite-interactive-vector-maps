@@ -14,7 +14,9 @@ export { PostFormElement } from "./Post/PostFormElement.js"
 export { RadioFormElement } from "./Radio/RadioFormElement.js"
 export { RegionsFormElement } from "./Regions/RegionsFormElement.js"
 export { SaveFormElement } from "./Save/SaveFormElement.js"
-
+// START filters
+export { SearchFormElement } from "./Search/SearchFormElement.js"
+// END
 export { SelectFormElement } from "./Select/SelectFormElement.js"
 export { StatusFormElement } from "./Status/StatusFormElement.js"
 export { TextFormElement } from "./Text/TextFormElement.js"

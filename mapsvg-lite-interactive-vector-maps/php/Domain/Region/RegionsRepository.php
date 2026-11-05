@@ -11,13 +11,7 @@ class RegionsRepository extends Repository
 	public function __construct($tableName = null)
 	{
 		$this->prefix = "";
-		$this->db = Database::get();
 		parent::__construct($tableName);
-	}
-
-	public function getTableName()
-	{
-		return $this->db->mapsvg_prefix . $this->id;
 	}
 
 	public function setPrefix($prefix)
@@ -71,15 +65,7 @@ class RegionsRepository extends Repository
 			return;
 		}
 
-		$rows = array();
-		foreach ($ids as $id) {
-			$rows[] = array(
-				'id'       => (string) $id,
-				'orphaned' => $orphaned ? 1 : 0,
-			);
-		}
-
-		$this->createOrUpdateAll($rows);
+		$this->orphanService()->markByIds($ids, $orphaned);
 	}
 
 	/**
@@ -91,13 +77,7 @@ class RegionsRepository extends Repository
 			return 0;
 		}
 
-		$table = $this->getTableName();
-		$sql = "SELECT COUNT(*) FROM `{$table}` WHERE `orphaned` = 1";
-		if ($this->prefix) {
-			$sql .= $this->db->prepare(' AND `id` LIKE %s', $this->prefix . '%');
-		}
-
-		return (int) $this->db->get_var($sql);
+		return $this->orphanService()->count((string) $this->prefix);
 	}
 
 	/**
@@ -117,39 +97,7 @@ class RegionsRepository extends Repository
 			);
 		}
 
-		$resp = $this->find(new Query(array(
-			'perpage' => 0,
-			'filters' => array(
-				'includeOrphans' => 1,
-				'orphaned'       => 1,
-			),
-		)));
-
-		$ids = RegionOrphanCleanup::orphanIdsFromRows($resp['items'] ?? array());
-
-		if (empty($ids)) {
-			return array(
-				'deleted'    => 0,
-				'r2oDeleted' => 0,
-				'ids'        => array(),
-			);
-		}
-
-		$r2oDeleted = $this->deleteR2oLinksForRegionIds($ids);
-
-		$table = $this->getTableName();
-		$placeholders = implode(',', array_fill(0, count($ids), '%s'));
-		$deleteSql = $this->db->prepare(
-			"DELETE FROM `{$table}` WHERE `orphaned` = 1 AND `id` IN ({$placeholders})",
-			...$ids
-		);
-		$this->db->query($deleteSql);
-
-		return array(
-			'deleted'    => count($ids),
-			'r2oDeleted' => $r2oDeleted,
-			'ids'        => $ids,
-		);
+		return $this->orphanService()->delete((string) $this->prefix);
 	}
 
 	/**
@@ -164,21 +112,10 @@ class RegionsRepository extends Repository
 			return 0;
 		}
 
-		$r2oTable = $this->db->mapsvg_prefix . 'r2o';
-		if (!$this->db->get_var("SHOW TABLES LIKE '" . esc_sql($r2oTable) . "'")) {
-			return 0;
-		}
-
-		$placeholders = implode(',', array_fill(0, count($regionIds), '%s'));
-		$regionsTableName = $this->id; // short name, e.g. regions_2
-		$sql = $this->db->prepare(
-			"DELETE FROM `{$r2oTable}` WHERE `regions_table` = %s AND `region_id` IN ({$placeholders})",
-			$regionsTableName,
-			...$regionIds
+		return $this->relationStore()->deleteForRegionsTableIds(
+			(string) $this->id,
+			$regionIds
 		);
-		$this->db->query($sql);
-
-		return (int) $this->db->rows_affected;
 	}
 
 	/**
@@ -187,39 +124,66 @@ class RegionsRepository extends Repository
 	 */
 	public function createOrUpdateAll($objects)
 	{
+		$objects = is_array($objects) ? $objects : array();
+		if ($objects === array()) {
+			return;
+		}
+
 		$fields = array();
-		$duplicateUpdateMysql = array();
 		foreach ($objects as $object) {
-			$keys = array_keys($object);
-			if (array_diff($keys, $fields)) {
-				$fields = $keys;
+			foreach (array_keys((array) $object) as $name) {
+				if (is_string($name)
+					&& $this->schema->getField($name)
+					&& !in_array($name, $fields, true)) {
+					$fields[] = $name;
+				}
 			}
 		}
+		if ($fields === array()) {
+			return;
+		}
 
-		// Filter out non-existing fields using schema validation
-		$validFields = array();
-		foreach ($fields as $k => $v) {
-			if ($this->schema->getField($v)) {
-				$validFields[] = $v;
+		$rows = array();
+		foreach ($objects as $object) {
+			$object = (array) $object;
+			$row = array();
+			foreach ($fields as $name) {
+				// Preserve legacy bulk semantics: missing/null values become ''.
+				$row[$name] = isset($object[$name]) ? $object[$name] : '';
 			}
-		}
-		$fields = $validFields;
-
-		$_fields = array();
-		foreach ($fields as $k => $v) {
-			$_fields[$k] = '`' . $v . '`';
-			$duplicateUpdateMysql[] = '`' . $v . '` = VALUES(`' . $v . '`)';
+			$rows[] = $row;
 		}
 
-		$regions = array();
-		foreach ($objects as $k => $object) {
-			$data = array();
-			foreach ($fields as $key => $fieldName) {
-				$data[$fieldName] = isset($object[$fieldName]) ? esc_sql($object[$fieldName]) : '';
-			}
-			$regions[] = "('" . implode("','", $data) . "')";
-		}
-
-		$this->db->query('INSERT INTO ' . static::getTableName() . ' (' . implode(',', $_fields) . ') VALUES ' . implode(',', $regions) . ' ON DUPLICATE KEY UPDATE ' . implode(',', $duplicateUpdateMysql));
+		$this->import($rows);
 	}
+
+	private function relationStore(): \MapSVG\DataLayer\Relation\WpdbRegionRelationStore
+	{
+		$dataLayer = $this->runtimeDataLayer();
+		return new \MapSVG\DataLayer\Relation\WpdbRegionRelationStore(
+			$dataLayer->client()->getAdapter()
+		);
+	}
+
+	private function runtimeDataLayer(): \MapSVG\DataLayer\DataLayerV2
+	{
+		if ($this->source instanceof
+			\MapSVG\DataLayer\Compatibility\PlasmaDataSource) {
+			return $this->source->dataLayer();
+		}
+
+		return \MapSVG\DataLayer\DataLayerFactory::createV2(
+			null,
+			array('force' => true, 'observe' => false)
+		);
+	}
+
+	private function orphanService(): \MapSVG\DataLayer\Workflow\RegionOrphanService
+	{
+		return \MapSVG\DataLayer\Workflow\RegionOrphanServiceFactory::forSchema(
+			$this->runtimeDataLayer(),
+			$this->schema
+		);
+	}
+
 }

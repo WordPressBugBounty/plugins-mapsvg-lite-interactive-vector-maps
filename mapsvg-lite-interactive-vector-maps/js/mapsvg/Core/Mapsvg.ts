@@ -48,9 +48,12 @@ export type MapsvgRoutes = {
   uploads: string
   // Path to home folder
   home: string
+  // Optional browser-only URL transport for embeds with a same-origin asset proxy.
+  resolveAssetUrl?: (url: string) => string
 }
 
 export interface MapsvgFrontendParams {
+  typographyProbeUrl?: string
   routes: MapsvgRoutes
   nonce: string
   google_maps_api_key: string
@@ -151,11 +154,16 @@ export class Mapsvg implements MapSVGProps {
     if (!options) {
       throw new Error("MapSVG: can't initialize the core due to the missing front-end options.")
     }
+    const extensions = window.MapSVG?.extensions
+    if (!extensions) {
+      throw new Error("MapSVG: shared extension host is missing before runtime initialization.")
+    }
+
     let mapsvgCore: Mapsvg
     if (!mapsvgCore) {
       mapsvgCore = new Mapsvg()
       mapsvgCore.init(options)
-      window.MapSVG = mapsvgCore
+      window.MapSVG = Object.assign(mapsvgCore, { extensions })
     }
     return mapsvgCore
   }
@@ -176,7 +184,7 @@ export class Mapsvg implements MapSVGProps {
 
     this.setEventHandlers()
     this.extendBuiltins()
-    if (!window.mapsvg || window.mapsvg instanceof HTMLElement) {
+    if (!window.mapsvg || window.mapsvg instanceof HTMLElement || window.mapsvg === (window as any).mapsvgLegacyV8) {
       const load = async () => {
         const initGlobalsFile = await import("@/Core/InitGlobals")
         initGlobalsFile.initGlobals()
@@ -204,6 +212,7 @@ export class Mapsvg implements MapSVGProps {
       svgFileLastChanged: _svgFileLastChanged,
       viewBox: _viewBox,
       loadDb,
+      versionId: _publishedVersionId,
       ...rest
     } = container.dataset
 
@@ -214,7 +223,10 @@ export class Mapsvg implements MapSVGProps {
     }
 
     setTimeout(() => {
-      new window.mapsvg.map(container.id, { id, options: { id, ...rest }, svgFileLastChanged })
+      new window.mapsvg.map(container.id, { id, options: { id, ...rest }, svgFileLastChanged }, {
+        prefetch: true,
+        publishedVersionId: _publishedVersionId === undefined ? undefined : Number(_publishedVersionId),
+      })
     }, 5)
   }
 
@@ -240,7 +252,7 @@ export class Mapsvg implements MapSVGProps {
 
   loadMaps() {
     this.unloadMaps()
-    const containers = document.querySelectorAll<HTMLElement>('.mapsvg[data-autoload="true"]')
+    const containers = document.querySelectorAll<HTMLElement>('.mapsvg[data-autoload="true"]:not([data-engine="8"])')
     containers.forEach((container) => {
       if (container.dataset.lazy === "true") {
         this.lazyLoadMap(container)
@@ -251,10 +263,10 @@ export class Mapsvg implements MapSVGProps {
     this.loaded = true
   }
   unloadMaps() {
-    const autoloadContainers = document.querySelectorAll('.mapsvg[data-autoload="true"]')
+    const autoloadContainers = document.querySelectorAll('.mapsvg[data-autoload="true"]:not([data-engine="8"])')
     autoloadContainers.forEach((container) => {
       const mapId = container.getAttribute("id")
-      const mapInstance = this.getById(mapId)
+      const mapInstance = this.getByContainerId(mapId)
       if (mapInstance) {
         mapInstance.destroy()
       }
@@ -281,6 +293,7 @@ export class Mapsvg implements MapSVGProps {
     if (instance.length > 0) {
       return instance[0]
     }
+    return (window as any).MapSVGLegacyV8?.getById(id)
   }
 
   getByContainerId(id) {
@@ -290,6 +303,7 @@ export class Mapsvg implements MapSVGProps {
     if (instance.length > 0) {
       return instance[0]
     }
+    return (window as any).MapSVGLegacyV8?.getByContainerId(id)
   }
 
   extend(sub, base) {

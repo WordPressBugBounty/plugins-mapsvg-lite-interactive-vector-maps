@@ -2,17 +2,17 @@
     "packages": [
         {
             "name": "enshrined/svg-sanitize",
-            "version": "0.22.0",
-            "version_normalized": "0.22.0.0",
+            "version": "1.0.0",
+            "version_normalized": "1.0.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/darylldoyle/svg-sanitizer.git",
-                "reference": "0afa95ea74be155a7bcd6c6fb60c276c39984500"
+                "reference": "f3300fcd1bbf67d205b52217c75d0f7d6a8c47ff"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/darylldoyle/svg-sanitizer/zipball/0afa95ea74be155a7bcd6c6fb60c276c39984500",
-                "reference": "0afa95ea74be155a7bcd6c6fb60c276c39984500",
+                "url": "https://api.github.com/repos/darylldoyle/svg-sanitizer/zipball/f3300fcd1bbf67d205b52217c75d0f7d6a8c47ff",
+                "reference": "f3300fcd1bbf67d205b52217c75d0f7d6a8c47ff",
                 "shasum": ""
             },
             "require": {
@@ -23,7 +23,7 @@
             "require-dev": {
                 "phpunit/phpunit": "^6.5 || ^8.5"
             },
-            "time": "2025-08-12T10:13:48+00:00",
+            "time": "2026-09-01T09:35:47+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -44,7 +44,7 @@
             "description": "An SVG sanitizer for PHP",
             "support": {
                 "issues": "https://github.com/darylldoyle/svg-sanitizer/issues",
-                "source": "https://github.com/darylldoyle/svg-sanitizer/tree/0.22.0"
+                "source": "https://github.com/darylldoyle/svg-sanitizer/tree/1.0.0"
             },
             "install-path": "../enshrined/svg-sanitize"
         },
@@ -389,83 +389,283 @@
             "install-path": "../guzzlehttp/psr7"
         },
         {
-            "name": "itsgoingd/clockwork",
-            "version": "v5.3.1",
-            "version_normalized": "5.3.1.0",
+            "name": "nlproduction/plasma",
+            "version": "dev-feature/mapsvg-integration-prerequisites",
+            "version_normalized": "dev-feature/mapsvg-integration-prerequisites",
             "source": {
                 "type": "git",
-                "url": "https://github.com/itsgoingd/clockwork.git",
-                "reference": "7b0c40418df761f7a78e88762a323386a139d83d"
+                "url": "https://github.com/nlproduction/plasma.git",
+                "reference": "bd0bbf04f7f4120badc56afae3665c263f87b5f9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/itsgoingd/clockwork/zipball/7b0c40418df761f7a78e88762a323386a139d83d",
-                "reference": "7b0c40418df761f7a78e88762a323386a139d83d",
+                "url": "https://api.github.com/repos/nlproduction/plasma/zipball/bd0bbf04f7f4120badc56afae3665c263f87b5f9",
+                "reference": "bd0bbf04f7f4120badc56afae3665c263f87b5f9",
                 "shasum": ""
             },
             "require": {
                 "ext-json": "*",
-                "php": ">=7.1"
+                "php": ">=7.4"
+            },
+            "require-dev": {
+                "mockery/mockery": "^1.6",
+                "pestphp/pest": "^2.0"
             },
             "suggest": {
-                "ext-pdo": "Needed in order to use a SQL database for metadata storage",
-                "ext-pdo_mysql": "Needed in order to use MySQL for metadata storage",
-                "ext-pdo_postgres": "Needed in order to use Postgres for metadata storage",
-                "ext-pdo_sqlite": "Needed in order to use a SQLite for metadata storage",
-                "ext-redis": "Needed in order to use Redis for metadata storage",
-                "php-http/discovery": "Vanilla integration - required for the middleware zero-configuration setup"
+                "ext-pdo": "Required for the PDO adapter",
+                "ext-pdo_mysql": "Use MySQL/MariaDB with PDO",
+                "ext-pdo_sqlite": "Use SQLite with PDO",
+                "itsgoingd/clockwork": "Optional database-query inspection"
             },
-            "time": "2024-11-19T17:25:22+00:00",
+            "time": "2026-09-25T23:32:20+00:00",
             "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Clockwork\\Support\\Laravel\\ClockworkServiceProvider"
-                    ],
-                    "aliases": {
-                        "Clockwork": "Clockwork\\Support\\Laravel\\Facade"
-                    }
-                }
-            },
             "installation-source": "dist",
             "autoload": {
                 "psr-4": {
-                    "Clockwork\\": "Clockwork/"
+                    "Plasma\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "autoload-dev": {
+                "psr-4": {
+                    "Plasma\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage"
+                ],
+                "example": [
+                    "@php examples/sqlite.php"
+                ]
+            },
             "license": [
                 "MIT"
             ],
             "authors": [
                 {
-                    "name": "itsgoingd",
-                    "email": "itsgoingd@luzer.sk",
-                    "homepage": "https://twitter.com/itsgoingd"
+                    "name": "MapSVG developers",
+                    "homepage": "https://mapsvg.com"
                 }
             ],
-            "description": "php dev tools in your browser",
-            "homepage": "https://underground.works/clockwork",
+            "description": "Schema-aware Prisma-style ORM for PHP and WordPress with bundled WordPress core metadata, relations, and PDO/wpdb adapters. By the developers of MapSVG.",
+            "homepage": "https://mapsvg.com",
             "keywords": [
-                "Devtools",
-                "debugging",
-                "laravel",
-                "logging",
-                "lumen",
-                "profiling",
-                "slim"
+                "database",
+                "mysql",
+                "orm",
+                "php",
+                "prisma",
+                "query-builder",
+                "sqlite",
+                "wordpress"
             ],
             "support": {
-                "issues": "https://github.com/itsgoingd/clockwork/issues",
-                "source": "https://github.com/itsgoingd/clockwork/tree/v5.3.1"
+                "source": "https://github.com/nlproduction/plasma",
+                "issues": "https://github.com/nlproduction/plasma/issues"
             },
-            "funding": [
+            "install-path": "../nlproduction/plasma"
+        },
+        {
+            "name": "opis/json-schema",
+            "version": "2.6.0",
+            "version_normalized": "2.6.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/opis/json-schema.git",
+                "reference": "8458763e0dd0b6baa310e04f1829fc73da4e8c8a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/opis/json-schema/zipball/8458763e0dd0b6baa310e04f1829fc73da4e8c8a",
+                "reference": "8458763e0dd0b6baa310e04f1829fc73da4e8c8a",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "opis/string": "^2.1",
+                "opis/uri": "^1.0",
+                "php": "^7.4 || ^8.0"
+            },
+            "require-dev": {
+                "ext-bcmath": "*",
+                "ext-intl": "*",
+                "phpunit/phpunit": "^9.0"
+            },
+            "time": "2025-10-17T12:46:48+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "2.x-dev"
+                }
+            },
+            "installation-source": "source",
+            "autoload": {
+                "psr-4": {
+                    "Opis\\JsonSchema\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
                 {
-                    "url": "https://github.com/itsgoingd",
-                    "type": "github"
+                    "name": "Sorin Sarca",
+                    "email": "sarca_sorin@hotmail.com"
+                },
+                {
+                    "name": "Marius Sarca",
+                    "email": "marius.sarca@gmail.com"
                 }
             ],
-            "install-path": "../itsgoingd/clockwork"
+            "description": "Json Schema Validator for PHP",
+            "homepage": "https://opis.io/json-schema",
+            "keywords": [
+                "json",
+                "json-schema",
+                "schema",
+                "validation",
+                "validator"
+            ],
+            "support": {
+                "issues": "https://github.com/opis/json-schema/issues",
+                "source": "https://github.com/opis/json-schema/tree/2.6.0"
+            },
+            "install-path": "../opis/json-schema"
+        },
+        {
+            "name": "opis/string",
+            "version": "2.1.0",
+            "version_normalized": "2.1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/opis/string.git",
+                "reference": "3e4d2aaff518ac518530b89bb26ed40f4503635e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/opis/string/zipball/3e4d2aaff518ac518530b89bb26ed40f4503635e",
+                "reference": "3e4d2aaff518ac518530b89bb26ed40f4503635e",
+                "shasum": ""
+            },
+            "require": {
+                "ext-iconv": "*",
+                "ext-json": "*",
+                "php": "^7.4 || ^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.0"
+            },
+            "time": "2025-10-17T12:38:41+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "2.x-dev"
+                }
+            },
+            "installation-source": "source",
+            "autoload": {
+                "psr-4": {
+                    "Opis\\String\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
+                {
+                    "name": "Marius Sarca",
+                    "email": "marius.sarca@gmail.com"
+                },
+                {
+                    "name": "Sorin Sarca",
+                    "email": "sarca_sorin@hotmail.com"
+                }
+            ],
+            "description": "Multibyte strings as objects",
+            "homepage": "https://opis.io/string",
+            "keywords": [
+                "multi-byte",
+                "opis",
+                "string",
+                "string manipulation",
+                "utf-8"
+            ],
+            "support": {
+                "issues": "https://github.com/opis/string/issues",
+                "source": "https://github.com/opis/string/tree/2.1.0"
+            },
+            "install-path": "../opis/string"
+        },
+        {
+            "name": "opis/uri",
+            "version": "1.1.0",
+            "version_normalized": "1.1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/opis/uri.git",
+                "reference": "0f3ca49ab1a5e4a6681c286e0b2cc081b93a7d5a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/opis/uri/zipball/0f3ca49ab1a5e4a6681c286e0b2cc081b93a7d5a",
+                "reference": "0f3ca49ab1a5e4a6681c286e0b2cc081b93a7d5a",
+                "shasum": ""
+            },
+            "require": {
+                "opis/string": "^2.0",
+                "php": "^7.4 || ^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9"
+            },
+            "time": "2021-05-22T15:57:08+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "1.x-dev"
+                }
+            },
+            "installation-source": "source",
+            "autoload": {
+                "psr-4": {
+                    "Opis\\Uri\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
+                {
+                    "name": "Marius Sarca",
+                    "email": "marius.sarca@gmail.com"
+                },
+                {
+                    "name": "Sorin Sarca",
+                    "email": "sarca_sorin@hotmail.com"
+                }
+            ],
+            "description": "Build, parse and validate URIs and URI-templates",
+            "homepage": "https://opis.io",
+            "keywords": [
+                "URI Template",
+                "parse url",
+                "punycode",
+                "uri",
+                "uri components",
+                "url",
+                "validate uri"
+            ],
+            "support": {
+                "issues": "https://github.com/opis/uri/issues",
+                "source": "https://github.com/opis/uri/tree/1.1.0"
+            },
+            "install-path": "../opis/uri"
         },
         {
             "name": "psr/http-client",

@@ -1,5 +1,26 @@
+import { Controller } from "../Core/Controller"
+import { googleMapLanguage, resolveGoogleMapStyles } from "./GoogleMapsOptions"
+import { linkedPostRepository } from "./linkedPost"
+import { onlySurfaceColorChanges, SURFACE_COLOR_KEYS } from "./surfaceColors"
+import type { DirectoryModule } from "../Directory/DirectoryModule"
+import { hasRuntimeFeature, availableFilterFields } from "../Core/productFeatures"
+import { mobileToolbarPageNodes, projectMobileToolbarLayout, resolveMobileToolbarTargets, slotForNode, visibleMobileToolbar, type MobileToolbarTargets, type MobileToolbarView } from "../Layout/MobileToolbarLayout"
+import { viewportLayoutBreakpoint, containerLayout } from "../Layout/ResponsiveLayout"
+import { applyContainerBackground } from "../Layout/ContainerStyles"
+import { applyStackChildLayout, applyStackContentLayout, filterLayoutPadding, setStackComponentOpen, stackComponentLayout } from "../Layout/StackLayout"
+import { TypographyRuntime } from "../Core/TypographyRuntime"
+import { DEFAULT_TYPOGRAPHY, type TypographyOptions } from "../Core/typography"
+import { readPageBinding, initialBindingPageId, componentBindingRole, showComponentPagination, removeEmptyLegacySources, type BindingRole } from "./pageBindings"
 /// <reference types="@types/google.maps" />
 // import {} from "googlemaps";
+import { createContextualChild } from "./loadAnotherMap"
+import type { ShowAnotherMapModule, MapLoadTarget, AnotherMapAction, ChildMapContextProvider } from "./loadAnotherMap"
+import { RegionDataRulesRuntime } from "../Region/dataRulesRuntime"
+import { Legend } from "../Legend/Legend"
+import { LayersControl } from "../Layers/LayersControl"
+import { applyMapPresentationStyles, canRepaintNodeStyles, layersPresentation, mapPresentationSource } from "../Components/MapPresentation"
+import { normalizeRegionDataRules, type RegionDataRules } from "../Region/dataRules"
+import { markerRuleImage, markerImageUrl, type MarkerDataRules } from "../Marker/dataRules"
 import { textElement } from "@/Core/textElement"
 import tinycolor from "tinycolor2"
 import { ArrayIndexed } from "../Core/ArrayIndexed"
@@ -38,7 +59,9 @@ import { SchemaEventType } from "@/Infrastructure/Server/Schema"
 import { MapsvgRequest, Repository, RepositoryEvent } from "../Core/Repository"
 import { ResizeSensor } from "../Core/ResizeSensor"
 import { DetailsController } from "../Details/Details"
-
+// START directory
+import type { DirectoryController } from "../Directory/Directory"
+// END
 import { FiltersController } from "../Filters/Filters"
 import { Query } from "../Infrastructure/Server/Query"
 import { Schema } from "../Infrastructure/Server/Schema"
@@ -56,12 +79,17 @@ import {
 } from "../Location/Location"
 import { MapObject, MapObjectEvent, MapObjectType } from "../MapObject/MapObject"
 import { Marker } from "../Marker/Marker"
-import { MarkerCluster } from "../MarkerCluster/MarkerCluster"
+import { WorldCopies } from "../Marker/WorldCopies"
+import type { MarkerCluster } from "../MarkerCluster/MarkerCluster"
+import type { ClusteringModule } from "../MarkerCluster/ClusteringModule"
 import { Model } from "../Model/Model"
 import { PopoverController } from "../Popover/Popover"
 import { Region } from "../Region/Region"
+import { isSvgRegionElement } from "../Region/svgRegion"
 import { Tooltip } from "../Tooltips/Tooltip"
 import { Converter } from "./Converter"
+import { ConfiguredEventHandlers } from "./configuredEventHandlers"
+import { isKeyboardControlTarget } from "./keyboardTarget"
 import {
   GalleryOptionsInterface,
   GroupOptionsInterface,
@@ -76,6 +104,36 @@ import {
   viewBoxForZoomLevel,
 } from "./clampViewBoxToScrollBoundaries"
 import { DefaultOptions } from "./default-options"
+import { concatTemplateCss } from "./templateCss"
+import {
+  getTemplateHtml,
+  normalizeTemplateEntry,
+  rewritePartialRefs,
+  wrapTemplatePartialHtml,
+  type TemplateEntry,
+} from "./templateEntry"
+import { inlineSvgUses } from "../WooCommerce/inlineSvgUses"
+import {
+  buildLayoutGridShell,
+  mountLayoutSlotHosts,
+  reconcileLayoutChildren,
+  reconcileLayoutGridShell,
+  pickLayoutGrid,
+  type LayoutGridBreakpoint,
+} from "../Layout/LayoutGridRuntime"
+import { normalizeNodesOptions, type MapSvgNode } from "@/Components/NodesRegistry"
+import { isMapInternalType, mapContentRoots } from "@/Components/MapChildren"
+import {
+  buildMapChromeShell,
+  findReachableNodesByType,
+  isNodeTypeReachable,
+  isTreeLayoutMode,
+  pickMapChromeGrid,
+  resolveDirectoryLocation,
+  resolveFiltersLocation,
+  resolveModalMount,
+  type ModalMountResolution,
+} from "@/Components/NodesRuntime"
 import { applyGroupsVisibility } from "./applySvgObjectVisibility"
 import { getPinchScale } from "./getPinchScale"
 import { forwardFirefoxPageScrollKey, lockFirefoxDocumentScroll, shouldResetFirefoxDocumentScroll } from "./firefoxPageScroll"
@@ -86,6 +144,7 @@ import {
   shouldSyncGoogleMapsOverlay,
 } from "./googleMapsViewport"
 import "./map.css"
+import { getGalleryModule, type GalleryController } from "../Gallery/GalleryModule"
 
 const $ = jQuery
 let firefoxScrollHandlerId = 0
@@ -138,7 +197,77 @@ export type ZoomLevel = {
  * ```
  */
 export class MapSVGMap {
+  private legacyApiSchemas: Partial<Record<BindingRole, any>> = {}
+  activePageId: string
+  private pageBindingKeys: Partial<Record<BindingRole, string>> = {}
+
+  private pageRepositorySchema(role: BindingRole) {
+    const legacyApi = this.legacyApiSchemas[role]
+    if (legacyApi && ["getObjects", "getRegions"].includes(this.getPageBinding(role).queryId)) return legacyApi
+    return { name: `page_binding_${role}`, type: role === "regions" ? "region" : "object",
+      objectNameSingular: role === "regions" ? "region" : "object", objectNamePlural: role, fields: [] }
+  }
+
+  getPageBinding(role: BindingRole) { return readPageBinding(this.options, role, this.activePageId) }
+  getComponentBindingRole(component: "directory" | "filters") { return componentBindingRole(this.options, component) }
+  private componentSource(component: "directory" | "filters") { return this.getComponentBindingRole(component) === "regions" ? "regions" : "database" }
+  setActivePage(pageId: string): void {
+    if (this.activePageId === pageId) return
+    if (!this.options.scenes?.some(page => page.id === pageId)) throw new Error("Page not found")
+    this.activePageId = pageId
+    this.refreshPageBindings()
+    if (this.containersCreated) this.refreshTreeLayout()
+  }
+  setScenes(scenes: MapOptions["scenes"]): void {
+    this.options.scenes = scenes
+    this.refreshPageBindings()
+  }
+  refreshPageBindings(): void {
+    if (!this.globalQueriesEnabled) return
+    let changed = false
+    for (const role of ["objects", "regions"] as const) {
+      const repository = role === "objects" ? this.objectsRepository : this.regionsRepository
+      if (!repository) continue
+      const key = JSON.stringify([this.activePageId, this.getPageBinding(role)])
+      if (key === this.pageBindingKeys[role]) continue
+      changed = true
+      this.pageBindingKeys[role] = key
+      repository.invalidateReads(true)
+      repository.setSchema?.(new Schema(this.pageRepositorySchema(role)))
+      repository.query.resetFilters()
+      repository.query.page = 1
+      if (repository.loaded) { repository.objects.clear(); repository.reload({ initial: true }) }
+    }
+    if (!changed) return
+    this.startDatabaseAutoRefetch()
+    this.startRegionsAutoRefetch()
+    if (this.controllers?.filters) this.setFilters()
+    if (this.controllers?.directory) this.loadDirectory()
+    if (this.containersCreated) this.setPagination()
+  }
+
+  private regionRulesRuntime = new RegionDataRulesRuntime()
+  private legendView?: Legend
+  private layersControlView?: LayersControl
+
+  setRegionDataRules(rules?: RegionDataRules): void {
+    if (rules) this.options.regionDataRules = normalizeRegionDataRules(deepMerge({}, this.options.regionDataRules, rules))
+    else delete this.options.regionDataRules
+    this.reloadAllRegionStyles()
+    if (this.$gauge?.container) this.$gauge.container.toggle(!rules && !!this.options.choropleth?.on)
+  }
   id: number
+  setMarkerDataRules(rules?: MarkerDataRules): void {
+    if (rules) this.options.markerDataRules = structuredClone(rules)
+    else delete this.options.markerDataRules
+    this.reloadMarkerImages()
+  }
+  reloadMarkerImages(): void {
+    this.markers?.forEach(marker => {
+      if (this.options.markerDataRules && marker.src === this.getMarkerImage(marker.object, marker.location)) return
+      marker.setImage(undefined, true)
+    })
+  }
   version: string
   container: HTMLElement
   markerOptions: Record<string, unknown> = { src: mapsvgCore.routes.root + "markers/pin1_red.png" }
@@ -159,10 +288,12 @@ export class MapSVGMap {
   schemaRepository: SchemaRepository
 
   events: Events
+  private configuredEventHandlers = new ConfiguredEventHandlers()
 
   resizeSensor: ResizeSensor
 
   liveCss: HTMLStyleElement
+  templatesCss: HTMLStyleElement
 
   defaults: MapOptions
   options: MapOptions
@@ -210,6 +341,11 @@ export class MapSVGMap {
   })
 
   galleries: ArrayIndexed<GalleryOptionsInterface>
+  private galleryController?: GalleryController
+
+  /** Lazy-loaded WooCommerce cart controller (only when options.woocommerce). */
+  private wooCart?: import("../WooCommerce/WooCart").default
+  private wooCartLoading?: Promise<void>
 
   svgDefault: {
     viewBox?: ViewBox
@@ -404,6 +540,8 @@ export class MapSVGMap {
     markersCss?: HTMLStyleElement
     controls?: HTMLElement
     zoomButtons?: HTMLElement
+    /** CSS grid overlay hosting Layers + Controls chrome widgets */
+    mapChromeGrid?: HTMLElement
     legend?: {
       title: HTMLElement
       text: HTMLElement
@@ -418,6 +556,7 @@ export class MapSVGMap {
     }
   } = {}
   containersCreated: boolean = false
+  private layoutPreviewBreakpoint: LayoutGridBreakpoint | null = null
   eventsBaseInitialized: boolean = false
 
   /**
@@ -432,8 +571,11 @@ export class MapSVGMap {
   controllers: {
     detailsView?: DetailsController
     popover?: PopoverController
-    directory?: {[key: string]: any}
-    
+    // START directory
+    directory?: DirectoryController
+    // REPLACE
+    // directory?: {[key: string]: any}
+    // END
     tooltips?: {
       cluster?: Tooltip
       marker?: Tooltip
@@ -504,8 +646,11 @@ export class MapSVGMap {
     zoom: HTMLElement
     userLocation: HTMLElement
     zoomReset: HTMLElement
-    previousMap?: {[key: string]: any}
-    
+    // START show_another_map
+    previousMap?: HTMLElement
+    // REPLACE
+    // previousMap?: {[key: string]: any}
+    // END
   }
   formBuilder: any
 
@@ -560,9 +705,15 @@ export class MapSVGMap {
   svgFileLoadedResolve: (value: boolean | PromiseLike<boolean>) => void
   mapDataPromise: Promise<void | Response>
   mapDataLoaded: boolean = false
+  globalQueriesEnabled: boolean = false
   extras: {
     // Map options can be prefetched on start from an API endpoint
     prefetch?: boolean
+    publishedVersionId?: number
+    inBackend?: boolean
+    resolvePrefetchedOptions?: (savedOptions: MapOptions) => MapOptions | undefined
+    /** Runtime-only per-child transport/lifecycle; native code owns construction. */
+    getChildMapContext?: ChildMapContextProvider
     [key: string]: any
   }
 
@@ -572,6 +723,10 @@ export class MapSVGMap {
   private touchMoveHandler: (e: TouchEvent) => void
   private touchEndHandler: (e: TouchEvent) => void
   private touchActive = false
+  private databaseAutoRefetchTimer: ReturnType<typeof setInterval> | null = null
+  private regionsAutoRefetchTimer: ReturnType<typeof setInterval> | null = null
+  /** Filters afterLoad blocker is currently reserved (must be released exactly once). */
+  private filtersAfterLoadBlockerActive = false
   /**
    * Initializes a new instance of the Map class.
    *
@@ -579,6 +734,14 @@ export class MapSVGMap {
    * @param mapParams An object containing map parameters such as ID, options, SVG file last changed timestamp, and version.
    * @param params Additional parameters for the map, including options for prefetching and backend mode.
    */
+  private directoryModule(): DirectoryModule | undefined {
+    return window.MapSVG?.extensions?.get<DirectoryModule>("runtime.component", "directory")
+  }
+  private directoryServices() {
+    const module = this.directoryModule()
+    return { DirectoryController: module?.controller(Controller), utils, deepMerge, isTreeLayoutMode, resolveDirectoryLocation, isPhone, MiddlewareType, hasRuntimeFeature }
+  }
+
   constructor(
     container: string | HTMLElement,
     mapParams: {
@@ -590,7 +753,18 @@ export class MapSVGMap {
     params: {
       // Map options can be prefetched on start from an API endpoint
       prefetch?: boolean
+      /** Immutable published snapshot selected by this shortcode instance. */
+      publishedVersionId?: number
       inBackend?: boolean
+      /**
+       * Optional admin/editor hook that can replace the saved server options
+       * before MapSVG initializes. Used by persistent editor drafts so a draft
+       * is restored before events/controllers are created, not patched on top
+       * of an already initialized saved map.
+       */
+      resolvePrefetchedOptions?: (savedOptions: MapOptions) => MapOptions | undefined
+      /** Runtime-only per-child transport/lifecycle; never serialized into settings. */
+      getChildMapContext?: ChildMapContextProvider
       [key: string]: any
     } = {
       prefetch: true,
@@ -620,7 +794,11 @@ export class MapSVGMap {
       contextName: "map",
       map: this,
     })
-    this.options = <MapOptions>deepMerge({}, DefaultOptions, mapParams.options)
+    this.options = <MapOptions>deepMerge(deepMerge({}, DefaultOptions, this.directoryModule()?.defaults ?? {}), mapParams.options)
+    const normalizedNodes = normalizeNodesOptions(this.options as MapOptions & Record<string, any>)
+    this.options.nodes = normalizedNodes.nodes
+    this.options.scenes = normalizedNodes.scenes
+    this.activePageId = initialBindingPageId(this.options)
 
     this.svgFileLoadedPromise = new Promise<boolean>((resolve, reject) => {
       this.svgFileLoadedResolve = resolve
@@ -641,7 +819,7 @@ export class MapSVGMap {
   }
 
   loadSvgFile(svgFileUrl, svgFileLastChanged = 1): Promise<void | Response> {
-    this.svgFilePromise = fetch(svgFileUrl + "?version=" + (svgFileLastChanged || ""))
+    const load = () => fetch(svgFileUrl + "?version=" + (svgFileLastChanged || ""))
       .then(async (response) => {
         if (!response.ok) {
           if (response.status === 404) {
@@ -649,15 +827,18 @@ export class MapSVGMap {
               "MapSVG couldn't load SVG file. Please check if the file exists: " +
               this.options.source +
               ". If the file exists, please contact support (this message is showing up only in wp-admin area)."
-            throw new Error(msg)
+            throw Object.assign(new Error(msg), { status: response.status })
           } else if (response.status >= 500) {
-            throw new Error(`MapSVG: SVG file loading error! status: ${response.status}`)
+            throw Object.assign(new Error(`MapSVG: SVG file loading error! status: ${response.status}`), { status: response.status })
           } else {
-            throw new Error(`MapSVG: SVG file loading error! status: ${response.status}`)
+            throw Object.assign(new Error(`MapSVG: SVG file loading error! status: ${response.status}`), { status: response.status })
           }
         }
         return (await response.text()).trim()
       })
+    this.svgFilePromise = Promise.resolve().then(() => this.extras.resolveSvgFile
+      ? this.extras.resolveSvgFile(this.options.source, svgFileLastChanged, load)
+      : load())
       .then(async (svgFileString) => {
         const parser = new DOMParser()
         const svgData = parser.parseFromString(svgFileString, "image/svg+xml")
@@ -674,6 +855,8 @@ export class MapSVGMap {
         }, 500)
       })
       .catch((error) => {
+        // Editor callers must be able to leave the loading state when an asset is unavailable.
+        this.extras.onLoadError?.(error)
         // Handle network or HTTP error
         if (this.inBackend) {
           $.growl.error({ message: error, duration: 60000 })
@@ -751,21 +934,66 @@ export class MapSVGMap {
       const baseUrl = mapsvgCore.routes.api + `maps/${this.id}`
       const separator = baseUrl.includes("?") ? "&" : "?"
       const orphanParam = this.inBackend ? "&includeOrphans=1" : ""
-      const url = `${baseUrl}${separator}withData=${withData}${orphanParam}`
-      this.mapDataPromise = fetch(url)
+      const previewParams = new URLSearchParams(window.location.search)
+      const previewQuery = new URLSearchParams()
+      if (!this.inBackend && Number(previewParams.get("mapsvg_preview_app")) === this.id) {
+        for (const key of ["mapsvg_preview_app", "mapsvg_preview_draft", "mapsvg_preview_nonce"]) {
+          const value = previewParams.get(key)
+          if (value) previewQuery.set(key, value)
+        }
+        // WP REST cookie auth requires its own nonce in addition to the user/App-bound preview nonce.
+        previewQuery.set("_wpnonce", mapsvgCore.nonce)
+      }
+      const versionQuery = !this.inBackend && this.extras.publishedVersionId !== undefined ? `&mapsvg_version=${encodeURIComponent(String(this.extras.publishedVersionId))}` : ""
+      const url = `${baseUrl}${separator}withData=${withData}${orphanParam}${versionQuery}${previewQuery.size ? "&" + previewQuery.toString() : ""}`
+      const editorRead = this.extras.fallbackMapData ? new AbortController() : undefined
+      const readTimeout = editorRead ? setTimeout(() => editorRead.abort(), 8000) : undefined
+      this.mapDataPromise = (this.extras.fetchMapData ?? fetch)(url, editorRead ? { signal: editorRead.signal } : undefined)
         .then(async (response) => {
           if (!response.ok) {
             // Handle HTTP error
-            throw new Error(`HTTP error! status: ${response.status}`)
+            throw Object.assign(new Error(`HTTP error! status: ${response.status}`), { status: response.status })
           }
           return await response.json()
         })
+        .finally(() => { if (readTimeout !== undefined) clearTimeout(readTimeout) })
+        .catch(error => {
+          if (this.extras.fallbackMapData) return this.extras.fallbackMapData(error)
+          throw error
+        })
         .then(async (res) => {
+          if (res.offlineCached === true) this.extras.offline = true
           const mapData = res.map
+          this.globalQueriesEnabled = res.globalQueriesEnabled === true
           this.version = mapData.version
           this.svgFileLastChanged = mapData.svgFileLastChanged
 
-          deepMerge(this.options, mapData.options)
+          const resolvedPrefetchedOptions =
+            this.extras.resolvePrefetchedOptions?.(mapData.options)
+
+          if (resolvedPrefetchedOptions) {
+            // The resolver returns a complete canonical options snapshot.
+            // Rebuild from defaults + snapshot so keys removed in the draft do
+            // not survive from the saved server object through deep-merge.
+            this.options = <MapOptions>deepMerge(
+              deepMerge({}, DefaultOptions, this.directoryModule()?.defaults ?? {}),
+              resolvedPrefetchedOptions,
+            )
+          } else {
+            deepMerge(this.options, mapData.options)
+          }
+
+          // Constructor normalization uses default options before the server
+          // responds. Do not mistake those provisional nodes for a saved tree
+          // when opening a legacy map with no nodes/scenes in its payload.
+          const canonicalPrefetchedOptions =
+            resolvedPrefetchedOptions || mapData.options
+          if (!Array.isArray(canonicalPrefetchedOptions?.nodes)) this.options.nodes = []
+          if (!Array.isArray(canonicalPrefetchedOptions?.scenes)) this.options.scenes = []
+          const normalizedNodes = normalizeNodesOptions(this.options as MapOptions & Record<string, any>)
+          this.options.nodes = normalizedNodes.nodes
+          this.options.scenes = normalizedNodes.scenes
+          this.activePageId = initialBindingPageId(this.options)
 
           // Convert options.regions to an object if it's an array
           if (Array.isArray(this.options.regions)) {
@@ -808,16 +1036,33 @@ export class MapSVGMap {
             isRemoteUrl(this.options.source) &&
             !sameDomain(this.options.source, mapsvgCore.routes.home)
               ? // proxy SVG file loading if it's on another domain
-                mapsvgCore.routes.api + `maps/${this.id}/svg`
+                mapsvgCore.routes.api + `maps/${this.id}/svg` + (versionQuery ? `?${versionQuery.slice(1)}` : "")
               : // otherwise load the file directly
                 this.urlToRelativePath(this.options.source)
           this.loadSvgFile(svgFileUrl, this.svgFileLastChanged)
 
           // Need to await loading viewBox and geoViewBox from SVG file, to be able to add locations from repo.loadDataFromResponse()
+          // React can replace a published v8 bootstrap with a v9 draft before
+          // pageBindings exists on the response. Keep its API transport schema;
+          // pageRepositorySchema selects it only for the retained built-in alias.
+          for (const role of ["objects", "regions"] as const) {
+            if (res[role]?.schema?.type === "api") this.legacyApiSchemas[role] = res[role].schema
+          }
           await this.initMap(this.options)
-
-          // Load Regions
-          if (!res.regions && this.id && this.options.database.regionsTableName) {
+          if (res.offlineCached === true) this.loadMockRegions()
+          // Load Regions. When an editor draft replaced the saved options,
+          // the prefetched rows belong to the saved table/schema and must not
+          // be injected into repositories created from the draft bindings.
+          if (resolvedPrefetchedOptions || res.pageBindings) {
+            if (!this.extras.offline && this.id && (this.globalQueriesEnabled || this.options.database.regionsTableName || this.options.database.schemas?.regions?.name)) {
+              this.regionsRepository.events.once(RepositoryEvent.AFTER_LOAD, () => {
+                this.decrementAfterloadBlockers()
+              })
+              this.regionsRepository.find(undefined, { initial: true })
+            } else {
+              this.decrementAfterloadBlockers()
+            }
+          } else if (!res.regions && this.id && (this.options.database.regionsTableName || this.options.database.schemas?.regions?.name)) {
             this.regionsRepository.events.once(RepositoryEvent.AFTER_LOAD, () => {
               this.decrementAfterloadBlockers()
             })
@@ -843,8 +1088,21 @@ export class MapSVGMap {
             }
           }
 
-          // Load objects
-          if (!res.objects && this.id && mapData.options.database.objectsTableName) {
+          // Load objects. See Regions above: a resolved draft may point to a
+          // different table/schema, so bypass saved prefetched rows.
+          if (resolvedPrefetchedOptions || res.pageBindings) {
+            if (
+              !this.extras.offline && (this.globalQueriesEnabled || this.options.database.objectsTableName || this.options.database.schemas?.objects?.name) &&
+              (this.globalQueriesEnabled || this.inBackend || this.options.database.loadOnStart)
+            ) {
+              this.objectsRepository.events.once(RepositoryEvent.AFTER_LOAD, () => {
+                this.decrementAfterloadBlockers()
+              })
+              this.objectsRepository.find(undefined, { initial: true })
+            } else {
+              this.decrementAfterloadBlockers()
+            }
+          } else if (!res.objects && this.id && mapData.options.database.objectsTableName) {
             if (mapData.options.database.loadOnStart) {
               this.objectsRepository.events.once(RepositoryEvent.AFTER_LOAD, () => {
                 this.decrementAfterloadBlockers()
@@ -879,6 +1137,7 @@ export class MapSVGMap {
           }
         })
         .catch((error) => {
+          this.extras.onLoadError?.(error)
           // Handle network or HTTP error
           console.error(
             "[CLIENT-003] Fetch error — Read more: https://mapsvg.com/docs/errors#CLIENT-003",
@@ -910,7 +1169,7 @@ export class MapSVGMap {
 
     options = this.middlewares.run(MiddlewareType.MAP_LOAD, [options, { map: this }])
 
-    this.regionsRepository = useRepository(options.database.schemas.regions, this)
+    this.regionsRepository = useRepository(this.globalQueriesEnabled ? this.pageRepositorySchema("regions") as any : options.database.schemas.regions, this)
     this.regionsRepository.init()
     // Turn off pagination for Regions:
     this.regionsRepository.query.update({ perpage: 0 })
@@ -919,7 +1178,7 @@ export class MapSVGMap {
       this.regionsRepository.query.update({ filters: { includeOrphans: 1 } })
     }
 
-    this.objectsRepository = useRepository(options.database.schemas.objects, this)
+    this.objectsRepository = useRepository(this.globalQueriesEnabled ? this.pageRepositorySchema("objects") as any : options.database.schemas.objects, this)
     this.objectsRepository.init()
     this.objectsRepository.query.update({
       perpage: options.database.pagination.on ? options.database.pagination.perpage : 0,
@@ -965,16 +1224,18 @@ export class MapSVGMap {
     this.update(restNewOptions)
 
     // 4. Google maps API blocker?
-    if (this.isGeo() && this.options.googleMaps.on) {
+    if (!this.extras.offline && this.isGeo() && this.options.googleMaps.on) {
       this.afterLoadBlockers++
     }
 
-    // 5. Filters may block loading too because they load remote HTML templates
-    if (this.filtersShouldBeShown()) {
+    // 5. Filters may block loading too because they load remote HTML templates.
+    // Only reserve a blocker when the filters node is reachable (draw rule).
+    if (!this.extras.offline && this.filtersShouldBeShown() && isNodeTypeReachable(this.options, "filters")) {
       this.afterLoadBlockers++
+      this.filtersAfterLoadBlockerActive = true
     }
 
-    
+    this.setGalleries(this.options.galleries ?? [])
 
     if (
       this.isGeo() &&
@@ -1053,6 +1314,7 @@ export class MapSVGMap {
     }
 
     applyGroupsVisibility(this.containers.svg, this.groups)
+    if (this.layersControlView) this.setLayersControl()
   }
 
   /**
@@ -1094,98 +1356,76 @@ export class MapSVGMap {
    * @private
    */
   setLayersControl(options?: LayersControlOptionsInterface): void {
-    const _this = this
-
     if (options) deepMerge(this.options.layersControl, options)
-
-    if (this.options.layersControl.on) {
-      if (!this.containers.layersControl) {
-        this.containers.layersControl = document.createElement("div")
-        this.containers.layersControl.classList.add("mapsvg-layers-control")
-
-        this.containers.layersControlLabel = document.createElement("div")
-        this.containers.layersControlLabel.classList.add("mapsvg-layers-label")
-        this.containers.layersControl.appendChild(this.containers.layersControlLabel)
-
-        const layersControlWrap = document.createElement("div")
-        layersControlWrap.classList.add("mapsvg-layers-list-wrap")
-        this.containers.layersControl.appendChild(layersControlWrap)
-
-        this.containers.layersControlListNano = document.createElement("div")
-        this.containers.layersControlListNano.classList.add("nano")
-        layersControlWrap.appendChild(this.containers.layersControlListNano)
-
-        this.containers.layersControlList = document.createElement("div")
-        this.containers.layersControlList.classList.add("mapsvg-layers-list")
-        this.containers.layersControlList.classList.add("nano-content")
-        this.containers.layersControlListNano.appendChild(this.containers.layersControlList)
-
-        this.containers.mapContainer.appendChild(this.containers.layersControl)
-      }
-      this.containers.layersControl.style.display = "block"
-      this.containers.layersControlLabel.textContent = this.options.layersControl.label
-
-      this.containers.layersControlLabel.style.display = "block"
-      this.containers.layersControlList.innerHTML = ""
-      while (this.containers.layersControlList.firstChild) {
-        this.containers.layersControlList.removeChild(this.containers.layersControlList.firstChild)
-      }
-      this.containers.layersControl.classList.remove(
-        "mapsvg-top-left",
-        "mapsvg-top-right",
-        "mapsvg-bottom-left",
-        "mapsvg-bottom-right",
-      )
-      this.containers.layersControl.classList.add("mapsvg-" + this.options.layersControl.position)
-      if (
-        this.options.menu.on &&
-        !this.options.menu.customContainer &&
-        this.options.layersControl.position.indexOf("left") !== -1
-      ) {
-        this.containers.layersControl.style.left = this.options.menu.width
-      }
-
-      this.containers.layersControl.style.maxHeight = this.options.layersControl.maxHeight
-
-      this.options.groups.forEach((g) => {
-        const item = document.createElement("div")
-        item.classList.add("mapsvg-layers-item")
-        item.setAttribute("data-group-id", g.id)
-        const checkbox = document.createElement("input")
-        checkbox.type = "checkbox"
-        checkbox.className = "ios8-switch ios8-switch-sm"
-        checkbox.checked = !!g.visible
-        item.append(checkbox, textElement("label", "", g.title))
-        this.containers.layersControlList.appendChild(item)
-      })
-
-      // @ts-ignore
-      $(this.containers.layersControlListNano).nanoScroller({
-        preventPageScrolling: true,
-        iOSNativeScrolling: true,
-      })
-
-      $(this.containers.layersControl).off()
-      $(this.containers.layersControl).on("click", ".mapsvg-layers-item", function () {
-        const id = $(this).data("group-id")
-        const input = $(this).find("input")
-        input.prop("checked", !input.prop("checked"))
-        _this.groups.forEach(function (g) {
-          if (g.id === id) g.visible = !g.visible
-        })
-        _this.setGroups()
-      })
-      $(this.containers.layersControlLabel).off()
-      $(this.containers.layersControlLabel).on("click", () => {
-        $(_this.containers.layersControl).toggleClass("closed")
-      })
-
-      $(this.containers.layersControl).toggleClass("closed", !this.options.layersControl.expanded)
-    } else {
-      if (this.containers.layersControl) {
-        this.containers.layersControl.style.display = "none"
-      }
+    const node = this.mapPresentationNode("layers")
+    const viewOptions = layersPresentation(this.options.layersControl, node)
+    const mount = node && this.mapPresentationMount(node)
+    if (!node || !viewOptions.on || !mount) {
+      if (this.containers.layersControl) this.containers.layersControl.style.display = "none"
+      return
     }
+    if (!this.layersControlView) {
+      this.layersControlView = new LayersControl(this.eventDocument || this.containers.map.ownerDocument)
+      Object.assign(this.containers, {
+        layersControl: this.layersControlView.element,
+        layersControlLabel: this.layersControlView.label,
+        layersControlListNano: this.layersControlView.listNano,
+        layersControlList: this.layersControlView.list,
+      })
+    }
+    this.layersControlView.update(viewOptions, Array.from(this.groups || this.options.groups || []), (id, visible) => {
+      this.groups.forEach(group => { if (String(group.id) === String(id)) group.visible = visible })
+      this.setGroups()
+    })
+    const element = this.containers.layersControl
+    element.style.display = mount.inline ? "block" : "flex"
+    // Tree Layout owns size constraints. Legacy chrome limits must not cap its view.
+    element.style.maxHeight = mount.inline ? viewOptions.maxHeight || "" : ""
+    element.classList.toggle("mapsvg-layers-slotted", !mount.inline)
+    element.classList.remove("mapsvg-top-left", "mapsvg-top-right", "mapsvg-bottom-left", "mapsvg-bottom-right")
+    if (mount.inline) {
+      this.applyMapChromeShell()
+      this.mountChromeWidget("layers", element)
+      element.dataset.mapsvgNodeId = node.id
+      if (!this.getChromeSlot("layers")) element.classList.add("mapsvg-" + viewOptions.position)
+    } else {
+      element.removeAttribute("data-mapsvg-node-id")
+      element.style.position = "relative"
+      element.style.left = element.style.right = element.style.top = element.style.bottom = ""
+      if (element.parentElement !== mount.host) mount.host.append(element)
+    }
+    applyMapPresentationStyles(element, node, mount.inline ? undefined : mount.host)
+  }
+
+  private mapPresentationNode(type: "legend" | "layers"): MapSvgNode | undefined {
+    const nodes = mobileToolbarPageNodes(Array.from(this.options.nodes || []), Array.from(this.options.scenes || []), this.activePageId) as MapSvgNode[]
+    const node = findReachableNodesByType(this.options, type).find(item => nodes.some(candidate => candidate.id === item.id))
+    if (!node) return undefined
+    return mapPresentationSource(nodes, node) ? node : undefined
+  }
+
+  private mapPresentationMount(node: MapSvgNode): { host: HTMLElement; inline: boolean } | undefined {
+    const tree = isTreeLayoutMode(this.options)
+    if (tree && this.containersCreated && !this.activeTreeNodeIds.has(node.id)) return undefined
+    const inline = !tree
+    const host = inline ? this.containers.map : this.layoutNodeHosts.get(node.id)
+    return host ? { host, inline } : undefined
+  }
+
+  private syncLegend(): void {
+    const model = this.regionRulesRuntime?.legendModel
+    const node = this.mapPresentationNode("legend")
+    const mount = node && this.mapPresentationMount(node)
+    const enabled = node?.settings?.on ?? this.options.regionDataRules?.legend?.on
+    if (!model || !node || !mount || !enabled) { this.legendView?.element.remove(); return }
+    this.legendView ??= new Legend(this.eventDocument || mount.host.ownerDocument)
+    this.legendView.update(model, typeof node.settings?.title === "string" ? node.settings.title : model.title)
+    const element = this.legendView.element
+    element.classList.toggle("mapsvg-legend-inline", mount.inline)
+    if (mount.inline) element.dataset.mapsvgNodeId = node.id
+    else element.removeAttribute("data-mapsvg-node-id")
+    if (element.parentElement !== mount.host) mount.host.append(element)
+    applyMapPresentationStyles(element, node, mount.inline ? undefined : mount.host)
   }
 
   loadDataObjects(params?: any): JQueryDeferred<any> {
@@ -1195,175 +1435,15 @@ export class MapSVGMap {
   /**
    * Loads items from a source defined in settings  to the directory. The source can be "Regions" or "Database".
    */
-  loadItemsToDirectory() {
-    let items = []
-    const _this = this
-
-    if (!this.controllers.directory?.repository || !this.controllers.directory?.repository.loaded)
-      return false
-
-    // If "categories" option is enabled, then:
-    if (
-      this.options.menu.categories &&
-      this.options.menu.categories.on &&
-      this.options.menu.categories.groupBy
-    ) {
-      // Get category field to group objects by
-      const categoryField = this.options.menu.categories.groupBy
-      // Get the list of categories
-      if (
-        this.controllers.directory?.repository.getSchema().getField(categoryField) === undefined
-      ) {
-        return false
-      }
-      const field = this.controllers.directory?.repository.getSchema().getField(categoryField)
-      let categories: Array<any>
-
-      if (field.options && field.options.length) {
-        // select / radio / status / regions — use predefined options
-        categories = field.options
-      } else {
-        // text / number / date / checkbox — derive unique values from loaded data
-        const allItems = this.controllers.directory?.repository
-          .getLoaded()
-          .map((item) => item.getData())
-        const seen = new Set<string>()
-        categories = []
-        allItems.forEach((item) => {
-          const raw = item[categoryField]
-          if (raw === null || raw === undefined || raw === "") return
-          const key = String(raw)
-          if (!seen.has(key)) {
-            seen.add(key)
-            const label = field.type === "checkbox" ? (raw ? "Yes" : "No") : key
-            categories.push({ value: raw, label })
-          }
-        })
-        categories.sort((a, b) => String(a.label).localeCompare(String(b.label)))
-      }
-
-      // Get the list of items for every category
-      categories.forEach((category) => {
-        let dbItems = this.controllers.directory?.repository
-          .getLoaded()
-          .map((item) => item.getData())
-        dbItems = this.directoryFilterOut(dbItems)
-        const itemArr: Array<any> = []
-        dbItems.forEach((item) => {
-          itemArr.push(item)
-        })
-        const catItems = itemArr.filter(function (object) {
-          if (categoryField === "regions") {
-            const objectRegions =
-              typeof object[categoryField] !== "undefined" && object[categoryField].length
-                ? object[categoryField]
-                : []
-            const objectRegionIDs = objectRegions.map(function (region) {
-              return region.id
-            })
-            return objectRegionIDs.indexOf(category.id) !== -1
-          } else {
-            return object[categoryField] == category.value
-          }
-        })
-        category.counter = catItems.length
-        if (categoryField === "regions") {
-          category.label = category.title
-          category.value = category.id
-        }
-
-        catItems.sort(function (a, b) {
-          const field = _this.options.menu.sortBy
-          const direction = _this.options.menu.sortDirection === "asc" ? 1 : -1
-
-          if (a[field] === b[field]) {
-            return 0
-          } else {
-            return a[field] > b[field] ? direction : -direction
-          }
-        })
-
-        items.push({ ...category, items: catItems })
-      })
-      // Filter out empty categories, if needed:
-      if (this.options.menu.categories.hideEmpty) {
-        items = items.filter(function (item) {
-          return item.counter > 0
-        })
-      }
-
-      this.controllers.directory?.setState({ categories: items, items: null })
-    } else {
-      // If categories are not enabled then just get the list of DB items:
-      if (this.options.menu.source === "regions") {
-        items = this.controllers.directory?.repository
-          .getLoaded()
-          .map((r) => {
-            const data = r.getData()
-            const mapRegion = this.getRegion(data.id)
-            if (mapRegion) {
-              data.objects = this.getRegion(data.id).objects
-              return data
-            } else {
-              return null
-            }
-          })
-          .filter((region) => region !== null)
-        items = this.directoryFilterOut(items)
-      } else {
-        items = this.controllers.directory?.repository.getLoaded().map((r) => r.getData())
-      }
-
-      this.controllers.directory?.setState({ categories: null, items })
-    }
-  }
+  loadItemsToDirectory() { return this.directoryModule()?.loadItemsToDirectory.call(this, this.directoryServices()) }
 
   /**
    * Filter out directory items
    */
-  directoryFilterOut(items) {
-    const _this = this
-
-    if (this.controllers.directory?.repository.schema.objectNameSingular.indexOf("region") !== -1) {
-      const f: { field: string; val: number | string } = {
-        field: "",
-        val: "",
-      }
-      if (this.options.menu.filterout.field) {
-        f.field = this.options.menu.filterout.field
-        f.val = this.options.menu.filterout.val
-      }
-
-      items = items.filter(function (item) {
-        let ok = true
-        const status = _this.options.regionStatuses
-        if (status[item.status]) {
-          ok = !status[item.status].disabled
-        }
-
-        if (ok && f.field) {
-          ok = item[f.field] != f.val
-        }
-        return ok
-      })
-    }
-
-    return items
-  }
+  directoryFilterOut(items) { return this.directoryModule()?.directoryFilterOut.call(this, this.directoryServices(), items) ?? items }
 
   loadDirectory(): void {
-    // If "Load DB on start" is off then
-    // don't load directory to avoid showing 'no records found' message
-    if (
-      !this.inBackend &&
-      this.options.menu.source === "database" &&
-      !this.objectsRepository.loaded
-    ) {
-      return
-    }
-    if (this.options.menu.on) {
-      this.controllers.directory && this.loadItemsToDirectory()
-    }
+    this.directoryModule()?.loadDirectory.call(this, this.directoryServices())
     this.setPagination()
   }
 
@@ -1374,28 +1454,28 @@ export class MapSVGMap {
     this.containers.pagerMap && $(this.containers.pagerMap).empty().remove()
     this.containers.pagerDir && $(this.containers.pagerDir).empty().remove()
 
-    const paginationMap = ["map", "both"].includes(this.options.database.pagination.showIn)
-    const paginationDir = ["directory", "both"].includes(this.options.database.pagination.showIn)
-
-    const paginationEnabledInGeneral =
-      this.options.database.pagination.on && this.options.database.pagination.perpage !== 0
+    const paginationMap = showComponentPagination(this.options, "map", this.activePageId)
+    const paginationDir = showComponentPagination(this.options, "directory", this.activePageId)
 
     const paginationInDirectoryEnabled =
       paginationDir &&
-      paginationEnabledInGeneral &&
       this.controllers.directory &&
-      this.options.menu.on
+      (hasRuntimeFeature("directory") && this.options.menu.on)
 
     const paginationForDirectory = paginationInDirectoryEnabled ? this.getPagination() : null
     if (this.controllers.directory) {
       this.controllers.directory?.setPagination(paginationForDirectory)
     }
 
-    const paginationInMapEnabled = paginationMap && paginationEnabledInGeneral
+    const paginationInMapEnabled = paginationMap
     this.containers.pagerMap = paginationInMapEnabled ? this.getPagination() : null
     if (this.containers.pagerMap) {
       this.containers.map.appendChild(this.containers.pagerMap)
     }
+  }
+  setShowPagination(on: boolean): void {
+    this.options.showPagination = on
+    this.setPagination()
   }
   /**
    * Generates HTML with pagination buttons and attaches callback event on button click
@@ -1403,17 +1483,20 @@ export class MapSVGMap {
    */
   getPagination(callback?: () => void): HTMLElement {
     const _this = this
+    const repository = this.globalQueriesEnabled && this.getComponentBindingRole("directory") === "regions" ? this.regionsRepository : this.objectsRepository
+    const paginationSettings = this.globalQueriesEnabled ? this.getPageBinding(this.getComponentBindingRole("directory")).pagination : this.options.database.pagination
+    const perpage = this.globalQueriesEnabled ? repository?.query?.perpage ?? paginationSettings.perpage : paginationSettings.perpage
 
     // pager && (pager.empty().remove());
     const nav = textElement("nav", "mapsvg-pagination")
     const list = textElement("ul", "pager")
     for (const direction of ["prev", "next"]) {
       const item = textElement("li", "mapsvg-" + direction)
-      const options = this.options.database.pagination
+      const options = paginationSettings
       const label =
         direction === "prev"
-          ? `← ${options.prev ?? ""} ${options.perpage}`
-          : `${options.next ?? ""} ${options.perpage} →`
+          ? `← ${options.prev ?? ""} ${perpage}`
+          : `${options.next ?? ""} ${perpage} →`
       const link = textElement("a", "", label)
       link.setAttribute("href", "#")
       item.appendChild(link)
@@ -1422,11 +1505,11 @@ export class MapSVGMap {
     nav.appendChild(list)
     const pager = $(nav)
 
-    if (!this.objectsRepository) {
+    if (!repository) {
       return pager[0]
     }
 
-    if (this.objectsRepository.onFirstPage() && this.objectsRepository.onLastPage()) {
+    if (repository.onFirstPage() && repository.onLastPage()) {
       pager.hide()
     } else {
       pager.find(".mapsvg-prev").removeClass("disabled")
@@ -1434,11 +1517,11 @@ export class MapSVGMap {
       pager.find(".mapsvg-last").removeClass("disabled")
       pager.find(".mapsvg-next").removeClass("disabled")
 
-      this.objectsRepository.onLastPage() &&
+      repository.onLastPage() &&
         pager.find(".mapsvg-next").addClass("disabled") &&
         pager.find(".mapsvg-last").addClass("disabled")
 
-      this.objectsRepository.onFirstPage() &&
+      repository.onFirstPage() &&
         pager.find(".mapsvg-prev").addClass("disabled") &&
         pager.find(".mapsvg-first").addClass("disabled")
     }
@@ -1446,33 +1529,33 @@ export class MapSVGMap {
     pager
       .on("click", ".mapsvg-next:not(.disabled)", (e) => {
         e.preventDefault()
-        if (this.objectsRepository.onLastPage()) return
-        const query = new Query({ page: this.objectsRepository.query.page + 1 })
-        this.objectsRepository.find(query).done(function () {
+        if (repository.onLastPage()) return
+        const query = { page: repository.query.page + 1 }
+        repository.find(query).done(function () {
           callback && callback()
         })
       })
       .on("click", ".mapsvg-prev:not(.disabled)", function (e) {
         e.preventDefault()
-        if (_this.objectsRepository.onFirstPage()) return
-        const query = new Query({ page: _this.objectsRepository.query.page - 1 })
-        _this.objectsRepository.find(query).done(function () {
+        if (repository.onFirstPage()) return
+        const query = { page: repository.query.page - 1 }
+        repository.find(query).done(function () {
           callback && callback()
         })
       })
       .on("click", ".mapsvg-first:not(.disabled)", function (e) {
         e.preventDefault()
-        if (_this.objectsRepository.onFirstPage()) return
-        const query = new Query({ page: 1 })
-        _this.objectsRepository.find(query).done(function () {
+        if (repository.onFirstPage()) return
+        const query = { page: 1 }
+        repository.find(query).done(function () {
           callback && callback()
         })
       })
       .on("click", ".mapsvg-last:not(.disabled)", function (e) {
         e.preventDefault()
-        if (_this.objectsRepository.onLastPage()) return
-        const query = new Query({ lastpage: true })
-        _this.objectsRepository.find(query).done(function () {
+        if (repository.onLastPage()) return
+        const query = { lastpage: true }
+        repository.find(query).done(function () {
           callback && callback()
         })
       })
@@ -1492,14 +1575,16 @@ export class MapSVGMap {
   /**
    * Delete all clusters from the map
    */
+  private clusteringModule(): ClusteringModule | undefined {
+    return window.MapSVG?.extensions?.get<ClusteringModule>("runtime.component", "clustering")
+  }
+
+  private clusteringServices() {
+    return { MapObject, MapObjectType, SVGPoint, ScreenPoint, ViewBox, MapEventType, WorldCopies }
+  }
+
   deleteClusters(): void {
-    if (this.markersClusters) {
-      this.markersClusters.forEach(function (markerCluster) {
-        markerCluster.destroy()
-      })
-      this.markersClusters.clear()
-    }
-    this.clustersFromWorker = []
+    return this.clusteringModule()?.deleteClusters.call(this, this.clusteringServices())
   }
 
   /**
@@ -1539,98 +1624,14 @@ export class MapSVGMap {
    * @ignore
    */
   addClustersFromWorker(clusters): void {
-    this.clustersFromWorker = []
-
-    for (const cell in clusters) {
-      const markers = clusters[cell].markers.map((marker) => {
-        const object = this.objectsRepository.objects.findById(marker.id)
-        if (object && object["location"]) return object["location"].marker
-      })
-      this.clustersFromWorker.push(
-        new MarkerCluster(
-          {
-            markers: markers,
-            svgPoint: new SVGPoint(clusters[cell].x, clusters[cell].y),
-            cellX: clusters[cell].cellX,
-            cellY: clusters[cell].cellY,
-          },
-          this,
-        ),
-      )
-    }
-
-    this.clusterizeMarkers()
+    return this.clusteringModule()?.addClustersFromWorker.call(this, this.clusteringServices(), clusters)
   }
   /**
    * Starts clusterizer worker in a separate thread
    * @private
    */
   async startClusterizer(): Promise<void | boolean> {
-    this.clustersFromWorker = []
-
-    if (!this.objectsRepository || this.objectsRepository.getLoaded().length === 0) {
-      return
-    }
-    const locationField = this.objectsRepository.getSchema().getFieldByType("location")
-    if (!locationField) {
-      return false
-    }
-
-    if (!this.clusterizerWorker) {
-      this.clusterizerWorker = new Worker(
-        mapsvgCore.routes.root + "js/mapsvg/Core/ClusteringWorker.js",
-      )
-      // Receive messages from postMessage() calls in the Worker
-      this.clusterizerWorker.onmessage = (evt) => {
-        if (evt.data.clusters) {
-          this.addClustersFromWorker(evt.data.clusters)
-        }
-      }
-      this.events.on(MapEventType.ZOOM, () => {
-        if (this.clusterizerWorker && this.options.clustering.on) {
-          this.clusterizerWorker.postMessage({
-            message: "zoom",
-            zoomLevel: this.zoomLevel,
-            viewBox: this.viewBox,
-          })
-        }
-      })
-      this.events.on(MapEventType.RESIZE, (event) => {
-        if (this.clusterizerWorker && this.options.clustering.on) {
-          this.clusterizerWorker.postMessage({
-            message: "resize",
-            viewBox: event.data.viewBox,
-            mapWidth: event.data.mapWidth,
-            mapHeight: event.data.mapHeight,
-          })
-        }
-      })
-    }
-
-    // Pass data to the WebWorker
-    const objectsData = []
-    this.objectsRepository
-      .getLoaded()
-      .filter((object) => {
-        return object["location"] && object["location"].marker
-      })
-      .forEach((object) => {
-        const { x, y } = object["location"].marker.svgPoint
-        objectsData.push({
-          id: object.getData().id,
-          x,
-          y,
-        })
-      })
-    this.clusterizerWorker.postMessage({
-      objects: objectsData,
-      cellSize: 50,
-      mapWidth: this.containers.map.clientWidth,
-      zoomLevel: this.zoomLevel,
-      zoomDelta: this.zoomDelta,
-      svgViewBox: this.svgDefault.viewBox,
-      viewBox: this.viewBox,
-    })
+    return this.clusteringModule()?.startClusterizer.call(this, this.clusteringServices())
   }
   /**
    * Starts clustering markers on the map
@@ -1639,47 +1640,7 @@ export class MapSVGMap {
    * @private
    */
   clusterizeMarkers(skipFitMarkers?: boolean): void {
-    $(this.layers.markers)
-      .children()
-      .each((i, obj) => {
-        $(obj).detach()
-      })
-    this.markers.clear()
-    this.markersClusters.clear()
-
-    $(this.containers.map).addClass("no-transitions-markers")
-
-    if (this.clustersFromWorker && this.clustersFromWorker.length > 0) {
-      this.clustersFromWorker.forEach((cluster) => {
-        // Don't clusterize on google maps with zoom level >= 17
-        if (
-          this.googleMaps.map &&
-          this.googleMaps.map.getZoom() >= this.options.clustering.maxZoom
-        ) {
-          this.markerAdd(cluster.markers[0])
-        } else {
-          if (this.zoomLevel >= this.options.clustering.maxZoom || cluster.markers.length === 1) {
-            this.markerAdd(cluster.markers[0])
-          } else {
-            this.markersClusterAdd(cluster)
-          }
-        }
-      })
-    }
-
-    if (this.editingMarker) {
-      this.markerAdd(this.editingMarker)
-    }
-
-    if (!skipFitMarkers) {
-      this.mayBeFitMarkers()
-    }
-
-    if (this.options.labelsMarkers.on) {
-      this.setLabelsMarkers()
-    }
-
-    $(this.containers.map).removeClass("no-transitions-markers")
+    return this.clusteringModule()?.clusterizeMarkers.call(this, this.clusteringServices(), skipFitMarkers)
   }
   /**
    * Returns URL of the mapsvg.css file
@@ -1750,7 +1711,13 @@ export class MapSVGMap {
         if (JSON.stringify(val) == JSON.stringify(this.defaults[key])) delete options[key]
       })
 
+    if (this.globalQueriesEnabled) removeEmptyLegacySources(options)
     return options
+  }
+
+  /** Read effective runtime settings without changing the authoring document. */
+  getRuntimeOptions(): Record<string, unknown> {
+    return { ...this.getOptions(false, false), viewBox: this.viewBox.toArray() }
   }
 
   /**
@@ -1767,6 +1734,10 @@ export class MapSVGMap {
     functions: { [K in MiddlewareType]: string | MiddlewareHandlers[K] },
     unique = false,
   ): void {
+    if (!hasRuntimeFeature("javascript")) {
+      deepMerge(this.options.middlewares, functions)
+      return
+    }
     let compiledFunction
 
     for (const eventName in functions) {
@@ -1815,39 +1786,17 @@ export class MapSVGMap {
    * @param {object} functions Object containing the event handlers: `{eventName: callback, eventName2: callback}`
    */
   setEvents(functions: { [key: string]: string }, unique?: boolean) {
-    // TODO add namespaces for events as done in jQuery
-
-    let compiledFunction
-
-    for (const eventName in functions) {
-      if (typeof functions[eventName] === "string") {
-        compiledFunction =
-          functions[eventName] != "" ? functionFromString(<string>functions[eventName]) : null
-        if (
-          !compiledFunction ||
-          compiledFunction.error ||
-          compiledFunction instanceof TypeError ||
-          compiledFunction instanceof SyntaxError
-        ) {
-          continue
-        }
-      } else if (typeof functions[eventName] === "function") {
-        compiledFunction = functions[eventName]
-      }
-
-      // Set new event
-      this.events.on(eventName, compiledFunction, { unique: unique ?? false })
-
-      if (eventName.indexOf("directory") !== -1) {
-        const event = eventName.split(".")[0]
-
-        if (this.controllers && this.controllers.directory) {
-          this.controllers.directory?.events.off(event)
-          this.controllers.directory?.events.on(event, compiledFunction)
-        }
-      }
+    if (!hasRuntimeFeature("javascript")) {
+      deepMerge(this.options.events, functions)
+      return
     }
-
+    this.configuredEventHandlers.apply(
+      functions,
+      unique ?? false,
+      functionFromString,
+      this.events,
+      this.controllers?.directory?.events,
+    )
     deepMerge(this.options.events, functions)
   }
   /**
@@ -1872,6 +1821,15 @@ export class MapSVGMap {
   setDetailsView(options?: { [key: string]: any }) {
     options = options || this.options.detailsView || {}
     deepMerge(this.options.detailsView, options)
+    if (this.controllers.detailsView) {
+      this.controllers.detailsView.applyDetailsStyles()
+      if (options.margin !== undefined || options.width !== undefined) {
+        this.controllers.detailsView.setStyles({
+          margin: this.options.detailsView.margin,
+          width: this.options.detailsView.width,
+        })
+      }
+    }
   }
   /**
    * Sets mobile view options
@@ -1879,6 +1837,8 @@ export class MapSVGMap {
    */
   setMobileView(options): void {
     deepMerge(this.options.mobileView, options)
+    this.controllers.toolbar?.setState(this.options.mobileView)
+    if (isTreeLayoutMode(this.options) && this.containersCreated) this.refreshTreeLayout()
   }
 
   /**
@@ -1886,7 +1846,7 @@ export class MapSVGMap {
    * @param object
    */
   attachDataToRegions(object?: Model) {
-    const regions = object.getRegionsForTable(this.options.database.regionsTableName)
+    const regions = object.getRegionsForTable(this.globalQueriesEnabled ? this.regionsRepository.schema.name : this.options.database.regionsTableName)
     const regionIds = regions.map((region) => region.id)
 
     this.regions
@@ -1896,7 +1856,7 @@ export class MapSVGMap {
       })
 
     this.objectsRepository.getLoaded().forEach((obj, index) => {
-      const regions = obj.getRegionsForTable(this.options.database.regionsTableName)
+      const regions = obj.getRegionsForTable(this.globalQueriesEnabled ? this.regionsRepository.schema.name : this.options.database.regionsTableName)
       if (regions && regions.length) {
         regions.forEach((region) => {
           const r = this.getRegion(region.id)
@@ -1907,68 +1867,142 @@ export class MapSVGMap {
   }
 
   /**
-   * Sets templates body
-   * @param {object} templates - Key:value pairs of template names and HTML content
+   * Sets templates body.
+   * Dual-registers each template as root (compile) and map-scoped partial.
+   * Injects concatenated flat template CSS into styleRoot (no auto-scope).
+   * @param {object} templates - Key:value pairs of template names and TemplateEntry (or legacy string)
    */
   setTemplates(templates): void {
     this.templates = this.templates || {}
+    this.options.templates = this.options.templates || {}
+
+    let directoryNeedsRedraw = false
+
     for (const name in templates) {
-      if (name !== undefined) {
-        // Skip already-compiled functions / non-strings (re-entrant update paths).
-        if (typeof templates[name] !== "string") {
-          continue
-        }
-        this.options.templates[name] = templates[name]
-        if (name == "directoryItem" || name == "directoryCategoryItem") {
-          Handlebars.unregisterPartial(name + "-" + this.id)
-          Handlebars.unregisterPartial(name)
-          try {
-            if (name == "directoryCategoryItem") {
-              templates[name] = templates[name].replace(
-                /\{\{\s*>?\s*directoryItem\s*\}\}/g,
-                "{{>directoryItem-" + this.id + "}}",
-              )
-            }
+      if (name === undefined) {
+        continue
+      }
+      // Skip already-compiled functions (re-entrant update paths).
+      // TemplateEntry objects must still pass through normalizeTemplateEntry.
+      if (typeof templates[name] === "function") {
+        continue
+      }
 
-            Handlebars.registerPartial(name + "-" + this.id, templates[name])
-          } catch (error) {
-            Handlebars.registerPartial(name + "-" + this.id, "")
-            console.error(
-              "[CLIENT-004] Handlebars template error — Read more: https://mapsvg.com/docs/errors#CLIENT-004",
-              error,
-            )
-          }
-        } else {
-          try {
-            if (name == "directory") {
-              this.options.templates[name] = templates[name]
-              templates[name] = templates[name]
-                .replace(/\{\{\s*>?\s*directoryItem\s*\}\}/g, "{{>directoryItem-" + this.id + "}}")
-                .replace(
-                  /\{\{\s*>?\s*directoryCategoryItem\s*\}\}/g,
-                  "{{>directoryCategoryItem-" + this.id + "}}",
-                )
-            }
-            this.templates[name] = Handlebars.compile(templates[name], { strict: false })
-          } catch (err) {
-            console.error(
-              "[CLIENT-005] Handlebars compilation error — Read more: https://mapsvg.com/docs/errors#CLIENT-005",
-              err,
-            )
-            this.templates[name] = Handlebars.compile("", { strict: false })
-          }
-        }
+      const incoming = templates[name]
+      const existing = this.options.templates[name]
+      let entry: TemplateEntry
 
-        if (
-          this.inBackend &&
-          (name == "directory" || name == "directoryCategoryItem" || name == "directoryItem") &&
-          this.controllers &&
-          this.controllers.directory
-        ) {
-          this.controllers.directory.templates.main = this.templates.directory
-          this.controllers.directory?.redraw()
+      if (typeof incoming === "string") {
+        entry = normalizeTemplateEntry(
+          {
+            ...(typeof existing === "object" && existing ? existing : {}),
+            html: incoming,
+          } as TemplateEntry,
+          name,
+        )
+      } else if (incoming && typeof incoming === "object") {
+        const base =
+          typeof existing === "object" && existing
+            ? normalizeTemplateEntry(existing, name)
+            : normalizeTemplateEntry(undefined, name)
+        entry = normalizeTemplateEntry(
+          {
+            html: incoming.html !== undefined ? incoming.html : base.html,
+            css: incoming.css !== undefined ? incoming.css : base.css,
+            js: incoming.js !== undefined ? incoming.js : base.js,
+            type: incoming.type !== undefined ? incoming.type : base.type,
+          },
+          name,
+        )
+      } else {
+        entry = normalizeTemplateEntry(existing, name)
+      }
+
+      this.options.templates[name] = entry
+      const html = wrapTemplatePartialHtml(
+        name,
+        rewritePartialRefs(entry.html, this.id),
+      )
+
+      Handlebars.unregisterPartial(name + "-" + this.id)
+      Handlebars.unregisterPartial(name)
+
+      try {
+        const compiled = Handlebars.compile(html, { strict: false })
+        this.templates[name] = compiled
+        Handlebars.registerPartial(name + "-" + this.id, compiled)
+      } catch (err) {
+        console.error(
+          "[CLIENT-005] Handlebars compilation error — Read more: https://mapsvg.com/docs/errors#CLIENT-005",
+          err,
+        )
+        const empty = Handlebars.compile("", { strict: false })
+        this.templates[name] = empty
+        try {
+          Handlebars.registerPartial(name + "-" + this.id, empty)
+        } catch (partialErr) {
+          console.error(
+            "[CLIENT-004] Handlebars template error — Read more: https://mapsvg.com/docs/errors#CLIENT-004",
+            partialErr,
+          )
         }
       }
+
+      if (name == "directory" || name == "directoryCategoryItem" || name == "directoryItem") {
+        directoryNeedsRedraw = true
+      }
+    }
+
+    this.injectTemplatesCss()
+
+    if (
+      directoryNeedsRedraw &&
+      this.inBackend &&
+      this.controllers &&
+      this.controllers.directory
+    ) {
+      this.controllers.directory.templates.main = this.templates.directory
+      this.controllers.directory?.redraw()
+    }
+  }
+
+  /**
+   * Inject per-template CSS as one flat &lt;style data-mapsvg-templates&gt; in styleRoot.
+   */
+  injectTemplatesCss(): void {
+    const css = concatTemplateCss(this.options.templates || {}, this.id)
+
+    if (!this.templatesCss) {
+      const style = this.eventDocument.createElement("style")
+      style.setAttribute("data-mapsvg-templates", String(this.id))
+      this.appendToStyleRoot(style)
+      this.templatesCss = style
+    }
+
+    this.templatesCss.textContent = css
+    this.refreshControllerCustomCss()
+  }
+
+  /**
+   * Compiled template with map-scoped partial refs (from setTemplates).
+   * Falls back to compile + rewrite if missing.
+   */
+  getCompiledTemplate(name: string) {
+    if (this.templates && this.templates[name]) {
+      return this.templates[name]
+    }
+    const html = wrapTemplatePartialHtml(
+      name,
+      rewritePartialRefs(getTemplateHtml(this.options.templates?.[name], name), this.id),
+    )
+    try {
+      return Handlebars.compile(html, { strict: false })
+    } catch (err) {
+      console.error(
+        "[CLIENT-005] Handlebars compilation error — Read more: https://mapsvg.com/docs/errors#CLIENT-005",
+        err,
+      )
+      return Handlebars.compile("", { strict: false })
     }
   }
   /**
@@ -2029,6 +2063,26 @@ export class MapSVGMap {
       }
       this.setSize(size.width, size.height, size.responsive)
     }
+  }
+
+  /** App-owned Gallery presets update without restarting the map. */
+  setGalleries(galleries: MapOptions["galleries"]): void {
+    const previous = this.options.galleries
+    const changed = JSON.stringify(this.options.galleries) !== JSON.stringify(galleries ?? [])
+    this.options.galleries = galleries ?? []
+    if (!this.events) return
+    const module = getGalleryModule()
+    if (!hasRuntimeFeature("gallery") || !module) {
+      this.galleryController?.destroy()
+      this.galleryController = undefined
+      Handlebars.registerHelper("mapsvg_gallery", () => "")
+      return
+    }
+    if (!this.galleryController) {
+      this.galleryController = module.create(this)
+      this.galleryController.init()
+    }
+    if (changed) this.galleryController.refresh(previous)
   }
 
   getDirtyFields(): { [key: string]: any } {
@@ -2128,6 +2182,7 @@ export class MapSVGMap {
    */
   setClustering(options) {
     deepMerge(this.options.clustering, options)
+    this.clusteringModule()?.sync.call(this, this.clusteringServices())
   }
 
   /**
@@ -2206,25 +2261,48 @@ export class MapSVGMap {
     // Capture region in the outer scope
     const capturedRegion = region
 
-    // Get all available statuses
+    const dataRules = this.options.regionDataRules
+    const dataResult = dataRules ? this.regionRulesRuntime.results.get(String(region.id)) : undefined
+
+    // Get all available statuses (schema values + presentation keys)
     const statusField = this.regionsRepository.getSchema().getFieldByType("status") || {
       options: [],
     }
 
-    const statuses = statusField ? statusField.options.map((option) => option.value) : []
+    const statusKeys = new Set<string>()
+    ;(statusField.options || []).forEach((option) => {
+      if (option && option.value != null && option.value !== "") {
+        statusKeys.add(String(option.value))
+      }
+    })
+    Object.keys(this.options.regionStatuses || {}).forEach((key) => statusKeys.add(String(key)))
+    const statuses = Array.from(statusKeys)
     statuses.push("undefined")
+    if (dataRules && region.status != null && !statuses.includes(String(region.status))) statuses.push(String(region.status))
 
     for (const status of statuses) {
       const styleDefault: Region["style"] = {}
       const styleSelected: Region["style"] = {}
       const styleHover: Region["style"] = {}
 
-      const currentStatus = statusField.options.find((option) => option.value === status)
+      const currentStatus = (statusField.options || []).find(
+        (option) => String(option.value) === String(status),
+      )
+      const presentation =
+        (this.options.regionStatuses && this.options.regionStatuses[status]) ||
+        (this.options.regionStatuses && this.options.regionStatuses[String(status)])
+      const presentationColor =
+        (presentation && presentation.color) ||
+        (this.options.colors &&
+          this.options.colors.status &&
+          (this.options.colors.status[status] || this.options.colors.status[String(status)]))
 
-      // Use capturedRegion instead of region
-      if (currentStatus?.color) {
+      // Presentation first; schema options color is legacy fallback
+      if (!dataRules && presentationColor) {
+        styleDefault.fill = presentationColor
+      } else if (!dataRules && currentStatus?.color) {
         styleDefault.fill = currentStatus.color
-      } else if (this.options.choropleth.on) {
+      } else if (!dataRules && this.options.choropleth.on) {
         styleDefault.fill = this.getChoroplethColor(capturedRegion)
       } else if (
         this.options.regions[capturedRegion.id] &&
@@ -2239,6 +2317,11 @@ export class MapSVGMap {
       } else {
         styleDefault.fill = "none"
       }
+
+      if (dataResult?.gradient) {
+        const { low, high, ratio } = dataResult.gradient
+        styleDefault.fill = tinycolor.mix(low, high, ratio * 100).toRgbString()
+      } else if (dataResult?.color) styleDefault.fill = dataResult.color
 
       // Set selected and hover styles
       if (isNumber(this.options.colors.selected)) {
@@ -2311,9 +2394,42 @@ export class MapSVGMap {
     const colors = {}
     for (const key in statuses) {
       const s = statuses[key]
-      colors[s.value] = s.color.length ? s.color : null
+      colors[s.value] = s.color && s.color.length ? s.color : null
     }
     this.setColors({ status: colors })
+  }
+
+  /**
+   * Sync presentation regionStatuses keys/labels from schema status options.
+   * Preserves existing color/disabled; does not copy presentation from schema.
+   */
+  syncRegionStatusesFromSchema(
+    options: Array<{ label?: string; value?: string | number; color?: string; disabled?: boolean }>,
+  ): void {
+    const existing = this.options.regionStatuses || {}
+    const next: Record<
+      string,
+      { label: string; value: string; disabled: boolean; color: string }
+    > = {}
+    ;(options || []).forEach((opt) => {
+      if (opt == null || opt.value === "" || opt.value == null) {
+        return
+      }
+      const key = String(opt.value)
+      const prev = existing[key] || existing[opt.value as string] || ({} as any)
+      next[key] = {
+        label: opt.label != null && opt.label !== "" ? String(opt.label) : prev.label || key,
+        value: key,
+        color: prev.color != null && prev.color !== "" ? prev.color : opt.color || "",
+        disabled:
+          typeof prev.disabled === "boolean"
+            ? prev.disabled
+            : typeof opt.disabled === "boolean"
+              ? opt.disabled
+              : false,
+      }
+    })
+    this.setRegionStatuses(next)
   }
   /**
    * @deprecated
@@ -2349,6 +2465,10 @@ export class MapSVGMap {
       }
     }
 
+    const surfaceOnly = colors && Object.keys(colors).length > 0 && (
+      Object.keys(colors).every(key => SURFACE_COLOR_KEYS.has(key)) ||
+      onlySurfaceColorChanges(this.options.colors, { ...this.options.colors, ...colors })
+    )
     deepMerge(this.options, { colors: colors })
 
     if (colors && colors.status) this.options.colors.status = colors.status
@@ -2361,8 +2481,8 @@ export class MapSVGMap {
       }
     }
 
-    if (this.options.colors.background)
-      $(this.containers.map).css({ background: this.options.colors.background })
+    if (this.options.colors.background !== undefined)
+      $(this.containers.map).css({ background: this.options.colors.background ?? "" })
     if (this.options.colors.hover) {
       // Typescript compiler thinks isNaN can't accept strings
       // @ts-ignore
@@ -2386,6 +2506,7 @@ export class MapSVGMap {
     })
     $(this.containers.header).css({ "background-color": this.options.colors.header })
     $(this.containers.footer).css({ "background-color": this.options.colors.footer })
+    this.applyTreeSlotColors()
 
     if (this.controllers.detailsView && this.options.colors.detailsView !== undefined) {
       this.controllers.detailsView.setStyles({ backgroundColor: this.options.colors.detailsView })
@@ -2394,11 +2515,18 @@ export class MapSVGMap {
       this.controllers.directory?.setStyles({ backgroundColor: this.options.colors.directory })
     }
     if (this.controllers.filters) {
-      if (this.options.colors.directorySearch) {
-        this.controllers.filters.setStyles({ backgroundColor: this.options.colors.directorySearch })
-      } else {
-        this.controllers.filters.setStyles({ backgroundColor: "" })
-      }
+      this.controllers.filters.setStyles({
+        backgroundColor: (this.controllers.filters.modal
+          ? "transparent"
+          : this.options.colors.directorySearch) || "",
+      })
+    }
+
+    if (this.controllers.popover && this.options.colors.popover !== undefined)
+      this.controllers.popover.setStyles({ backgroundColor: this.options.colors.popover })
+    for (const tooltip of Object.values(this.controllers.tooltips || {})) {
+      if (tooltip && this.options.colors.tooltip !== undefined)
+        tooltip.setStyles({ backgroundColor: this.options.colors.tooltip })
     }
 
     if ($(this.containers.filtersModal) && this.options.colors.modalFilters !== undefined) {
@@ -2407,48 +2535,19 @@ export class MapSVGMap {
       })
     }
 
-    if (!this.containers.clustersCss) {
-      this.containers.clustersCss = <HTMLStyleElement>$("<style></style>")[0]
-      if (this.useShadowRoot) {
-        this.containers.shadowRoot.appendChild(this.containers.clustersCss)
-      } else {
-        document.head.appendChild(this.containers.clustersCss)
-      }
+    // A palette gesture is a CSS paint, not a Region/Legend or marker-style update.
+    if (surfaceOnly) {
+      $.each(this.options.colors, (key, color) => {
+        if (color === null) delete this.options.colors[key]
+      })
+      return
     }
-    let css = ""
-    if (this.options.colors.clusters) {
-      css += "background-color: " + this.options.colors.clusters + ";"
-    }
-    if (this.options.colors.clustersBorders) {
-      css += "border-color: " + this.options.colors.clustersBorders + ";"
-    }
-    if (this.options.colors.clustersText) {
-      css += "color: " + this.options.colors.clustersText + ";"
-    }
-    $(this.containers.clustersCss).html(".mapsvg-marker-cluster {" + css + "}")
 
-    if (!this.containers.clustersHoverCss) {
-      this.containers.clustersHoverCss = <HTMLStyleElement>$("<style></style>").appendTo("body")[0]
-    }
-    let cssHover = ""
-    if (this.options.colors.clustersHover) {
-      cssHover += "background-color: " + this.options.colors.clustersHover + ";"
-    }
-    if (this.options.colors.clustersHoverBorders) {
-      cssHover += "border-color: " + this.options.colors.clustersHoverBorders + ";"
-    }
-    if (this.options.colors.clustersHoverText) {
-      cssHover += "color: " + this.options.colors.clustersHoverText + ";"
-    }
-    $(this.containers.clustersHoverCss).html(".mapsvg-marker-cluster:hover {" + cssHover + "}")
+    this.clusteringModule()?.setColors.call(this)
 
     if (!this.containers.markersCss) {
-      this.containers.markersCss = <HTMLStyleElement>$("<style></style>").appendTo("head")[0]
-      if (this.useShadowRoot) {
-        this.containers.shadowRoot.appendChild(this.containers.markersCss)
-      } else {
-        document.head.appendChild(this.containers.markersCss)
-      }
+      this.containers.markersCss = this.eventDocument.createElement("style")
+      this.appendToStyleRoot(this.containers.markersCss)
     }
     const markerCssText =
       ".mapsvg-with-marker-active .mapsvg-marker {\n" +
@@ -2518,6 +2617,10 @@ export class MapSVGMap {
 
     deepMerge(this.options, { tooltips: options })
 
+    if (!isNodeTypeReachable(this.options, "tooltip")) {
+      this.options.tooltips.on = false
+    }
+
     this.controllers.tooltips = {}
   }
   /**
@@ -2536,6 +2639,10 @@ export class MapSVGMap {
     if (options.on !== undefined) options.on = utils.numbers.parseBoolean(options.on)
 
     deepMerge(this.options.popovers, options)
+
+    if (!isNodeTypeReachable(this.options, "popover")) {
+      this.options.popovers.on = false
+    }
   }
   /**
    * Sets region prefix
@@ -2543,7 +2650,13 @@ export class MapSVGMap {
    * @private
    */
   setRegionPrefix(prefix) {
+    const changed = this.options.regionPrefix !== prefix
     this.options.regionPrefix = prefix
+    if (changed && this.svgFileLoaded && this.containers?.svg) {
+      this.deselectAllRegions()
+      this.reloadRegions()
+      if (this.regionsRepository?.loaded) this.reloadRegionsFull()
+    }
   }
   /**
    * Sets initial viewbox
@@ -2585,16 +2698,19 @@ export class MapSVGMap {
    * @param {ViewBox} viewBox
    * @param {boolean} adjustGoogleMap
    */
-  setViewBox(viewBox?: ViewBox, adjustGoogleMap = true): boolean {
+  setViewBox(viewBox?: ViewBox | number[], adjustGoogleMap = true): boolean {
     if (!this.svgFileLoaded) {
       return
     }
 
     let isZooming = false
+    let isMoving = false
 
     if (viewBox) {
-      isZooming = this.checkIfZoomIsNeeded(viewBox)
-      this.viewBox.update(viewBox)
+      const next = viewBox instanceof ViewBox ? viewBox : new ViewBox(viewBox)
+      isZooming = this.checkIfZoomIsNeeded(next)
+      isMoving = next.x !== this.viewBox.x || next.y !== this.viewBox.y
+      this.viewBox.update(next)
     }
     // Calculate new padding
     const newPaddingBottom = (this.viewBox.height * 100) / this.viewBox.width
@@ -2636,7 +2752,7 @@ export class MapSVGMap {
       if (isZooming) {
         this.googleFitCurrentGeoBounds()
       }
-      if (googlePrevZoom !== this.googleMaps.map.getZoom()) {
+      if (googlePrevZoom !== this.googleMaps.map.getZoom() || (isMoving && !isZooming)) {
         this.googleMaps.map.setCenter(this.getCenterGeoPoint())
       }
     } else {
@@ -2681,7 +2797,7 @@ export class MapSVGMap {
     if (isZooming) {
       this.adjustStrokes()
       this.throttle(this.toggleSvgLayerOnZoom, 50, this)
-      if (this.options.clustering.on) {
+      if (hasRuntimeFeature("clustering") && this.options.clustering.on) {
         // Google Maps is calling setViewBox 20-30 times per zoom cycle (400ms)
         // until the animation finishes. So we have to use .throttle to avoid calling
         // the expensive operation multiple times.
@@ -2759,8 +2875,7 @@ export class MapSVGMap {
    */
 
   clusterizeOnZoom(): void {
-    this.events.trigger(MapEventType.ZOOM)
-    this.clusterizeMarkers(true)
+    return this.clusteringModule()?.clusterizeOnZoom.call(this, this.clusteringServices())
   }
   /**
    * Delays method execution.
@@ -2797,35 +2912,7 @@ export class MapSVGMap {
    * Used to overlay SVG map on Google Map.
    */
   setViewBoxByGoogleMapBounds(): void {
-    const googleMapBounds = this.googleMaps.map.getBounds()
-    if (!googleMapBounds) return
-    const googleMapBoundsJSON = googleMapBounds.toJSON()
-
-    if (googleMapBoundsJSON.west == -180 && googleMapBoundsJSON.east == 180) {
-      const center = this.googleMaps.map.getCenter().toJSON()
-    }
-    const ne = new GeoPoint(
-      googleMapBounds.getNorthEast().lat(),
-      googleMapBounds.getNorthEast().lng(),
-    )
-    const sw = new GeoPoint(
-      googleMapBounds.getSouthWest().lat(),
-      googleMapBounds.getSouthWest().lng(),
-    )
-
-    const xyNE = this.converter.convertGeoToSVG(ne)
-    const xySW = this.converter.convertGeoToSVG(sw)
-
-    // Check if map is on border between 180/-180 longitude
-    if (xyNE.x < xySW.y) {
-      const mapPointsWidth = (this.svgDefault.viewBox.width / this.converter.mapLonDelta) * 360
-      xySW.x = -(mapPointsWidth - xySW.y)
-    }
-
-    const width = xyNE.x - xySW.x
-    const height = xySW.y - xyNE.y
-    const viewBox = new ViewBox(xySW.x, xyNE.y, width, height)
-    this.setViewBox(viewBox)
+    this.setViewBoxByGoogleMapsOverlay()
   }
   /**
    * Whether the map container currently has a non-zero layout size.
@@ -3103,6 +3190,14 @@ export class MapSVGMap {
       this.options.controls.previousMap,
     )
 
+    // Draw rule: skip chrome Controls when node is not reachable from scenes.
+    if (!isNodeTypeReachable(this.options, "controls")) {
+      if (this.containers.controls) {
+        $(this.containers.controls).hide()
+      }
+      return
+    }
+
     const loc = this.options.controls.location || "right"
 
     if (!this.containers.controls) {
@@ -3184,26 +3279,33 @@ export class MapSVGMap {
       const zoomResetGroup = $("<div />").addClass("mapsvg-btn-group").appendTo(buttons)
       zoomResetGroup.append(zoomResetButton)
 
-      
+
 
       this.containers.controls = buttons[0]
       this.controls = {
         zoom: zoomGroup[0],
         userLocation: locationGroup[0],
         zoomReset: zoomResetGroup[0],
-        
       }
-      $(this.containers.map).append($(this.containers.controls))
+    }
+
+    this.applyMapChromeShell()
+    if (this.containers.controls) {
+      this.mountChromeWidget("controls", this.containers.controls)
+      // A prior unreachable update hides the wrapper. Legacy mounts do not
+      // project node visibility, so restore it once Controls is reachable again.
+      if (!isTreeLayoutMode(this.options)) $(this.containers.controls).show()
     }
 
     $(this.controls.zoom).toggle(this.options.controls.zoom)
     $(this.controls.userLocation).toggle(this.options.controls.userLocation)
     $(this.controls.zoomReset).toggle(this.options.controls.zoomReset)
-    
+    this.anotherMapModule()?.controls(this, this.containers.controls)
 
     $(this.containers.controls).removeClass("left")
     $(this.containers.controls).removeClass("right")
-    if (loc === "right" || loc === "left") {
+    // Legacy left/right only when chrome grid cell is missing.
+    if (!this.getChromeSlot("controls") && (loc === "right" || loc === "left")) {
       $(this.containers.controls).addClass(loc)
     }
   }
@@ -3589,6 +3691,34 @@ export class MapSVGMap {
   }
 
   /**
+   * True when the map container already lives inside a ShadowRoot that this Map
+   * did not create (e.g. Gutenberg / host app put the container into a shadow).
+   */
+  get isInsideForeignShadowRoot(): boolean {
+    const node = this.container
+    if (!node || typeof node.getRootNode !== "function") {
+      return false
+    }
+    const root = node.getRootNode()
+    if (!(root instanceof ShadowRoot)) {
+      return false
+    }
+    // Own shadow after createContainers — not "foreign".
+    if (this.containers?.shadowRoot && root === this.containers.shadowRoot) {
+      return false
+    }
+    return true
+  }
+
+  /**
+   * Whether Map should call attachShadow itself.
+   * Skip when already inside a foreign ShadowRoot (avoid nested shadows).
+   */
+  get shouldCreateShadowRoot(): boolean {
+    return this.useShadowRoot && !this.isInsideForeignShadowRoot
+  }
+
+  /**
    * Document that owns the map container. Differs from global `document` when
    * MapSVG runs in a parent window but the container lives in an iframe
    * (Gutenberg editor canvas).
@@ -3603,29 +3733,132 @@ export class MapSVGMap {
   get eventWindow(): Window & typeof globalThis {
     return (this.eventDocument.defaultView as Window & typeof globalThis) ?? window
   }
+
+  /**
+   * Where stylesheets / &lt;style&gt; tags must be injected:
+   * own shadowRoot → foreign ShadowRoot (getRootNode) → document.
+   */
+  get styleRoot(): ShadowRoot | Document {
+    if (this.containers?.shadowRoot) {
+      return this.containers.shadowRoot
+    }
+    const node = this.container ?? this.containers?.wrapAll ?? this.containers?.map
+    if (node && typeof node.getRootNode === "function") {
+      const root = node.getRootNode()
+      if (root instanceof ShadowRoot) {
+        return root
+      }
+    }
+    return this.eventDocument
+  }
+
+  /**
+   * Append a &lt;link&gt; / &lt;style&gt; into {@link styleRoot}.
+   */
+  appendToStyleRoot(node: Node): void {
+    const root = this.styleRoot
+    if (root instanceof Document) {
+      ;(root.head || root.documentElement).appendChild(node)
+    } else {
+      root.appendChild(node)
+    }
+  }
+
+  /**
+   * Inject core MapSVG + theme stylesheets into {@link styleRoot}.
+   */
+  private injectMapStylesheets(): void {
+    const root = this.styleRoot
+    const doc = this.eventDocument
+    const injectIntoShadow = root instanceof ShadowRoot
+
+    const hasStylesheet = (dataAttr: string, dataValue: string): boolean => {
+      if (!injectIntoShadow) {
+        return false
+      }
+      const links = root.querySelectorAll(`link[${dataAttr}]`)
+      for (let i = 0; i < links.length; i++) {
+        if (links[i].getAttribute(dataAttr) === dataValue) {
+          return true
+        }
+      }
+      return false
+    }
+
+    const appendStylesheet = (href: string, dataAttr: string, dataValue: string): void => {
+      if (hasStylesheet(dataAttr, dataValue)) {
+        return
+      }
+      const link = doc.createElement("link")
+      link.rel = "stylesheet"
+      link.href = href
+      link.setAttribute(dataAttr, dataValue)
+      this.appendToStyleRoot(link)
+    }
+
+    if (injectIntoShadow || !mapsvgCore.stylesAddedToBody) {
+      for (const style of mapsvgCore.styles) {
+        appendStylesheet(style.url + "?ver=" + style.version, "data-mapsvg-css", style.url)
+      }
+      if (!injectIntoShadow) {
+        mapsvgCore.stylesAddedToBody = true
+      }
+    }
+
+    const themeName = (this.options.theme && this.options.theme.name) || "default"
+    appendStylesheet(
+      mapsvgCore.routes.root + "themes/" + themeName + "/assets/css/styles.css?ver=" + mapsvgCore.version,
+      "data-mapsvg-theme",
+      themeName,
+    )
+  }
+
   /**
    * Sets custom map CSS.
    * CSS is added as <style>...</style> tag in the page <header>
    * @param {string} css
    * @private
    */
+  private typographyResizeTimer?: number
+  private typographyResize = () => {
+    this.eventWindow.clearTimeout(this.typographyResizeTimer)
+    if (this.options.typography?.mode === "theme") this.typographyResizeTimer = this.eventWindow.setTimeout(() => this.setTypography(), 200)
+  }
+  private typographyRuntime = new TypographyRuntime(() => this.events?.trigger("typographyChanged"))
+
+  getTypographyStatus(): string { return this.typographyRuntime.status }
+
+  mountTypography(element: HTMLElement): void {
+    const root = element.getRootNode() as Document | ShadowRoot
+    this.typographyRuntime.mount(element, root)
+  }
+
+  setTypography(options?: Partial<TypographyOptions>): void {
+    this.options.typography = deepMerge(this.options.typography ?? structuredClone(DEFAULT_TYPOGRAPHY), options ?? {})
+    if (this.containers?.wrapAll) void this.typographyRuntime.update(this.options.typography, this.eventDocument, this.inBackend, window.mapsvgFrontendParams?.typographyProbeUrl)
+  }
+
   setCss(css?: string): void {
     if (css && css.indexOf("%id%") !== -1) {
       css = css.replace(/%id%/g, "" + this.id)
     }
-    this.options.css = css || this.options.css
+    if (css !== undefined) this.options.css = css
 
     if (!this.liveCss) {
-      const style = document.createElement("style")
-      if (this.useShadowRoot) {
-        this.containers.shadowRoot.appendChild(style)
-      } else {
-        document.head.appendChild(style)
-      }
+      const style = this.eventDocument.createElement("style")
+      this.appendToStyleRoot(style)
       this.liveCss = style
     }
 
     this.liveCss.textContent = this.options.css
+    this.refreshControllerCustomCss()
+  }
+
+  private refreshControllerCustomCss(): void {
+    const views = [...Object.values(this.controllers || {}), ...Object.values(this.controllers?.tooltips || {})]
+    for (const controller of new Set(views)) {
+      if (controller && "refreshCustomCss" in controller && typeof controller.refreshCustomCss === "function") controller.refreshCustomCss()
+    }
   }
   /**
    * Sets the filters schema for the map.
@@ -3671,6 +3904,22 @@ export class MapSVGMap {
       return
     }
 
+    // Draw rule: filters mounts only when reachable in the nodes tree.
+    const treeMode = isTreeLayoutMode(this.options)
+    const legacyCustom = treeMode && this.hasLegacyCustomTreePlacement("filters")
+    const treeHost = treeMode && !legacyCustom ? this.getTreeComponentHost("filters") : null
+    const nodeLocation = resolveFiltersLocation(this.options)
+    if (nodeLocation === null || (treeMode && !treeHost && !legacyCustom)) {
+      this.controllers.filters?.destroy()
+      this.controllers.filters = null
+      // initMap may still have reserved a filters afterLoad blocker (schema on + unreachable).
+      this.releaseFiltersAfterLoadBlocker()
+      return
+    }
+    if (!treeMode && nodeLocation !== "custom") {
+      this.options.filters.location = nodeLocation
+    }
+
     const scrollable = false
 
     if (
@@ -3689,7 +3938,7 @@ export class MapSVGMap {
       )
     }
 
-    if (
+    if (!treeMode &&
       ["leftSidebar", "rightSidebar", "header", "footer", "custom", "map"].indexOf(
         this.options.filters.location,
       ) === -1
@@ -3715,7 +3964,9 @@ export class MapSVGMap {
 
       let container: HTMLElement
 
-      if (this.options.filters.location === "custom") {
+      if (treeHost) {
+        container = treeHost
+      } else if (this.options.filters.location === "custom") {
         if ($("#" + this.options.filters.containerId).length) {
           container = $("#" + this.options.filters.containerId)[0]
         } else {
@@ -3734,7 +3985,7 @@ export class MapSVGMap {
         } else {
           const location = isPhone() ? "header" : this.options.filters.location
           if (
-            this.options.menu.on &&
+            (hasRuntimeFeature("directory") && this.options.menu.on) &&
             this.controllers.directory &&
             this.options.menu.location === this.options.filters.location
           ) {
@@ -3808,7 +4059,7 @@ export class MapSVGMap {
       $(this.containers.filterTags).show()
     }
 
-    if (this.options.menu.on && this.controllers.directory) {
+    if ((hasRuntimeFeature("directory") && this.options.menu.on) && this.controllers.directory) {
       $(this.controllers.directory?.containers.toolbar).append(this.containers.filterTags)
       this.controllers.directory?.updateTopShift()
     } else {
@@ -3842,7 +4093,7 @@ export class MapSVGMap {
         const filterField = $(e.target).data("filter")
         $(e.target).parent().remove()
         const repo =
-          this.options.filters.source === "regions"
+          this.componentSource("filters") === "regions"
             ? this.regionsRepository
             : this.objectsRepository
         if (filterField === "search") {
@@ -3864,7 +4115,7 @@ export class MapSVGMap {
     }
 
     const repo =
-      this.options.filters.source === "regions" ? this.regionsRepository : this.objectsRepository
+      this.componentSource("filters") === "regions" ? this.regionsRepository : this.objectsRepository
 
     const tags: { label: string; value: string; name: string }[] = []
 
@@ -3887,6 +4138,9 @@ export class MapSVGMap {
       }
       const fieldFormattedName = filterField ? filterField.label : (repoField.label ?? "")
       let fieldFormattedValue = field_value
+      if (repoField.type === "post" && field_value && typeof field_value === "object" && !Array.isArray(field_value)) {
+        fieldFormattedValue = field_value.name ?? field_value.ID ?? field_value.id ?? ""
+      }
 
       if (filterField) {
         if (filterField.type === "select") {
@@ -3933,7 +4187,7 @@ export class MapSVGMap {
     style.setAttribute("data-mapsvg-critical", "region-labels")
     style.textContent = `
 .mapsvg-region-label {
-  font-size: 11px;
+  font-size: var(--mapsvg-font-size, 14px);
   padding: 2px 12px;
   border-radius: 15px;
   background: #ffffffbb;
@@ -3941,7 +4195,7 @@ export class MapSVGMap {
   top: 0;
   left: 0;
   pointer-events: none;
-  font-family: Helvetica, sans-serif;
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
 }
 .mapsvg-region-label:empty {
   display: none;
@@ -3964,6 +4218,10 @@ export class MapSVGMap {
     this.containers.scrollpaneWrap.appendChild(this.containers.scrollpane)
 
     this.containers.map.classList.add("mapsvg")
+    // Repeated shortcode embeds keep independent document/ShadowRoot host IDs.
+    const instanceId = this.containers.map.id.startsWith(`mapsvg-${this.id}-`)
+      ? this.containers.map.id.slice("mapsvg-".length)
+      : String(this.id)
 
     // this.containers.wrapAll = document.createElement("div")
     // this.containers.wrapAll.classList.add("mapsvg-wrap-all")
@@ -3989,7 +4247,7 @@ export class MapSVGMap {
     this.containers.footer.className = "mapsvg-footer mapsvg-top-container"
 
     this.containers.wrapAll = $('<div class="mapsvg-wrap-all"></div>')
-      .attr("id", "mapsvg-map-" + this.id)
+      .attr("id", "mapsvg-map-" + instanceId)
       .attr("data-map-id", this.id)[0]
     this.containers.wrap = $('<div class="mapsvg-wrap"></div>')[0]
     this.containers.mapContainer = $('<div class="mapsvg-map-container"></div>')[0]
@@ -4020,71 +4278,40 @@ export class MapSVGMap {
     this.containers.wrap.appendChild(this.containers.mapContainer)
     this.containers.wrap.appendChild(this.containers.rightSidebar)
 
-    if (this.useShadowRoot) {
-      // Добавляем ID карты, чтобы WP видел карту как раньше
+    this.applyLayoutGridShell()
+
+    if (this.shouldCreateShadowRoot) {
+      // Host keeps WP-facing id; map chrome lives inside the shadow.
       this.containers.root = $('<div class="mapsvg-shadow-root"></div>')
-        .attr("id", "mapsvg-map-" + this.id)
+        .attr("id", "mapsvg-map-" + instanceId)
         .attr("data-map-id", this.id)[0]
 
-      // 2. Создаём Shadow Root
-      // open — чтобы можно было получить root из JS снаружи:
-      // document.querySelector('#mapsvg-map-123').shadowRoot
+      // open — accessible as host.shadowRoot from outside
       this.containers.shadowRoot = this.containers.root.attachShadow({ mode: "open" })
-      // Insert this.containers.wrapAll before this.containers.map
       this.containers.wrapAll.parentNode.insertBefore(this.containers.root, this.containers.wrapAll)
       this.containers.shadowRoot.appendChild(this.containers.wrapAll)
-
-      // @font-face inside Shadow DOM is ignored; register the icon font on the document
-      ensureIconFontFace(mapsvgCore.routes.root, mapsvgCore.version)
-
-      // Critical label CSS first (sync), then async bundle/theme links
-      this.injectCriticalRegionLabelCss(this.containers.shadowRoot)
-      ensureLoadingCriticalCss(this.containers.shadowRoot)
-
-      // 6. Добавляем стили внутрь Shadow
-      for (const style of mapsvgCore.styles) {
-        const link = document.createElement("link")
-        link.rel = "stylesheet"
-        link.href = style.url + "?ver=" + style.version
-        this.containers.shadowRoot.appendChild(link)
-      }
-
-      // Add theme
-      const link = document.createElement("link")
-      link.rel = "stylesheet"
-      link.href =
-        mapsvgCore.routes.root + "themes/" + this.options.theme.name + "/assets/css/styles.css"
-      this.containers.shadowRoot.appendChild(link)
-    } else {
-      // Critical label CSS first (sync), then async bundle/theme links
-      this.injectCriticalRegionLabelCss(document.head)
-      ensureLoadingCriticalCss(document.head)
-
-      // 6. Добавляем стили внутрь Shadow
-      if (!mapsvgCore.stylesAddedToBody) {
-        for (const style of mapsvgCore.styles) {
-          const link = document.createElement("link")
-          link.rel = "stylesheet"
-          link.href = style.url + "?ver=" + style.version
-          document.head.appendChild(link)
-        }
-        mapsvgCore.stylesAddedToBody = true
-      }
-      // Add theme
-      const link = document.createElement("link")
-      link.rel = "stylesheet"
-      link.href =
-        mapsvgCore.routes.root + "themes/" + this.options.theme.name + "/assets/css/styles.css"
-      document.head.appendChild(link)
-
-      // Insert this.containers.wrapAll before this.containers.map
-      // this.containers.map.parentNode.insertBefore(this.containers.wrapAll, this.containers.map)
-      // this.containers.wrapAll.parentNode.insertBefore(this.containers.root, this.containers.wrapAll)
     }
+
+    // Own shadow, foreign shadow (getRootNode), or document.head
+    this.injectMapStylesheets()
+    this.mountTypography(this.containers.wrapAll)
+    this.setTypography(this.options.typography)
+    this.eventWindow.addEventListener("resize", this.typographyResize)
+
+    // @font-face inside Shadow DOM is ignored; register the icon font on the document
+    ensureIconFontFace(mapsvgCore.routes.root, mapsvgCore.version)
+
+    const styleHost =
+      this.styleRoot instanceof Document
+        ? this.styleRoot.head || this.styleRoot.documentElement
+        : this.styleRoot
+    this.injectCriticalRegionLabelCss(styleHost)
+    ensureLoadingCriticalCss(styleHost)
 
     this.containers.wrapAll.setAttribute("data-mapsvg-theme", this.options.theme.name)
 
     this.containersCreated = true
+    this.ensureTreeBreakpointListener()
 
     if (!this.resizeSensor) {
       this.resizeSensor = new ResizeSensor(this.containers.map, () => {
@@ -4103,9 +4330,12 @@ export class MapSVGMap {
       })
     }
 
-    // ADD MOBILE TOOLBAR
-    this.containers.toolbar = $('<div class="mapsvg-map-toolbar"></div>')[0]
-    this.containers.wrapAll.appendChild(this.containers.toolbar)
+    // Legacy maps keep the historical toolbar mount outside the layout grid.
+    // Tree-layout maps mount Mobile Toolbar through an explicit component node.
+    if (!isTreeLayoutMode(this.options)) {
+      this.containers.toolbar = $('<div class="mapsvg-map-toolbar"></div>')[0]
+      this.containers.wrapAll.appendChild(this.containers.toolbar)
+    }
 
     this.disableAnimation()
     this.addLayer("markers")
@@ -4113,6 +4343,591 @@ export class MapSVGMap {
     this.addLayer("bubbles")
     this.addLayer("popovers")
     this.addLayer("scrollpane")
+    this.applyTreeInternalVisibility()
+  }
+
+  /**
+   * Optional grid shell from `options.layout.grids` (desktop/tablet/mobile).
+   * Keeps existing container refs and moves them into named slot cells.
+   */
+  private applyLayoutGridShell(): void {
+    const breakpoint = this.getLayoutBreakpoint()
+    const selected = pickLayoutGrid(this.options.layout, {
+      isPhone: isPhone(),
+      isTablet: isTablet(),
+      breakpoint,
+    })
+    if (!selected || !this.containers.wrapAll) return
+
+    const doc = this.eventDocument
+    const mobile = this.resolveTreeMobileToolbar(selected.widgets, breakpoint)
+    const projection = mobile ? projectMobileToolbarLayout(Array.from(this.options.nodes || []), selected.widgets, breakpoint, mobile.targets) : null
+    const treeMode = isTreeLayoutMode(this.options)
+    const candidate = buildLayoutGridShell(doc, projection ? { ...selected, widgets: projection.widgets } : selected, {
+      rowSizing: "content",
+      ...(treeMode ? {
+        nodes: (projection?.nodes ?? Array.from(this.options.nodes || [])) as MapSvgNode[],
+        breakpoint,
+      } : {}),
+    })
+    const existing = treeMode ? Array.from(this.containers.wrapAll.children).find(child => child.classList.contains("mapsvg-layout-grid")) as HTMLElement | undefined : undefined
+    const { grid, slots, retired } = reconcileLayoutGridShell(existing, candidate)
+
+    grid.dataset.mapsvgLayoutBreakpoint = breakpoint
+
+    const slotElements: Record<string, HTMLElement | undefined> = {
+      Header: this.containers.header,
+      LeftSidebar: this.containers.leftSidebar,
+      Main: this.containers.wrap,
+      RightSidebar: this.containers.rightSidebar,
+      Footer: this.containers.footer,
+      // Backward alias while old JSON may still contain Map
+      Map: this.containers.wrap,
+    }
+
+    if (!treeMode) this.restoreLegacyMapShell()
+    this.activeLayoutSlotIds = new Set(slots.keys())
+    this.layoutSlotHosts = mountLayoutSlotHosts(
+      doc, slots, slotElements, this.layoutSlotHosts, treeMode,
+    )
+
+    const toolbar = this.containers.toolbar
+    if (!treeMode) this.containers.wrapAll.innerHTML = ""
+    if (grid.parentElement !== this.containers.wrapAll) this.containers.wrapAll.appendChild(grid)
+    if (toolbar && !treeMode) {
+      this.containers.wrapAll.appendChild(toolbar)
+    }
+    if (treeMode) {
+      this.containers.leftSidebar?.remove()
+      this.containers.rightSidebar?.remove()
+      this.applyTreeSlotColors()
+      this.mountTreeLayoutNodes()
+      for (const cell of retired) cell.remove()
+      if (mobile && projection) {
+        const mapCell = slots.get(mobile.targets.mapId)
+        const listCell = slots.get(mobile.targets.listId)
+        if (mapCell && listCell) {
+          // Keep Map in layout as the row-height anchor, preserving camera and controllers.
+          mapCell.style.opacity = mobile.view === "list" ? "0" : ""
+          mapCell.inert = mobile.view === "list"
+          if (mobile.view === "list") mapCell.setAttribute("aria-hidden", "true")
+          listCell.style.display = mobile.view === "map" ? "none" : ""
+          listCell.style.zIndex = "1"
+          grid.dataset.mapsvgMobileView = mobile.view
+        }
+      }
+    }
+    this.events.trigger("layoutBreakpointChange", { breakpoint })
+  }
+
+  private treeMobileToolbar?: { key: string; targets: MobileToolbarTargets; view: MobileToolbarView }
+
+  private resolveTreeMobileToolbar(widgets: import("../Layout/LayoutGridRuntime").LayoutGridWidget[], breakpoint: LayoutGridBreakpoint) {
+    if (!hasRuntimeFeature("directory") || !isTreeLayoutMode(this.options) || this.layoutPreviewBreakpoint || this.options.menu?.on === false) {
+      this.treeMobileToolbar = undefined
+      return undefined
+    }
+    const nodes = Array.from(this.options.nodes || []) as MapSvgNode[]
+    const pageNodes = mobileToolbarPageNodes(nodes, Array.from(this.options.scenes || []), this.activePageId)
+    const toolbar = visibleMobileToolbar(pageNodes, widgets, breakpoint)
+    const { targets } = resolveMobileToolbarTargets(pageNodes, this.options.mobileView ?? {})
+    if (!toolbar || !targets || !widgets.some(widget => widget.id === targets.mapId) ||
+      [targets.mapId, targets.listId].includes(slotForNode(nodes, toolbar.id) || "")) {
+      this.treeMobileToolbar = undefined
+      return undefined
+    }
+    const first = this.options.mobileView?.showFirst ?? this.options.menu?.showFirst ?? "map"
+    const key = JSON.stringify([this.activePageId, toolbar.id, targets.mapId, targets.listId, breakpoint, first])
+    if (this.treeMobileToolbar?.key !== key) this.treeMobileToolbar = { key, targets, view: first === "list" || first === "directory" ? "list" : "map" }
+    return this.treeMobileToolbar
+  }
+
+  /** Temporary visitor view; does not update App options or trigger draft autosave. */
+  setMobileToolbarView(view: MobileToolbarView): void {
+    if (!this.treeMobileToolbar || (view !== "map" && view !== "list")) return
+    if (this.treeMobileToolbar.view === view) return
+    if (view === "list") {
+      this.saveGoogleMapsViewport()
+      if (this.googleMaps) this.googleMaps.needsViewportRestore = true
+    }
+    this.treeMobileToolbar.view = view
+    this.applyLayoutGridShell()
+    this.controllers.toolbar?.setActive(view === "list" ? "menu" : "map")
+    if (view === "map") this.redraw()
+    this.events.trigger("mobileViewChange", { view })
+  }
+
+  private layoutSlotHosts = new Map<string, HTMLElement>()
+  private activeLayoutSlotIds = new Set<string>()
+  private layoutNodeHosts = new Map<string, HTMLElement>()
+  private activeTreeNodeIds = new Set<string>()
+  private treeViewportResizeListener?: () => void
+  private treeViewportBreakpoint?: LayoutGridBreakpoint
+
+  private restoreLegacyMapShell(): void {
+    const { wrap, leftSidebar, mapContainer, rightSidebar } = this.containers
+    if (!wrap || !mapContainer) return
+    if (mapContainer.parentElement !== wrap) wrap.appendChild(mapContainer)
+    if (leftSidebar) wrap.insertBefore(leftSidebar, mapContainer)
+    if (rightSidebar) wrap.appendChild(rightSidebar)
+  }
+
+  private applyTreeSlotColors(): void {
+    if (!isTreeLayoutMode(this.options)) return
+    const nodes = Array.from(this.options.nodes || []) as MapSvgNode[]
+    for (const [slotId, host] of this.layoutSlotHosts) {
+      const node = nodes.find(item => item.id === slotId)
+      if (!node) continue
+      // Paint the whole grid cell, including empty/fill space; avoid double alpha.
+      const cell = host.parentElement?.classList.contains("mapsvg-layout-slot") ? host.parentElement : host
+      if (cell !== host) host.style.backgroundColor = ""
+      applyContainerBackground(cell, node, this.options.colors)
+    }
+  }
+
+  /** Route explicit legacy location overrides to visible tree slots when possible. */
+  private getLocationContainer(location: string): HTMLElement | undefined {
+    if (isTreeLayoutMode(this.options)) {
+      const slotId = ({
+        header: "Header",
+        leftSidebar: "LeftSidebar",
+        rightSidebar: "RightSidebar",
+        footer: "Footer",
+      } as Record<string, string>)[location]
+      if (slotId) {
+        return this.activeLayoutSlotIds.has(slotId) ? this.layoutSlotHosts.get(slotId) : undefined
+      }
+    }
+    return this.containers[location]
+  }
+  private readonly onTreeBreakpointChange = () => {
+    if (!isTreeLayoutMode(this.options) || this.layoutPreviewBreakpoint || !this.containersCreated) return
+    this.applyLayoutGridShell()
+    this.setContainers(this.options.containers)
+    this.applyMapChromeShell()
+    if (this.containers.layersControl) this.mountChromeWidget("layers", this.containers.layersControl)
+    if (this.containers.controls) this.mountChromeWidget("controls", this.containers.controls)
+    this.refreshTreeControllers()
+  }
+
+  private ensureTreeBreakpointListener(): void {
+    if (!isTreeLayoutMode(this.options) || this.treeViewportResizeListener) return
+    const viewport = this.eventWindow
+    this.treeViewportBreakpoint = viewportLayoutBreakpoint(viewport.innerWidth)
+    this.treeViewportResizeListener = () => {
+      const breakpoint = viewportLayoutBreakpoint(viewport.innerWidth)
+      if (breakpoint === this.treeViewportBreakpoint) return
+      this.treeViewportBreakpoint = breakpoint
+      this.onTreeBreakpointChange()
+    }
+    viewport.addEventListener("resize", this.treeViewportResizeListener)
+  }
+
+  private stopTreeBreakpointListener(): void {
+    if (!this.treeViewportResizeListener) return
+    this.eventWindow.removeEventListener("resize", this.treeViewportResizeListener)
+    this.treeViewportResizeListener = undefined
+    this.treeViewportBreakpoint = undefined
+  }
+
+  /** Keep actual component DOM attached to stable hosts while grid breakpoints change. */
+  private mountTreeLayoutNodes(): void {
+    const currentNodes = Array.from(this.options.nodes || []) as MapSvgNode[]
+    if (currentNodes.some(node => node.type === "map" && mapContentRoots(currentNodes, node.id).length > 0)) {
+      const normalized = normalizeNodesOptions(this.options as MapOptions & Record<string, any>)
+      this.options.nodes = normalized.nodes
+      this.options.scenes = normalized.scenes
+    }
+    this.activeTreeNodeIds.clear()
+    const breakpoint = this.getLayoutBreakpoint()
+    if (this.containers.wrap) {
+      this.containers.wrap.style.flexDirection = "column"
+      this.containers.wrap.style.width = "100%"
+    }
+    const nodes = Array.from((this.options.nodes || []) as ArrayLike<MapSvgNode>)
+    const byId = new Map(nodes.map((node) => [node.id, node]))
+    const visited = new Set<string>()
+    const mountedHosts = new Set<string>()
+    let mapMounted = false
+
+    const mountChildren = (parent: MapSvgNode, host: HTMLElement, bounded = false) => {
+      const children: HTMLElement[] = []
+      for (const childId of parent.children || []) {
+        const child = byId.get(childId)
+        if (!child || visited.has(child.id)) continue
+        visited.add(child.id)
+        if (child.settings?.on === false || containerLayout(child, breakpoint).hidden) continue
+        this.activeTreeNodeIds.add(child.id)
+
+        if (child.type === "map") {
+          if (this.containers.mapContainer && this.containers.wrap) {
+            this.containers.wrap.dataset.mapsvgNodeId = child.id
+            children.push(this.containers.wrap)
+            mapMounted = true
+            mountChildren(child, this.containers.mapContainer, true)
+          }
+          continue
+        }
+        if (isMapInternalType(child.type)) {
+          continue // Map-owned features keep their existing canvas/chrome mount points.
+        }
+
+        let childHost = this.layoutNodeHosts.get(child.id)
+        if (!childHost) {
+          childHost = this.eventDocument.createElement("div")
+          childHost.className = child.type === "frame" ? "mapsvg-layout-frame" : "mapsvg-layout-component"
+          childHost.dataset.mapsvgNodeId = child.id
+          this.layoutNodeHosts.set(child.id, childHost)
+        }
+        const presentation = stackComponentLayout(child, breakpoint, nodes)
+        if (child.type === "modal") {
+          const details = this.controllers.detailsView
+          setStackComponentOpen(childHost, !!details?.opened && details.containers.parent === childHost)
+        }
+        const childBounded = applyStackChildLayout(childHost, child.type === "filters" ? { ...presentation, padding: 0, paddingBottom: undefined } : presentation, bounded)
+        if (child.type === "frame") applyContainerBackground(childHost, child, this.options.colors)
+        childHost.style.zIndex = child.type === "modal" ? "30"
+          : ["legend", "layers"].includes(child.type) ? "3" : parent.type === "map" ? "21"
+          : child.type === "filters" ? "3" : ""
+        children.push(childHost)
+        mountedHosts.add(child.id)
+        if (child.type === "frame") mountChildren(child, childHost, childBounded)
+      }
+      reconcileLayoutChildren(host, children)
+    }
+
+    for (const slotId of this.activeLayoutSlotIds) {
+      const node = byId.get(slotId)
+      const host = this.layoutSlotHosts.get(slotId)
+      if (node?.type === "slot" && host) {
+        const settings = containerLayout(node, breakpoint)
+        const cell = host.parentElement
+        const bounded = cell?.dataset.mapsvgHeightMode === "fixed" || cell?.dataset.mapsvgRowFollower === "true" || settings.maxHeight !== undefined
+        // The cell owns dimensions; a bounded content stack distributes the remainder.
+        applyStackContentLayout(host, settings, bounded)
+        if (cell) {
+          cell.style.display = "flex"
+          cell.style.flexDirection = "column"
+          cell.style.overflow = "visible"
+        }
+        mountChildren(node, host, bounded)
+      }
+    }
+    for (const [id, host] of this.layoutNodeHosts) if (!mountedHosts.has(id)) host.remove()
+    if (!mapMounted) this.containers.wrap?.remove()
+    this.applyTreeInternalVisibility()
+  }
+
+  private applyTreeInternalVisibility(): void {
+    if (!isTreeLayoutMode(this.options)) return
+    const region = findReachableNodesByType(this.options, "region")[0]
+    const marker = findReachableNodesByType(this.options, "marker")[0]
+    this.containers.map?.classList.toggle("mapsvg-hide-region-node", region?.settings?.on === false)
+    this.containers.map?.classList.toggle("mapsvg-hide-marker-node", marker?.settings?.on === false)
+    if (this.layers.markers) {
+      this.layers.markers.style.display = marker?.settings?.on === false ? "none" : ""
+    }
+  }
+
+  private getTreeComponentHost(type: string): HTMLElement | null {
+    for (const node of findReachableNodesByType(this.options, type)) {
+      if (!this.activeTreeNodeIds.has(node.id)) continue
+      const host = this.layoutNodeHosts.get(node.id)
+      if (host) return host
+    }
+    return null
+  }
+
+  private syncMobileToolbar(): void {
+    const treeMode = isTreeLayoutMode(this.options)
+    if (treeMode && this.containers.wrapAll) {
+      $(this.containers.wrapAll).removeClass("mapsvg-hide-map-list-buttons")
+    }
+    const toolbarNode = treeMode
+      ? findReachableNodesByType(this.options, "mobileToolbar")[0]
+      : undefined
+    const container = treeMode
+      ? this.getTreeComponentHost("mobileToolbar")
+      : this.containers.toolbar
+    const shouldMount = Boolean(
+      hasRuntimeFeature("directory") && container &&
+      (treeMode
+        ? toolbarNode?.settings?.on !== false && Boolean(this.treeMobileToolbar)
+        : this.controllers.directory && this.options.menu?.on),
+    )
+
+    if (!shouldMount) {
+      this.controllers.toolbar?.destroy()
+      delete this.controllers.toolbar
+      return
+    }
+
+    if (
+      this.controllers.toolbar &&
+      !this.controllers.toolbar.destroyed &&
+      this.controllers.toolbar.containers.parent === container
+    ) {
+      const next = { ...this.options.mobileView, active: this.treeMobileToolbar?.view === "list" ? "menu" : "map" }
+      if (Object.entries(next).some(([key, value]) => this.controllers.toolbar.state[key] !== value)) this.controllers.toolbar.setState(next)
+      return
+    }
+
+    this.createToolbar(container)
+  }
+
+  private shouldPlaceDetailsInFlow(
+    modalMount: ModalMountResolution,
+    treeModalHost: HTMLElement | null,
+    locationOverride?: string,
+  ): boolean {
+    return !!treeModalHost &&
+      !locationOverride &&
+      modalMount.kind === "main-overlay" &&
+      !(isPhone() && this.options.detailsView.mobileFullscreen)
+  }
+
+  private hasLegacyCustomTreePlacement(type: string): boolean {
+    return findReachableNodesByType(this.options, type).some((node) =>
+      node.settings?.location === "custom" &&
+      !node.settings?.placement &&
+      typeof node.settings?.containerId === "string" &&
+      node.settings.containerId !== ""
+    )
+  }
+
+  /** Paint supported style-only node edits in place; structural changes reconcile mounts. */
+  refreshTreeLayout(previousNodes?: unknown): void {
+    if (!isTreeLayoutMode(this.options) || !this.containersCreated) return
+    if (canRepaintNodeStyles(previousNodes, this.options.nodes)) {
+      this.applyTreeSlotColors()
+      for (const node of Array.from(this.options.nodes || []) as MapSvgNode[]) {
+        const host = this.layoutNodeHosts.get(node.id)
+        if (node.type === "frame" && host) applyContainerBackground(host, node, this.options.colors)
+      }
+      for (const type of ["legend", "layers"] as const) {
+        const node = this.mapPresentationNode(type)
+        const mount = node && this.mapPresentationMount(node)
+        const element = type === "legend" ? this.legendView?.element : this.layersControlView?.element
+        if (node && mount && element) applyMapPresentationStyles(element, node, mount.inline ? undefined : mount.host)
+      }
+      return
+    }
+    this.applyLayoutGridShell()
+    this.setContainers(this.options.containers)
+    this.refreshTreeControllers()
+  }
+
+  private refreshTreeControllers(): void {
+    if (!isTreeLayoutMode(this.options) || !this.mapDataLoaded) return
+    const directory = this.controllers.directory
+    const directoryHost = this.getTreeComponentHost("directory")
+    const customDirectory = this.hasLegacyCustomTreePlacement("directory")
+    if ((directory || (this.options.menu.on && (directoryHost || customDirectory))) &&
+      (!directory || directory.destroyed || !this.options.menu.on || (!customDirectory && directory.containers.parent !== directoryHost))) {
+      this.setMenu(this.options.menu)
+    }
+    const filters = this.controllers.filters
+    const filterHost = this.getTreeComponentHost("filters")
+    const customFilters = this.hasLegacyCustomTreePlacement("filters")
+    if ((filters || (this.options.filters.on && (filterHost || customFilters))) &&
+      (!filters || filters.destroyed || !this.options.filters.on || (!customFilters && filters.containers.parent !== filterHost))) {
+      this.setFilters(this.options.filters)
+    } else if (filters && filterHost) {
+      const node = findReachableNodesByType(this.options, "filters")[0]
+      const profile = containerLayout(node, this.getLayoutBreakpoint())
+      const styles = {
+        padding: filterLayoutPadding(node, this.getLayoutBreakpoint(), this.options.filters.padding, {
+          nodes: Array.from(this.options.nodes || []),
+          widgets: pickLayoutGrid(this.options.layout, { isPhone: isPhone(), isTablet: isTablet(), breakpoint: this.getLayoutBreakpoint() })?.widgets ?? [],
+        }),
+        ...(profile.paddingBottom !== undefined ? { paddingBottom: `${profile.paddingBottom}px` } : {}),
+      }
+      if (filters.styles) delete filters.styles.paddingBottom
+      Object.assign(filters.styles ??= {}, styles)
+      filters.setStyles(styles)
+    }
+    this.refreshTreeDetailsPosition()
+    this.setLayersControl()
+    this.syncLegend()
+    this.syncMobileToolbar()
+  }
+
+  private refreshTreeDetailsPosition(): void {
+    const details = this.controllers.detailsView
+    if (!details || details.destroyed) return
+    const modal = findReachableNodesByType(this.options, "modal")[0]
+    if (modal?.settings?.on === false || containerLayout(modal, this.getLayoutBreakpoint()).hidden) {
+      details.close()
+      return
+    }
+    if (details.fullscreen) return
+    const modalMount = resolveModalMount(this.options)
+    const treeModalHost = this.getTreeComponentHost("modal")
+    if (!treeModalHost || details.containers.parent !== treeModalHost) return
+
+    const inFlow = this.shouldPlaceDetailsInFlow(modalMount, treeModalHost)
+    const position = inFlow ? "relative" : "absolute"
+    if (details.position === position) return
+
+    details.position = position
+    details.classList = details.classList.filter((name) =>
+      name !== "mapsvg-relative" && name !== "mapsvg-absolute"
+    )
+    details.classList.push(`mapsvg-${position}`)
+    details.containers.main?.classList.toggle("mapsvg-relative", inFlow)
+    details.containers.main?.classList.toggle("mapsvg-absolute", !inFlow)
+    if (inFlow) {
+      const wasScrollable = details.scrollable
+      details.scrollable = false
+      if (wasScrollable) $(details.containers.contentWrap).nanoScroller({ destroy: true })
+      details.containers.contentWrap?.classList.remove("nano")
+      details.containers.contentWrap2?.classList.remove("nano-content")
+    } else {
+      details.scrollable = true
+      details.containers.contentWrap?.classList.add("nano")
+      details.containers.contentWrap2?.classList.add("nano-content")
+      details.updateScroll()
+    }
+  }
+
+  private mapChromeSlots: Map<string, HTMLElement> = new Map()
+
+  private getChromeSlot(id: string): HTMLElement | undefined {
+    return this.mapChromeSlots.get(id)
+  }
+
+  /**
+   * Map chrome CSS grid (Layers + Controls) from map node settings.chromeGrid.
+   * Separate from page layout.grids.
+   */
+  private applyMapChromeShell(): void {
+    if (!this.containers.mapContainer && !this.containers.map) return
+
+    const mapNode =
+      (this.options.nodes as any)?.get?.("map") ||
+      (Array.isArray(this.options.nodes)
+        ? this.options.nodes.find((n: any) => n?.type === "map")
+        : undefined)
+
+    const forcedBreakpoint = this.inBackend ? this.layoutPreviewBreakpoint : null
+    const selected = pickMapChromeGrid(mapNode, {
+      isPhone: isPhone(),
+      isTablet: isTablet(),
+      breakpoint: isTreeLayoutMode(this.options) ? this.getLayoutBreakpoint() : forcedBreakpoint,
+    })
+    if (!selected) return
+
+    const host = this.containers.mapContainer || this.containers.map
+    if (!host) return
+
+    if (getComputedStyle(host).position === "static") {
+      host.style.position = "relative"
+    }
+
+    const doc = this.eventDocument || document
+    const { grid, slots, retired } = reconcileLayoutGridShell(this.containers.mapChromeGrid, buildMapChromeShell(doc, selected))
+    this.containers.mapChromeGrid = grid
+    this.mapChromeSlots = slots
+    if (grid.parentElement !== host) host.appendChild(grid)
+    for (const cell of retired) cell.remove()
+  }
+
+  private mountChromeWidget(slotId: string, element: HTMLElement | undefined): void {
+    if (!element) return
+    if (slotId === "layers") {
+      const node = this.mapPresentationNode("layers")
+      const mount = node && this.mapPresentationMount(node)
+      if (!node || !mount || !layersPresentation(this.options.layersControl, node).on) { element.style.display = "none"; return }
+      element.style.display = ""
+      if (!mount.inline) {
+        element.style.display = "flex"
+        element.style.position = "relative"
+        element.style.left = element.style.right = element.style.top = element.style.bottom = ""
+        if (element.parentElement !== mount.host) mount.host.append(element)
+        return
+      }
+    }
+    if (isTreeLayoutMode(this.options) && slotId !== "layers") {
+      const node = findReachableNodesByType(this.options, slotId)[0]
+      element.style.display = node?.settings?.on === false ? "none" : ""
+    }
+    const cell = this.getChromeSlot(slotId)
+    if (cell) {
+      element.style.position = "relative"
+      element.style.left = ""
+      element.style.right = ""
+      element.style.top = ""
+      element.style.bottom = ""
+      if (element.parentElement !== cell) cell.appendChild(element)
+      return
+    }
+    if (slotId === "layers" && this.containers.mapContainer) {
+      const presentation = layersPresentation(this.options.layersControl, this.mapPresentationNode("layers"))
+      element.style.position = "absolute"
+      element.style.left = hasRuntimeFeature("directory") && this.options.menu?.on && !this.options.menu.customContainer && String(presentation.position).includes("left")
+        ? String(this.options.menu.width) : ""
+      element.style.right = element.style.top = element.style.bottom = ""
+      if (element.parentElement !== this.containers.mapContainer) this.containers.mapContainer.appendChild(element)
+    } else if (this.containers.map) {
+      if (element.parentElement !== this.containers.map) this.containers.map.appendChild(element)
+    }
+  }
+
+  /**
+   * Applies layout grid options and reflows the live shell immediately.
+   */
+  setLayout(options: any): void {
+    deepMerge(this.options, { layout: options })
+    const normalized = normalizeNodesOptions(this.options as MapOptions & Record<string, any>)
+    this.options.nodes = normalized.nodes
+    this.options.scenes = normalized.scenes
+    if (Array.isArray(this.options.layout?.deletedNodeTypes)) {
+      this.options.layout.deletedNodeTypes = this.options.layout.deletedNodeTypes.filter(
+        type => !normalized.nodes.some(node => node.type === type),
+      )
+    }
+    if (!this.containersCreated) return
+    this.ensureTreeBreakpointListener()
+    this.applyLayoutGridShell()
+    // Re-apply visibility/sizes after moving container nodes into new slots.
+    this.setContainers(this.options.containers)
+    this.applyMapChromeShell()
+    if (this.containers.layersControl) {
+      this.mountChromeWidget("layers", this.containers.layersControl)
+    }
+    if (this.containers.controls) {
+      this.mountChromeWidget("controls", this.containers.controls)
+    }
+    this.refreshTreeControllers()
+  }
+
+  /** Page layout follows the owning viewport; Layout authoring can explicitly override it. */
+  getLayoutBreakpoint(): LayoutGridBreakpoint {
+    if (this.inBackend && this.layoutPreviewBreakpoint) return this.layoutPreviewBreakpoint
+    if (isTreeLayoutMode(this.options)) {
+      return viewportLayoutBreakpoint(this.eventWindow.innerWidth)
+    }
+    return isPhone() ? "mobile" : isTablet() ? "tablet" : "desktop"
+  }
+
+  setLayoutPreviewBreakpoint(breakpoint?: LayoutGridBreakpoint | null): void {
+    const next =
+      breakpoint === "desktop" || breakpoint === "tablet" || breakpoint === "mobile"
+        ? breakpoint
+        : null
+    if (this.layoutPreviewBreakpoint === next) return
+    this.layoutPreviewBreakpoint = next
+    if (!this.containersCreated) return
+    this.applyLayoutGridShell()
+    this.setContainers(this.options.containers)
+    this.applyMapChromeShell()
+    if (this.containers.layersControl) {
+      this.mountChromeWidget("layers", this.containers.layersControl)
+    }
+    if (this.containers.controls) {
+      this.mountChromeWidget("controls", this.containers.controls)
+    }
+    this.refreshTreeControllers()
   }
 
   /**
@@ -4131,6 +4946,17 @@ export class MapSVGMap {
     const _this = this
 
     options = options || _this.options.containers || {}
+
+    if (isTreeLayoutMode(this.options)) {
+      for (const contName in options) {
+        if (options[contName].on !== undefined) {
+          options[contName].on = utils.numbers.parseBoolean(options[contName].on)
+        }
+      }
+      deepMerge(this.options, { containers: options })
+      this.setDetailsView()
+      return
+    }
 
     for (const contName in options) {
       if (options[contName].on !== undefined) {
@@ -4189,49 +5015,58 @@ export class MapSVGMap {
     _this.setDetailsView()
   }
 
-  createToolbar() {
+  createToolbar(container?: HTMLElement) {
+    const toolbarContainer = container || this.containers.toolbar
+    if (!toolbarContainer) return
     if (this.controllers.toolbar) {
       this.controllers.toolbar.destroy()
     }
     this.controllers.toolbar = new ToolbarController({
       map: this,
       parent: this,
-      container: this.containers.toolbar,
+      container: toolbarContainer,
+      classList: isTreeLayoutMode(this.options) ? ["mapsvg-toolbar-tree"] : [],
       state: {
-        active: "map",
         ...this.options.mobileView,
+        active: this.treeMobileToolbar?.view === "list" ? "menu" : "map",
       },
       events: {
         click: (event) => {
+          const directory = this.controllers.directory
           const { buttonName } = event.data
+          if (isTreeLayoutMode(this.options)) {
+            this.setMobileToolbarView(buttonName === "menu" ? "list" : "map")
+            return
+          }
           switch (buttonName) {
             case "map": {
               $(this.containers.mapContainer).show()
-              $(this.controllers.directory.containers.parent).hide()
-              if (isPhone()) {
-                $(this.containers.wrap).css("height", "auto")
-                this.controllers.directory.updateScroll()
+              if (directory) {
+                $(directory.containers.parent).hide()
+                if (isPhone()) directory.updateScroll()
               }
+              if (isPhone()) $(this.containers.wrap).css("height", "auto")
               this.redraw()
               break
             }
             case "menu": {
+              if (!directory) break
               this.saveGoogleMapsViewport()
               if (this.googleMaps) {
                 this.googleMaps.needsViewportRestore = true
               }
               $(this.containers.mapContainer).hide()
-              $(this.controllers.directory.containers.parent).show()
+              $(directory.containers.parent).show()
               if (
                 isPhone() &&
-                $(this.controllers.directory.containers.main).height() <
-                  parseInt(this.controllers.directory.options.minHeight)
+                $(directory.containers.main).height() <
+                  parseInt(directory.options.minHeight)
               ) {
                 $(this.containers.wrap).css(
                   "height",
-                  parseInt(this.controllers.directory.options.minHeight) + "px",
+                  parseInt(directory.options.minHeight) + "px",
                 )
-                this.controllers.directory.updateScroll()
+                directory.updateScroll()
               }
               break
             }
@@ -4240,7 +5075,7 @@ export class MapSVGMap {
             }
           }
 
-          this.controllers.directory.updateTopShift()
+          directory?.updateTopShift()
         },
       },
     })
@@ -4284,7 +5119,30 @@ export class MapSVGMap {
     }
   }
 
-  
+  // START directory
+
+  /**
+   * Sets directory options.
+   * @alias setMenu
+   * @param {object} options
+   * @returns {*|void}
+   *
+   * @example
+   * mapsvg.setDirectory({
+   *   on: true,
+   *   container: "leftSidebar"
+   * });
+   */
+  setDirectory(options) {
+    return this.setMenu(options)
+  }
+  /**
+   * Sets menu (directory) options
+   * @param options
+   * @private
+   */
+  setMenu(options?: { [key: string]: any }) { return this.directoryModule()?.setMenu.call(this, this.directoryServices(), options) }
+  // END
 
   extractField(
     region: Region | null,
@@ -4301,8 +5159,9 @@ export class MapSVGMap {
       if (!["Region", "Object"].includes(objectName)) {
         throw new Error("extractField: Incorrect object type " + objectName)
       }
-      const objectFinal = objectName == "Region" ? region.getData() : object.getData()
-      data = getNestedValue(objectFinal, field)
+      const source = objectName == "Region" ? region : object
+      const objectFinal = source?.getData()
+      data = objectFinal ? getNestedValue(objectFinal, field) : undefined
       return callback(data)
     }
   }
@@ -4336,6 +5195,22 @@ export class MapSVGMap {
         options.pagination.perpage = parseInt(options.pagination.perpage)
       }
     }
+    if (options.autoRefetch) {
+      if (options.autoRefetch.on != undefined) {
+        options.autoRefetch.on = utils.numbers.parseBoolean(options.autoRefetch.on)
+      }
+      if (options.autoRefetch.value != undefined) {
+        options.autoRefetch.value = parseInt(options.autoRefetch.value, 10) || 0
+      }
+    }
+    if (options.regionsAutoRefetch) {
+      if (options.regionsAutoRefetch.on != undefined) {
+        options.regionsAutoRefetch.on = utils.numbers.parseBoolean(options.regionsAutoRefetch.on)
+      }
+      if (options.regionsAutoRefetch.value != undefined) {
+        options.regionsAutoRefetch.value = parseInt(options.regionsAutoRefetch.value, 10) || 0
+      }
+    }
     const prevOptions = { ...this.options.database.pagination }
     deepMerge(this.options, { database: options })
     if (options.pagination) {
@@ -4355,6 +5230,87 @@ export class MapSVGMap {
       } else {
         this.setPagination()
       }
+    }
+    if (options.autoRefetch && this.loaded) {
+      this.startDatabaseAutoRefetch()
+    }
+    if (options.regionsAutoRefetch && this.loaded) {
+      this.startRegionsAutoRefetch()
+    }
+  }
+
+  /**
+   * Interval in ms for database auto-refetch, or null when disabled.
+   * Enforces a minimum of 5 seconds.
+   */
+  private getAutoRefetchMs(opt: { on?: boolean; value?: number; unit?: string } | undefined): number | null {
+    if (!opt?.on || !opt.value || opt.value <= 0) {
+      return null
+    }
+    const multipliers: Record<string, number> = { s: 1, m: 60, h: 3600 }
+    const seconds = opt.value * (multipliers[opt.unit] ?? 1)
+    return Math.max(seconds, 5) * 1000
+  }
+
+  private getDatabaseAutoRefetchMs(): number | null {
+    return this.getAutoRefetchMs(this.globalQueriesEnabled ? this.getPageBinding("objects").refetch : this.options.database?.autoRefetch)
+  }
+
+  private getRegionsAutoRefetchMs(): number | null {
+    return this.getAutoRefetchMs(this.globalQueriesEnabled ? this.getPageBinding("regions").refetch : this.options.database?.regionsAutoRefetch)
+  }
+
+  /**
+   * Start (or restart) client-side polling that reloads objects from the database.
+   * Skipped in the admin backend to avoid constant reloads while editing.
+   */
+  startDatabaseAutoRefetch(): void {
+    this.stopDatabaseAutoRefetch()
+    if (this.inBackend) {
+      return
+    }
+    const ms = this.getDatabaseAutoRefetchMs()
+    if (!ms || !this.objectsRepository) {
+      return
+    }
+    this.databaseAutoRefetchTimer = setInterval(() => {
+      if (this.options.database?.on && this.objectsRepository) {
+        void this.objectsRepository.reload({ silent: true, automatic: true })
+      }
+    }, ms)
+  }
+
+  stopDatabaseAutoRefetch(): void {
+    if (this.databaseAutoRefetchTimer) {
+      clearInterval(this.databaseAutoRefetchTimer)
+      this.databaseAutoRefetchTimer = null
+    }
+  }
+
+  /**
+   * Start (or restart) client-side polling that reloads regions.
+   * Skipped in the admin backend.
+   */
+  startRegionsAutoRefetch(): void {
+    this.stopRegionsAutoRefetch()
+    if (this.inBackend) {
+      return
+    }
+    const ms = this.getRegionsAutoRefetchMs()
+    if (!ms || !this.regionsRepository) {
+      return
+    }
+    this.regionsAutoRefetchTimer = setInterval(() => {
+      if (this.regionsRepository) {
+        void this.regionsRepository.reload({ silent: true, automatic: true })
+      }
+    }, ms)
+  }
+
+  stopRegionsAutoRefetch(): void {
+    if (this.regionsAutoRefetchTimer) {
+      clearInterval(this.regionsAutoRefetchTimer)
+      this.regionsAutoRefetchTimer = null
     }
   }
   updateGoogleMapsMaxZoom(geoPoint: GeoPoint): void {
@@ -4388,6 +5344,9 @@ export class MapSVGMap {
     }
 
     deepMerge(this.options, { googleMaps: options })
+    // All callers (including partial live patches) use the same complete options.
+    options = this.options.googleMaps
+    options.styleJSON = resolveGoogleMapStyles(options.style, options.styleJSON)
 
     // Exit, if map is uncalibrated (incompatible with Google Maps)
     if (this.isGeo() === false) {
@@ -4438,13 +5397,6 @@ export class MapSVGMap {
             zoomControl: false,
             styles: options.styleJSON,
             tilt: 0,
-            // Keep the viewport anchored to the primary world copy so markers
-            // are never hidden behind a longitudinally-wrapped duplicate.
-            // strictBounds:false still allows zooming out to see world copies.
-            // restriction: {
-            //   latLngBounds: { north: 85, south: -85, west: -180, east: 180 },
-            //   strictBounds: false,
-            // },
           })
           let overlay
 
@@ -4498,26 +5450,20 @@ export class MapSVGMap {
           if (options.type) {
             this.googleMaps.map.setMapTypeId(options.type)
           }
+          this.googleMaps.map.setOptions({ styles: options.styleJSON })
         }
       }
     } else {
       $(this.containers.googleMaps) && $(this.containers.googleMaps).css({ opacity: 0 })
     }
     if (this.converter) {
-      this.converter.setWorldShift(!!this.googleMaps.map)
+      this.converter.setGoogleMaps(!!this.options.googleMaps.on && !!this.googleMaps.map)
     }
   }
   createGoogleMapOverlay(bounds, map) {
     class GoogleMapsOverlay extends google.maps.OverlayView {
       bounds_: google.maps.LatLngBounds
       map_: google.maps.Map
-      prevCoords: {
-        sw: { x: number; y: number }
-        sw2: { x: number; y: number }
-        ne: { x: number; y: number }
-        ne2: { x: number; y: number }
-      }
-      element: HTMLElement
       mapsvg: MapSVGMap
 
       constructor(bounds, googleMapInstance, mapsvg_: MapSVGMap) {
@@ -4527,12 +5473,7 @@ export class MapSVGMap {
         this.map_ = googleMapInstance
         this.mapsvg = mapsvg_
         this.setMap(googleMapInstance)
-        this.prevCoords = {
-          sw: { x: 0, y: 0 },
-          sw2: { x: 0, y: 0 },
-          ne: { x: 0, y: 0 },
-          ne2: { x: 0, y: 0 },
-        }
+
       }
 
       draw(): void {
@@ -4543,77 +5484,27 @@ export class MapSVGMap {
       }
 
       getScale(): null | number {
-        const bounds = this.getPixelBounds()
-        if (!bounds) return null
-        return (bounds.ne.x - bounds.sw.x) / this.mapsvg.svgDefault.viewBox.width
+        const projection = this.getProjection()
+        if (!projection) return null
+        return projection.getWorldWidth() * this.mapsvg.converter.mapLonDelta / 360 /
+          this.mapsvg.svgDefault.viewBox.width
       }
 
-      onAdd(): void {
-        this.element = document.createElement("div")
-        this.element.style.borderStyle = "none"
-        this.element.style.borderWidth = "0px"
-        this.element.style.position = "absolute"
-        // this.element.style.background = "rgba(255,0,0,.5)"
-
-        // Add the element to the "overlayLayer" pane.
-        const panes = this.getPanes()
-        panes.overlayLayer.appendChild(this.element)
-      }
+      // This single overlay supplies projection/lifecycle only. Marker representations
+      // are owned by MapSVG; no geographic rectangle or previous-frame world heuristic.
+      onAdd(): void {}
+      onRemove(): void {}
 
       getPixelBounds(): { sw: google.maps.Point; ne: google.maps.Point } {
-        const overlayProjection = this.getProjection()
-        if (!overlayProjection) return
-
-        const geoSW = this.bounds_.getSouthWest()
-        const geoNE = this.bounds_.getNorthEast()
-
-        const coords = {
-          sw: overlayProjection.fromLatLngToDivPixel(geoSW),
-          ne: overlayProjection.fromLatLngToDivPixel(geoNE),
-          sw2: overlayProjection.fromLatLngToContainerPixel(geoSW),
-          ne2: overlayProjection.fromLatLngToContainerPixel(geoNE),
-        }
-
-        // check if map on border between 180/-180 longitude
-        // if(ne.x < sw.x){
-        //     sw.x = sw.x - overlayProjection.getWorldWidth();
-        // }
-        // console.log('NOW sw:'+sw.x+' and ne:'+ne.x+'and W-width:'+overlayProjection.getWorldWidth());
-
-        // if(ne2.x < sw2.x){
-        //     sw2.x = sw2.x - overlayProjection.getWorldWidth();
-        // }
-
-        const ww = overlayProjection.getWorldWidth()
-
-        if (this.prevCoords.sw) {
-          if (coords.ne.x < coords.sw.x) {
-            if (
-              Math.abs(this.prevCoords.sw.x - coords.sw.x) >
-              Math.abs(this.prevCoords.ne.x - coords.ne.x)
-            ) {
-              coords.sw.x = coords.sw.x - ww
-            } else {
-              coords.ne.x = coords.ne.x + ww
-            }
-            if (
-              Math.abs(this.prevCoords.sw2.x - coords.sw2.x) >
-              Math.abs(this.prevCoords.ne2.x - coords.ne2.x)
-            ) {
-              coords.sw2.x = coords.sw2.x - ww
-            } else {
-              coords.ne2.x = coords.ne2.x + ww
-            }
-          }
-        }
-        this.element.style.left = coords.sw.x + "px"
-        this.element.style.top = coords.ne.y + "px"
-        this.element.style.width = coords.ne.x - coords.sw.x + "px"
-        this.element.style.height = coords.sw.y - coords.ne.y + "px"
-
-        this.prevCoords = coords
-
-        return { sw: coords.sw2, ne: coords.ne2 }
+        const projection = this.getProjection()
+        if (!projection) return
+        const sw = projection.fromLatLngToContainerPixel(this.bounds_.getSouthWest())
+        const ne = projection.fromLatLngToContainerPixel(this.bounds_.getNorthEast())
+        if (!sw || !ne) return
+        // Project one anchor and use the calibrated longitude span. The independently
+        // projected east/west corners can belong to different repeated worlds.
+        const width = projection.getWorldWidth() * this.mapsvg.converter.mapLonDelta / 360
+        return { sw, ne: new google.maps.Point(sw.x + width, ne.y) }
       }
     }
     return new GoogleMapsOverlay(bounds, map, this)
@@ -4681,10 +5572,10 @@ export class MapSVGMap {
     if (gmLibraries.length > 0) {
       libraries = "&libraries=" + gmLibraries.join(",")
     }
+    const language = googleMapLanguage(this.options.googleMaps.language)
     this.googleMapsScript.src =
-      "https://maps.googleapis.com/maps/api/js?language=" +
-      this.options.googleMaps.language +
-      "&loading=async&callback=mapsvgInitGoogleMap" +
+      "https://maps.googleapis.com/maps/api/js?loading=async&callback=mapsvgInitGoogleMap" +
+      (language ? "&language=" + encodeURIComponent(language) : "") +
       "&key=" +
       mapsvgCore.googleMaps.apiKey +
       libraries
@@ -4718,15 +5609,32 @@ export class MapSVGMap {
   /**
    * @ignore
    */
-  loadDetailsView(obj: Region | Model, templateName?: string): void {
+  loadDetailsView(obj: Region | Model, templateName?: string, locationOverride?: string): void {
+    this.detailsRegionId = "type" in obj && obj.isRegion() ? String(obj.id) : undefined
     if (this.controllers.popover) this.controllers.popover.close()
     if (this.controllers.detailsView) this.controllers.detailsView.destroy()
 
+    if (isTreeLayoutMode(this.options)) {
+      const modal = findReachableNodesByType(this.options, "modal")[0]
+      if (modal?.settings?.on === false || containerLayout(modal, this.getLayoutBreakpoint()).hidden) return
+    }
+
+    // Draw rule: no modal node in tree → skip (unless legacy override still requested).
+    if (!locationOverride && !isNodeTypeReachable(this.options, "modal")) {
+      return
+    }
+
+    const modalMount = resolveModalMount(this.options)
+    const location =
+      (locationOverride && String(locationOverride)) ||
+      (modalMount.kind !== "legacy" ? modalMount.location : null) ||
+      this.options.detailsView.location ||
+      "map"
+
     const cancelAutoresize =
-      this.options.detailsView.location === "fullscreen" ||
-      (isPhone() &&
-        this.options.detailsView.mobileFullscreen &&
-        this.options.detailsView.location !== "custom")
+      location === "fullscreen" ||
+      modalMount.kind === "body" ||
+      (isPhone() && this.options.detailsView.mobileFullscreen && location !== "custom")
 
     if ($(this.containers.detailsView) && this.options.colors.detailsView !== undefined) {
       $(this.containers.detailsView).css({
@@ -4735,50 +5643,90 @@ export class MapSVGMap {
     }
 
     let detContainer
-    if (this.options.detailsView.location === "custom") {
-      detContainer = $("#" + this.options.detailsView.containerId)[0]
-    } else if (this.options.detailsView.location === "fullscreen") {
+    const treeModalHost = isTreeLayoutMode(this.options) && modalMount.kind !== "custom"
+      ? this.getTreeComponentHost("modal")
+      : null
+    if (treeModalHost && !locationOverride && modalMount.kind !== "body") {
+      detContainer = treeModalHost
+    } else if (locationOverride === "custom" || (location === "custom" && !locationOverride)) {
+      const containerId = modalMount.containerId || this.options.detailsView.containerId
+      detContainer = $("#" + containerId)[0]
+    } else if (modalMount.kind === "body" && !locationOverride) {
+      // Scene-Modal / body portal host
+      detContainer = this.eventDocument?.body || document.body
+    } else if (modalMount.kind === "main-overlay" && !locationOverride) {
+      // Modal under Main → overlay inside map wrap
+      detContainer = this.containers.wrap || this.containers.map
+    } else if (location === "fullscreen") {
       detContainer = this.containers.map
+    } else if (location === "custom") {
+      detContainer = $("#" + this.options.detailsView.containerId)[0]
     } else {
-      detContainer = this.containers[this.options.detailsView.location]
+      detContainer = this.getLocationContainer(location) || this.containers.map
     }
 
+    // START templates
     const template = templateName
-? this.options.templates[templateName]
-: "type" in obj && obj.isRegion()
-? this.options.templates.detailsViewRegion
-: this.options.templates.detailsView
-    
+      ? this.getCompiledTemplate(templateName)
+      : "type" in obj && obj.isRegion()
+        ? this.getCompiledTemplate("detailsViewRegion")
+        : this.getCompiledTemplate("detailsView")
+    // REPLACE
+    // const template = templateName
+    //   ? this.getCompiledTemplate(templateName)
+    //   : "type" in obj && obj.isRegion()
+    //     ? this.getCompiledTemplate("detailsViewRegion")
+    //     : this.getCompiledTemplate("detailsView")
+    // END
 
+    const modalSettings = modalMount.modalNode?.settings || {}
+    const detailsInFlow = this.shouldPlaceDetailsInFlow(modalMount, treeModalHost, locationOverride)
+    const detailsStyles = {
+      backgroundColor: this.options.colors.detailsView,
+      margin:
+        typeof modalSettings.margin === "string"
+          ? modalSettings.margin
+          : this.options.detailsView.margin,
+      width:
+        typeof modalSettings.width === "string"
+          ? modalSettings.width
+          : this.options.detailsView.width,
+    }
+
+    if (treeModalHost && detContainer === treeModalHost) setStackComponentOpen(treeModalHost, true)
     this.controllers.detailsView = new DetailsController({
       map: this,
       parent: this,
-      styles: {
-        backgroundColor: this.options.colors.detailsView,
-        margin: this.options.detailsView.margin,
-        width: this.options.detailsView.width,
-      },
-      autoresize: cancelAutoresize ? false : this.options.detailsView.autoresize,
+      styles: detailsStyles,
+      autoresize: cancelAutoresize || treeModalHost && detContainer === treeModalHost
+        ? false
+        : typeof modalSettings.autoresize === "boolean"
+          ? modalSettings.autoresize
+          : this.options.detailsView.autoresize,
       container: detContainer,
       template,
       state: obj.getData(),
-      scrollable: cancelAutoresize || this.shouldBeScrollable(this.options.detailsView.location), //['custom','header','footer'].indexOf(this.options.detailsView.location) === -1,
+      scrollable: detailsInFlow ? false : cancelAutoresize || this.shouldBeScrollable(location),
       fullscreen:
-        this.options.detailsView.location === "fullscreen" ||
+        location === "fullscreen" ||
+        modalMount.kind === "body" ||
         (isPhone() && this.options.detailsView.mobileFullscreen),
       useShadowRoot:
         this.useShadowRoot &&
-        ((isPhone() && this.options.detailsView.mobileFullscreen) ||
-          ["custom", "fullscreen"].includes(this.options.detailsView.location)),
-      position: ["custom", "header", "footer"].includes(this.options.detailsView.location)
+        (modalMount.kind === "body" ||
+          (isPhone() && this.options.detailsView.mobileFullscreen) ||
+          ["custom", "fullscreen"].includes(location)),
+      position: detailsInFlow || (!treeModalHost && ["custom", "header", "footer"].includes(location))
         ? "relative"
         : "absolute",
       events: {
         afterShow: (event) => {
           const { controller } = event.data
+          if (treeModalHost) setStackComponentOpen(treeModalHost, controller.containers.parent === treeModalHost)
         },
         afterClose: (event) => {
           const { controller } = event.data
+          if (treeModalHost) setStackComponentOpen(treeModalHost, false)
           this.deselectAllRegions()
           this.deselectAllMarkers()
           if (this.controllers && this.controllers.directory) {
@@ -4790,6 +5738,23 @@ export class MapSVGMap {
     })
     this.controllers.detailsView.init()
     this.controllers.detailsView.open()
+  }
+
+  private detailsRegionId?: string
+
+  /** Refresh an open Region card after live Objects change, retaining its controller/placement. */
+  private refreshRegionDetails(): void {
+    const controller = this.controllers.detailsView
+    if (!this.detailsRegionId || !controller?.opened || controller.destroyed) return
+    const region = this.getRegion(this.detailsRegionId)
+    if (!region) return
+    const data = region.getData()
+    // Unchanged polling must retain forms, focus and scroll without rendering again.
+    if (JSON.stringify(controller.state) === JSON.stringify(data)) return
+    const wrap = controller.containers.contentWrap
+    const scrollTop = wrap?.scrollTop
+    controller.setState(data, true)
+    if (wrap && scrollTop !== undefined) wrap.scrollTop = scrollTop
   }
   /**
    * Loads modal window with filters
@@ -4808,7 +5773,7 @@ export class MapSVGMap {
         $("body").append($(this.containers.filtersModal))
         $(this.containers.filtersModal).css({ width: "" })
       } else {
-        $(this.containers[this.options.filters.modalLocation]).append(
+        $(this.getLocationContainer(this.options.filters.modalLocation) || this.containers.map).append(
           $(this.containers.filtersModal),
         )
       }
@@ -4825,8 +5790,9 @@ export class MapSVGMap {
    * @param {boolean} modal - If filter should be in a modal window
    */
   loadFiltersController(container: HTMLElement, modal = false): void {
-    if (!this.filtersShouldBeShown()) {
+    if (!this.filtersShouldBeShown() || !isNodeTypeReachable(this.options, "filters")) {
       this.controllers.filters?.destroy()
+      this.releaseFiltersAfterLoadBlocker()
       return
     }
 
@@ -4837,14 +5803,14 @@ export class MapSVGMap {
       filtersHide = this.options.filters.hideOnMobile
     } else {
       filtersInDirectory =
-        this.options.menu.on &&
+        (hasRuntimeFeature("directory") && this.options.menu.on) &&
         this.controllers.directory &&
         this.options.menu.location === this.options.filters.location
       filtersHide = this.options.filters.hide
     }
 
     this.filtersRepository =
-      this.options.filters.source === "regions" ? this.regionsRepository : this.objectsRepository
+      this.componentSource("filters") === "regions" ? this.regionsRepository : this.objectsRepository
 
     if (this.options.filters.searchButton) {
       this.changedFields = null
@@ -4861,6 +5827,9 @@ export class MapSVGMap {
     }
     this.controllers.filters?.destroy()
 
+    const treeFilterNode = !modal && isTreeLayoutMode(this.options) && container === this.getTreeComponentHost("filters")
+      ? findReachableNodesByType(this.options, "filters")[0] : undefined
+    const filterProfile = treeFilterNode ? containerLayout(treeFilterNode, this.getLayoutBreakpoint()) : {}
     this.controllers.filters = new FiltersController({
       map: this,
       parent: this,
@@ -4869,18 +5838,30 @@ export class MapSVGMap {
       classList:
         this.options.filters.location === "custom" ? ["mapsvg-filter-container-custom"] : [],
       styles: {
-        backgroundColor: this.options.colors.directorySearch,
+        // The modal wrapper owns its background; alpha must not be painted twice.
+        backgroundColor: modal ? "transparent" : this.options.colors.directorySearch,
+        // Neutral tree slots do not inherit the legacy Header stacking context.
+        // Keep a filter dropdown above a following Directory controller (z-index 2).
+        zIndex: isTreeLayoutMode(this.options) ? "3" : "",
         width: $(container).hasClass("mapsvg-map-container") ? this.options.filters.width : "100%",
-        padding: this.options.filters.padding,
+        padding: treeFilterNode ? filterLayoutPadding(treeFilterNode, this.getLayoutBreakpoint(), this.options.filters.padding, {
+          nodes: Array.from(this.options.nodes || []),
+          widgets: pickLayoutGrid(this.options.layout, { isPhone: isPhone(), isTablet: isTablet(), breakpoint: this.getLayoutBreakpoint() })?.widgets ?? [],
+        }) : this.options.filters.padding,
+        ...(treeFilterNode && filterProfile.paddingBottom !== undefined ? { paddingBottom: `${filterProfile.paddingBottom}px` } : {}),
       },
       useShadowRoot: this.useShadowRoot && this.options.filters.location === "custom",
       query: this.filtersRepository?.query,
-      schema: this.filtersSchema,
+      schema: hasRuntimeFeature("filters") ? this.filtersSchema : new Schema({
+        ...this.filtersSchema.getData(),
+        fields: availableFilterFields(this.filtersSchema.getFields(), false),
+      }),
       template: '<div class="mapsvg-filters-container"></div>',
       scrollable:
         modal ||
+        (!(isTreeLayoutMode(this.options) && container === this.getTreeComponentHost("filters")) &&
         (!filtersInDirectory &&
-          ["leftSidebar", "rightSidebar"].indexOf(this.options.filters.location) !== -1),
+          ["leftSidebar", "rightSidebar"].indexOf(this.options.filters.location) !== -1)),
       modal,
       modalLocation: this.options.filters.modalLocation,
       hideFilters: this.options.filters.hide,
@@ -4914,7 +5895,7 @@ export class MapSVGMap {
         "afterLoad.form": () => {
           // TODO add resize sensor to directory instead of this:
           this.controllers.directory && this.controllers.directory?.updateTopShift()
-          this.decrementAfterloadBlockers()
+          this.releaseFiltersAfterLoadBlocker()
         },
         "click.btnShowFilters": () => {
           this.loadFiltersModal()
@@ -4926,8 +5907,18 @@ export class MapSVGMap {
 
   private filtersShouldBeShown() {
     return (
-      this.options.filters.on && this.options.filtersSchema && this.options.filtersSchema.length > 0
+      this.options.filters.on && Array.isArray(this.options.filtersSchema) &&
+      availableFilterFields(this.options.filtersSchema, hasRuntimeFeature("filters")).length > 0
     )
+  }
+
+  /**
+   * Release the afterLoad blocker reserved for FiltersController. Idempotent.
+   */
+  private releaseFiltersAfterLoadBlocker(): void {
+    if (!this.filtersAfterLoadBlockerActive) return
+    this.filtersAfterLoadBlockerActive = false
+    this.decrementAfterloadBlockers()
   }
 
   /**
@@ -4991,6 +5982,8 @@ export class MapSVGMap {
    * Used when Region statuses are loaded from the database or when choropleth map is enabled.
    */
   reloadAllRegionStyles(): void {
+    this.regionRulesRuntime.prepare(this)
+    this.syncLegend()
     this.regions.forEach(this.reloadRegionStyles)
   }
 
@@ -5028,6 +6021,29 @@ export class MapSVGMap {
    * @returns {MapSVGMap}
    */
   destroy(): void {
+    this.galleryController?.destroy()
+    this.eventWindow.clearTimeout(this.typographyResizeTimer)
+    this.eventWindow.removeEventListener("resize", this.typographyResize)
+    this.typographyRuntime.destroy()
+    this.clusteringModule()?.dispose.call(this)
+    const markers = new Set<Marker>(this.markers)
+    const location = this.objectsRepository?.getSchema().getFieldByType("location")?.name
+    this.objectsRepository?.getLoaded().forEach(object => {
+      if (object[location]?.marker) markers.add(object[location].marker)
+    })
+    if (this.userLocationMarker) markers.add(this.userLocationMarker)
+    for (const marker of markers) marker.delete()
+    this.googleMaps?.overlay?.setMap(null)
+    this.anotherMapModule()?.release(this)
+    this.regionRulesRuntime.destroy()
+    this.legendView?.destroy()
+    this.layersControlView?.destroy()
+    this.objectsRepository?.invalidateReads()
+    this.regionsRepository?.invalidateReads()
+    this.stopTreeBreakpointListener()
+    this.stopDatabaseAutoRefetch()
+    this.stopRegionsAutoRefetch()
+
     $(this.eventDocument).off("keydown" + this.firefoxScrollNamespace)
     $(this.eventDocument).off("scroll" + this.firefoxScrollNamespace)
     $(this.containers.map)
@@ -5052,7 +6068,7 @@ export class MapSVGMap {
     $(this.containers.filters).remove()
     $(this.containers.map).empty().remove()
 
-    const indexToRemove = mapsvgCore.instances.findIndex((item) => item.id === this.id)
+    const indexToRemove = mapsvgCore.instances.findIndex((item) => item === this)
     if (indexToRemove !== -1) {
       mapsvgCore.instances.splice(indexToRemove, 1) // Remove 1 element at the found index
     }
@@ -5152,7 +6168,7 @@ export class MapSVGMap {
         }
       }
     } else {
-      if (this.options.clustering.on) {
+      if (hasRuntimeFeature("clustering") && this.options.clustering.on) {
         const arr = []
         this.markersClusters.forEach((c) => {
           arr.push(c)
@@ -5982,9 +6998,7 @@ export class MapSVGMap {
    * @param {MarkerCluster} markersCluster
    */
   markersClusterAdd(markersCluster: MarkerCluster): void {
-    this.layers.markers.append(markersCluster.elem)
-    this.markersClusters.push(markersCluster)
-    markersCluster.adjustScreenPosition()
+    return this.clusteringModule()?.markersClusterAdd.call(this, this.clusteringServices(), markersCluster)
   }
   /** Adds a marker to the map.
    * @param {Marker} marker
@@ -6005,9 +7019,8 @@ export class MapSVGMap {
    */
   markerAdd(marker): void {
     $(marker.element).hide()
-    marker.adjustScreenPosition()
-    // marker.setImage(this.getMarkerImage(marker.object, marker.location), true);
     this.layers.markers.append(marker.element)
+    marker.adjustScreenPosition()
     this.markers.push(marker)
     marker.mapped = true
 
@@ -6602,8 +7615,8 @@ export class MapSVGMap {
     if (this.options.multiSelect && !this.editRegions.on) {
       if (region.selected) {
         this.deselectRegion(region)
-        if (!skipDirectorySelection && this.options.menu.on) {
-          if (this.options.menu.source == "database") {
+        if (!skipDirectorySelection && (hasRuntimeFeature("directory") && this.options.menu.on)) {
+          if (this.componentSource("directory") == "database") {
             if (region.objects && region.objects.length) {
               ids = region.objects.map((obj: Model) => {
                 return obj.getData().id.toString()
@@ -6619,8 +7632,8 @@ export class MapSVGMap {
       }
     } else if (this.selected_id.length > 0) {
       this.deselectAllRegions()
-      if (!skipDirectorySelection && this.options.menu.on) {
-        if (this.options.menu.source == "database") {
+      if (!skipDirectorySelection && (hasRuntimeFeature("directory") && this.options.menu.on)) {
+        if (this.componentSource("directory") == "database") {
           if (region.objects && region.objects.length) {
             ids = region.objects.map((obj: Model) => {
               return obj.getData().id.toString()
@@ -6644,16 +7657,16 @@ export class MapSVGMap {
     this.selected_id.push(region.id)
     region.select()
 
-    const skip = this.options.actions.region.click.filterDirectory
+    const skip = (hasRuntimeFeature("directory") && this.options.actions.region.click.filterDirectory)
 
     if (
       !skip &&
       !skipDirectorySelection &&
-      this.options.menu.on &&
+      (hasRuntimeFeature("directory") && this.options.menu.on) &&
       this.controllers &&
       this.controllers.directory
     ) {
-      if (this.options.menu.source == "database") {
+      if (this.componentSource("directory") == "database") {
         if (region.objects && region.objects.length) {
           ids = region.objects.map((obj: Model) => {
             return obj.getData().id.toString()
@@ -6669,7 +7682,7 @@ export class MapSVGMap {
 
     if (
       this.options.actions.region.click.addIdToUrl &&
-      !this.options.actions.region.click.showAnotherMap
+      !(hasRuntimeFeature("show_another_map") && this.options.actions.region.click.showAnotherMap)
     ) {
       window.location.hash = "/m/r/" + region.id
       // history.replaceState(null, null, region.id);
@@ -6736,7 +7749,7 @@ export class MapSVGMap {
 
     $(this.layers.markers).addClass("mapsvg-with-marker-active")
 
-    if (this.options.menu.on && this.options.menu.source == "database") {
+    if ((hasRuntimeFeature("directory") && this.options.menu.on) && this.componentSource("directory") == "database") {
       this.controllers.directory?.deselectItems()
       this.controllers.directory?.selectItems(marker.object.getData().id)
     }
@@ -6789,36 +7802,6 @@ export class MapSVGMap {
   }
 
   /**
-   * Converts map geo-boundaries to viewBox
-   * @param sw
-   * @param ne
-   * @returns {*[]}
-   *
-   * @private
-   * @deprecated
-   */
-  /*
-    convertGeoBoundsToViewBox (geoViewBox: GeoViewBox): ViewBox {
-        //sw, ne
-
-        var lat = parseFloat(coords[0]);
-        var lon = parseFloat(coords[1]);
-        var x = (lon - this.geoViewBox.leftLon) * (this.svgDefault.viewBox.width / this.converter.mapLonDelta);
-
-        var lat = lat * 3.14159 / 180;
-        // var worldMapWidth = ((this.svgDefault.width / this.converter.mapLonDelta) * 360) / (2 * 3.14159);
-        var worldMapWidth = ((this.svgDefault.viewBox.width / this.converter.mapLonDelta) * 360) / (2 * 3.14159);
-        var mapOffsetY = (worldMapWidth / 2 * Math.log((1 + Math.sin(this.mapLatBottomDegree)) / (1 - Math.sin(this.mapLatBottomDegree))));
-        var y = this.svgDefault.viewBox.height - ((worldMapWidth / 2 * Math.log((1 + Math.sin(lat)) / (1 - Math.sin(lat)))) - mapOffsetY);
-
-        x += this.svgDefault.viewBox.x;
-        y += this.svgDefault.viewBox.y;
-
-        return [x, y];
-    }
-    */
-
-  /**
    * For choropleth map: returns color for given number value
    * @param {number} choroplethValue - Number value
    * @returns {{r: number, g: number, b: number, a: number}} - Color values, 0-255.
@@ -6867,22 +7850,49 @@ export class MapSVGMap {
     }
   }
 
-  
+  // START show_another_map
+  /**
+   * Gets map settings from the server
+   */
+  private anotherMapModule(): ShowAnotherMapModule | undefined {
+    return window.MapSVG?.extensions?.get<ShowAnotherMapModule>("runtime.component", "show_another_map")
+  }
 
-  
+  runAnotherMapAction(action: AnotherMapAction & { showAnotherMap?: boolean; showAnotherMapField?: string }, region, object): boolean {
+    return this.anotherMapModule()?.action(this, action, region, object) ?? false
+  }
+
+  loadMap(id: number | string, container?: MapLoadTarget): void {
+    if (!hasRuntimeFeature("show_another_map")) return
+    const create = (element: HTMLElement, mapId: number, loadingText: string) =>
+      createContextualChild(this.extras.getChildMapContext?.(element, mapId), (extras) =>
+        new MapSVGMap(element, { id: mapId, options: { id: mapId, loadingText } }, extras))
+    this.anotherMapModule()?.load(this, id, container, create, mapsvgCore.instances)
+
+  }
+
+  /** Only visible, mounted structural containers of this App can host a nested App. */
+  getActionMapLayoutHost(nodeId: string): HTMLElement | undefined {
+    if (!isTreeLayoutMode(this.options)) return undefined
+    const node = Array.from(this.options.nodes || []).find(node => node.id === nodeId)
+    if (!node || node.settings?.on === false) return undefined
+    if (node.type === "slot" && this.activeLayoutSlotIds.has(nodeId)) return this.layoutSlotHosts.get(nodeId)
+    if (node.type === "frame" && this.activeTreeNodeIds.has(nodeId)) return this.layoutNodeHosts.get(nodeId)
+    return undefined
+  }
+  // END
+
+  // START show_another_map
+  /**
+   * Load previous map from the history (MapSVGMap.options.previousMapsIds)
+   */
+  loadPreviousMap(): void {
+    this.anotherMapModule()?.previous(this)
+  }
+  // END
 
   markerClusterClickHandler(e: JQuery.TriggeredEvent, markerCluster: MarkerCluster): void {
-    this.objectClickedBeforeScroll = null
-    if (this.eventsPreventList["click"]) return
-
-    const allSamePoint = markerCluster.markers.every(
-      (m) =>
-        m.svgPoint.x === markerCluster.markers[0].svgPoint.x &&
-        m.svgPoint.y === markerCluster.markers[0].svgPoint.y,
-    )
-    const zoomLevel = allSamePoint ? this.options.clustering.maxZoom : undefined
-    this.zoomTo(markerCluster.markers, zoomLevel)
-    return
+    return this.clusteringModule()?.markerClusterClickHandler.call(this, this.clusteringServices(), e, markerCluster)
   }
   regionClickHandler(e: JQuery.TriggeredEvent, region: Region): void {
     this.objectClickedBeforeScroll = null
@@ -6904,10 +7914,12 @@ export class MapSVGMap {
       )
     }
 
-    if (actions.region.click.filterDirectory && this.options.database.on) {
+    if (hasRuntimeFeature("directory") && actions.region.click.filterDirectory && this.options.database.on) {
+      const relationField = this.objectsRepository.getSchema().getFieldByType("relation")
+      const filterKey = (relationField && relationField.name) || "regions"
       const query = new Query({
         filters: {
-          regions: {
+          [filterKey]: {
             table_name: this.regionsRepository.getSchema().name,
             region_ids: [region.id],
           },
@@ -6929,8 +7941,9 @@ export class MapSVGMap {
     }
 
     if (actions.region.click.showDetails) {
-      const template = this.options.actions.region.click.detailsViewTemplate
-      this.loadDetailsView(region, template)
+      const template = hasRuntimeFeature("templates") ? undefined : actions.region.click.detailsViewTemplate
+      const location = this.options.actions.region.click.detailsViewLocation
+      this.loadDetailsView(region, template, location)
     }
 
     if (actions.region.click.showPopover) {
@@ -6947,14 +7960,40 @@ export class MapSVGMap {
       }, 400)
     }
 
-    
+    // START links
+    if (actions.region.click.goToLink) {
+      this.extractField(region, region.objects[0], actions.region.click.linkField, (url) => {
+        if (url && !this.disableLinks) {
+          if (this.inBackend) {
+            alert("Redirect: " + url + "\nLinks are disabled in the preview.")
+            return
+          }
+          if (actions.region.click.newTab) {
+            const win = window.open(url, "_blank")
+            win.focus()
+          } else {
+            window.location.href = url
+          }
+        }
+      })
+    }
+    // END
 
-    
+    if (this.runAnotherMapAction(actions.region.click, region, region.objects[0])) return
 
     this.selectRegion(region.id)
     this.events.trigger("click.region", e, { region })
   }
+  getMarkerFromElement(target: EventTarget): Marker | undefined {
+    const element = $(target).closest(".mapsvg-marker")[0] as HTMLElement | undefined
+    if (!element) return
+    const marker = this.markers.get(element.dataset.mapsvgCopyOf || element.id)
+    if (marker) marker.interactionElement = element
+    return marker
+  }
+
   markerClickHandler(e: JQuery.TriggeredEvent, marker: Marker): void {
+    if (!marker) return
     this.objectClickedBeforeScroll = null
     if (this.eventsPreventList["click"]) return
 
@@ -6972,15 +8011,16 @@ export class MapSVGMap {
       )
     }
 
-    if (actions.marker.click.filterDirectory && this.options.database.on) {
+    if (hasRuntimeFeature("directory") && actions.marker.click.filterDirectory && this.options.database.on) {
       const query = new Query({ filters: { id: marker.object.getData().id } })
       this.objectsRepository.find(query)
       this.updateFiltersState()
     }
 
     if (actions.marker.click.showDetails) {
-      const template = this.options.actions.marker.click.detailsViewTemplate
-      this.loadDetailsView(passingObject, template)
+      const template = hasRuntimeFeature("templates") ? undefined : actions.marker.click.detailsViewTemplate
+      const location = this.options.actions.marker.click.detailsViewLocation
+      this.loadDetailsView(passingObject, template, location)
     }
 
     if (actions.marker.click.showPopover) {
@@ -6996,12 +8036,28 @@ export class MapSVGMap {
         this.showPopover(passingObject, template)
       }, delay)
     }
-    
-    
+    // START links
+    if (actions.marker.click.goToLink) {
+      this.extractField(null, passingObject, actions.marker.click.linkField, (url) => {
+        if (url && !this.disableLinks)
+          if (this.inBackend) {
+            alert("Redirect: " + url + "\nLinks are disabled in the preview.")
+            return
+          }
+        if (actions.marker.click.newTab) {
+          const win = window.open(url, "_blank")
+          win.focus()
+        } else {
+          window.location.href = url
+        }
+      })
+    }
+    // END
+    if (this.runAnotherMapAction(actions.marker.click, null, passingObject)) return
 
     if (
       this.options.actions.marker.click.addIdToUrl &&
-      !this.options.actions.marker.click.showAnotherMap
+      !(hasRuntimeFeature("show_another_map") && this.options.actions.marker.click.showAnotherMap)
     ) {
       window.location.hash = "/m/db/" + marker.object.getData().id
     }
@@ -7144,6 +8200,10 @@ export class MapSVGMap {
    * @private
    */
   getMarkerImage(fieldValueOrObject: any, location?: Location): string {
+    if (this.options.markerDataRules) {
+      const fallback = this.options.defaultMarkerImage || this.objectsRepository?.getSchema().getFieldByType("location")?.defaultMarkerPath || "_pin_default.png"
+      return markerImageUrl(markerRuleImage(this.options.markerDataRules, fieldValueOrObject, fallback), mapsvgCore.routes)
+    }
     let fieldValue
 
     if (this.setMarkersByField) {
@@ -7319,12 +8379,20 @@ export class MapSVGMap {
       point = mapObject.getCenterSVG()
     }
 
-    const template = templateName
-? this.options.templates[templateName]
-: "type" in object && object.isRegion()
-? this.options.templates.popoverRegion
-: this.options.templates.popoverMarker
-    
+    // START templates
+    const template =
+      !hasRuntimeFeature("templates") && templateName
+        ? this.getCompiledTemplate(templateName)
+        : "type" in object && object.isRegion()
+          ? this.getCompiledTemplate("popoverRegion")
+          : this.getCompiledTemplate("popoverMarker")
+    // REPLACE
+    // const template = templateName
+    //   ? this.getCompiledTemplate(templateName)
+    //   : "type" in object && object.isRegion()
+    //     ? this.getCompiledTemplate("popoverRegion")
+    //     : this.getCompiledTemplate("popoverMarker")
+    // END
 
     if (this.controllers.popover) this.controllers.popover.destroy()
     this.controllers.popover = new PopoverController({
@@ -7454,23 +8522,29 @@ export class MapSVGMap {
 
     if (object.isMarker()) {
       if (this.options.actions.marker.mouseover.showTooltip) {
-        const template = this.options.actions.marker.mouseover.tooltipTemplate
-        
+        // START templates
+        const template = hasRuntimeFeature("templates") ? undefined : this.options.actions.marker.mouseover.tooltipTemplate
+        // REPLACE
+        // const template = this.options.actions.marker.mouseover.tooltipTemplate
+        // END
         this.showTooltip(object, template)
       }
     }
 
     if (object.isRegion()) {
       if (this.options.actions.region.mouseover.showTooltip) {
-        const template = this.options.actions.region.mouseover.tooltipTemplate
-        
+        // START templates
+        const template = hasRuntimeFeature("templates") ? undefined : this.options.actions.region.mouseover.tooltipTemplate
+        // REPLACE
+        // const template = this.options.actions.region.mouseover.tooltipTemplate
+        // END
         this.showTooltip(object, template)
       }
     }
 
     let ids: any[]
-    if (this.options.menu.on && this.controllers.directory) {
-      if (this.options.menu.source == "database") {
+    if ((hasRuntimeFeature("directory") && this.options.menu.on) && this.controllers.directory) {
+      if (this.componentSource("directory") == "database") {
         if (object.isRegion() && object.objects.length) {
           ids = object.objects.map((obj) => {
             return obj.getData().id
@@ -7524,8 +8598,8 @@ export class MapSVGMap {
         this.controllers.tooltips[camelName].destroy()
       }
       const template = templateName
-        ? this.options.templates[templateName]
-        : this.options.templates[camelName]
+        ? this.getCompiledTemplate(templateName)
+        : this.getCompiledTemplate(camelName)
       const tooltip = new Tooltip({
         map: this,
         parent: this,
@@ -7571,8 +8645,8 @@ export class MapSVGMap {
     }
 
     let ids: any[]
-    if (this.options.menu.on && this.controllers.directory) {
-      if (this.options.menu.source == "database") {
+    if ((hasRuntimeFeature("directory") && this.options.menu.on) && this.controllers.directory) {
+      if (this.componentSource("directory") == "database") {
         if (object.isMarker()) {
           const marker = <Marker>object
           ids = marker.object ? [marker.object.getData().id] : []
@@ -7631,9 +8705,8 @@ export class MapSVGMap {
   }
 
   objectsLoadedToMapHandler(): void {
+    if (this.options.markerDataRules) this.reloadMarkerImages()
     this.mayBeFitMarkers()
-
-    this.fixMarkersWorldScreen()
 
     this.loadDirectory()
     if (this.options.labelsMarkers.on) {
@@ -7641,12 +8714,12 @@ export class MapSVGMap {
     }
     // Check if there's a call to "{{objects}}" inside of the labelRegion template
     // and if it's found then reload Region Labels
-    if (this.options.templates.labelRegion.indexOf("{{objects") !== -1) {
+    if (getTemplateHtml(this.options.templates.labelRegion, "labelRegion").indexOf("{{objects") !== -1) {
       this.setLabelsRegions()
     }
     if (
       this.options.filters.on &&
-      this.options.filters.source === "database" &&
+      this.componentSource("filters") === "database" &&
       this.controllers.filters &&
       this.controllers.filters.hideFilters
     ) {
@@ -7659,31 +8732,241 @@ export class MapSVGMap {
       this.setChoropleth()
     }
 
-    const filteredStatus = this.options.regionsDynamicStatus?.noObjects
-    if (typeof filteredStatus !== "undefined") {
-      this.regions
-        .filter((region) => region.objects.length === 0)
-        .forEach((region) => {
-          region.setStatus(filteredStatus)
-        })
-    }
+    this.applyRegionsDynamicStatus()
 
     this.events.trigger("afterLoadObjects", {
       objects: this.objectsRepository.getLoaded(),
     })
   }
 
+  /**
+   * Front-only: apply the dynamic-status rules (statusSync / noObjects / filtered) to all regions,
+   * honoring the priority order in options.regionsDynamicStatusOrder (top of list wins on conflict).
+   * Does not write to the database.
+   */
+  applyRegionsDynamicStatus(): void {
+    if (this.options.regionDataRules) { this.reloadAllRegionStyles(); return }
+    if (this.inBackend) {
+      return
+    }
+    const order =
+      this.options.regionsDynamicStatusOrder && this.options.regionsDynamicStatusOrder.length
+        ? this.options.regionsDynamicStatusOrder
+        : ["statusSync", "noObjects", "filtered"]
+
+    this.regions.forEach((region) => {
+      for (const rule of order) {
+        const status = this.getDynamicStatusForRegion(region, rule)
+        if (status !== undefined && status !== null && status !== "") {
+          region.setStatus(status)
+          break
+        }
+      }
+    })
+  }
+
+  /**
+   * Returns the status a single dynamic-status rule would assign to a region, or undefined if the
+   * rule does not apply. Empty string means "leave unchanged".
+   */
+  private getDynamicStatusForRegion(
+    region: Region,
+    rule: string,
+  ): string | number | undefined {
+    switch (rule) {
+      case "filtered":
+        return this.getFilteredDynamicStatus(region)
+      case "noObjects":
+        return this.getNoObjectsDynamicStatus(region)
+      case "statusSync":
+        return this.getStatusSyncStatus(region)
+      default:
+        return undefined
+    }
+  }
+
+  /**
+   * Status for a region that is filtered out (not present in the loaded regions set).
+   */
+  private getFilteredDynamicStatus(region: Region): string | number | undefined {
+    if (this.regionsRepository.getLoaded().findById(region.id)) {
+      return undefined
+    }
+    const filteredStatus = this.options.regionsDynamicStatus?.filtered
+    if (filteredStatus || filteredStatus === 0) {
+      return filteredStatus
+    }
+    if (
+      this.componentSource("directory") === "regions" &&
+      this.options.menu.filterout &&
+      this.options.menu.filterout.field === "status" &&
+      (this.options.menu.filterout.val || this.options.menu.filterout.val === 0)
+    ) {
+      return this.options.menu.filterout.val
+    }
+    return undefined
+  }
+
+  /**
+   * Status for a region that has no linked objects.
+   */
+  private getNoObjectsDynamicStatus(region: Region): string | number | undefined {
+    const noObjects = this.options.regionsDynamicStatus?.noObjects
+    if (typeof noObjects === "undefined") {
+      return undefined
+    }
+    return region.objects && region.objects.length === 0 ? noObjects : undefined
+  }
+
+  /**
+   * Status derived from a field via options.statusSyncField / statusSyncMap.
+   * Source: connected objects (default) or the region row itself (statusSyncSource=regions).
+   */
+  private getStatusSyncStatus(region: Region): string | number | undefined {
+    if (!this.options.statusSyncOn) {
+      return undefined
+    }
+    const field = this.options.statusSyncField
+    const map = this.options.statusSyncMap
+    if (!field || !map || !map.length) {
+      return undefined
+    }
+
+    const source = this.options.statusSyncSource || "objects"
+    const candidates: string[] = []
+    const seen: { [key: string]: boolean } = {}
+
+    if (source === "regions") {
+      const model = (region as any).getModel ? (region as any).getModel() : (region as any).data
+      this.collectMatchCandidates(this.resolveObjectFieldValue(model || region, field)).forEach(
+        (c) => {
+          if (!seen[c]) {
+            seen[c] = true
+            candidates.push(c)
+          }
+        },
+      )
+    } else {
+      if (!region.objects || region.objects.length === 0) {
+        return undefined
+      }
+      region.objects.forEach((object) => {
+        this.collectMatchCandidates(this.resolveObjectFieldValue(object, field)).forEach((c) => {
+          if (!seen[c]) {
+            seen[c] = true
+            candidates.push(c)
+          }
+        })
+      })
+    }
+
+    if (!candidates.length) {
+      return undefined
+    }
+
+    const MULTIPLE = "__multiple__"
+    const strategy = this.options.statusSyncMultiStrategy || "priority"
+    if (strategy === "special" && candidates.length > 1) {
+      const special = map.find((m) => String(m.value) === MULTIPLE)
+      if (special && special.status !== "" && special.status != null) {
+        return special.status
+      }
+      return undefined
+    }
+
+    for (let i = 0; i < map.length; i++) {
+      const entry = map[i]
+      if (String(entry.value) === MULTIPLE) {
+        continue
+      }
+      if (entry.status === "" || entry.status == null) {
+        continue
+      }
+      if (candidates.indexOf(String(entry.value)) !== -1) {
+        return entry.status
+      }
+    }
+    return undefined
+  }
+
+  /**
+   * Flattens a resolved field value into candidate strings to match against statusSyncMap.
+   * Scalars map to themselves; taxonomy terms (objects) contribute their slug and name; arrays
+   * (e.g. multiple terms or meta value lists) contribute all of their candidates.
+   */
+  private collectMatchCandidates(raw: any): string[] {
+    if (raw === null || typeof raw === "undefined" || raw === "") {
+      return []
+    }
+    if (Array.isArray(raw)) {
+      const out: string[] = []
+      raw.forEach((item) => {
+        this.collectMatchCandidates(item).forEach((c) => out.push(c))
+      })
+      return out
+    }
+    if (typeof raw === "object") {
+      const out: string[] = []
+      if (raw.slug != null && raw.slug !== "") {
+        out.push(String(raw.slug))
+      }
+      if (raw.name != null && raw.name !== "") {
+        out.push(String(raw.name))
+      }
+      return out
+    }
+    return [String(raw)]
+  }
+
+  /**
+   * Resolves a dotted field path (e.g. "Object.post.meta._stock_status") against an object's data.
+   * Strips the leading type-prefix segment (as produced by the field picker). Intermediate arrays
+   * are collapsed to their first element so traversal can continue; the final node is returned as
+   * is (e.g. a meta value list or an array of taxonomy terms).
+   */
+  private resolveObjectFieldValue(object: Model | Region | any, field: string): any {
+    const data =
+      object && typeof (object as any).getData === "function"
+        ? (object as any).getData()
+        : (object as any)?.data != null
+          ? (object as any).data
+          : (object as any)
+    if (!data || !field) {
+      return undefined
+    }
+    const path = field.split(".").slice(1)
+    if (!path.length) {
+      return undefined
+    }
+    let current: any = data
+    for (let i = 0; i < path.length; i++) {
+      if (current == null) {
+        return undefined
+      }
+      current = current[path[i]]
+      if (i < path.length - 1 && Array.isArray(current)) {
+        current = current[0]
+      }
+    }
+    return current
+  }
+
   setRepositoryEvents() {
     this.eventsBaseInitialized = true
 
-    this.objectsRepository.events.on(RepositoryEvent.BEFORE_LOAD, () => {
-      this.showLoadingMessage()
-      if (typeof this.firstDataLoad === "undefined") {
-        this.firstDataLoad = true
-      } else if (this.firstDataLoad === true) {
-        this.firstDataLoad = false
-      }
-    })
+    this.objectsRepository.events.on(
+      RepositoryEvent.BEFORE_LOAD,
+      (event: EventWithData<{ silent?: boolean }>) => {
+        if (!event?.data?.silent) {
+          this.showLoadingMessage()
+        }
+        if (typeof this.firstDataLoad === "undefined") {
+          this.firstDataLoad = true
+        } else if (this.firstDataLoad === true) {
+          this.firstDataLoad = false
+        }
+      },
+    )
     this.objectsRepository.events.on(RepositoryEvent.FAILED_LOAD, () => {
       this.hideLoadingMessage()
       console.error(
@@ -7693,8 +8976,12 @@ export class MapSVGMap {
 
     this.objectsRepository.events.on(
       RepositoryEvent.AFTER_LOAD,
-      (event: EventWithData<{ repository: Repository }>) => {
+      (event: EventWithData<{ repository: Repository; data?: unknown }>) => {
         const { repository } = event.data
+        const data = event.data.data
+        if (data && typeof data === "object" && "schema" in data && data.schema &&
+            this.getComponentBindingRole("filters") === "objects") this.setFilters()
+        this.locationField = repository.schema.getFieldByType("location")
         this.fitOnDataLoadDone = false
         this.setGlobalDistanceFilter()
         this.deleteMarkers()
@@ -7714,16 +9001,17 @@ export class MapSVGMap {
           .filter((object) => object.getData().location)
           .forEach((object) => this.addObject(object))
 
-        if (this.options.clustering.on) {
+        if (hasRuntimeFeature("clustering") && this.options.clustering.on) {
           this.startClusterizer()
         }
         this.reloadRegionsFull()
+        this.refreshRegionDetails()
         this.objectsLoadedToMapHandler()
       },
     )
 
     this.objectsRepository.schema?.events.on(SchemaEventType.UPDATE, () => {
-      this.objectsRepository.find()
+      this.objectsRepository.find(undefined, { automatic: true })
     })
     this.objectsRepository.events.on(
       RepositoryEvent.AFTER_UPDATE,
@@ -7766,7 +9054,10 @@ export class MapSVGMap {
         "[CLIENT-015] Could not load regions. Read more: https://mapsvg.com/docs/errors#CLIENT-015",
       )
     })
-    this.regionsRepository.events.on(RepositoryEvent.AFTER_LOAD, () => {
+    this.regionsRepository.events.on(RepositoryEvent.AFTER_LOAD, (event) => {
+      const data = event.data?.data
+      if (data && typeof data === "object" && "schema" in data && data.schema &&
+          this.getComponentBindingRole("filters") === "regions") this.setFilters()
       this.hideLoadingMessage()
       this.reloadRegionsFull()
       this.events.trigger("afterLoadRegions", { regions: this.regions })
@@ -7817,6 +9108,9 @@ export class MapSVGMap {
    * @private
    */
   handleFirefoxPageScrollKey(e: JQuery.KeyDownEvent): void {
+    // Document events are retargeted to the React shadow host. Inputs, menus
+    // and color-picker sliders must keep their own Arrow/Page key behavior.
+    if (isKeyboardControlTarget(e, this.eventDocument)) return
     const forwarded = forwardFirefoxPageScrollKey(
       {
         key: e.key,
@@ -7864,6 +9158,7 @@ export class MapSVGMap {
     $(_this.eventDocument).off(".scroll.mapsvg")
     $(_this.eventDocument).off(".scrollInit.mapsvg")
     this.setFirefoxPageScrollHandlers()
+    this.clusteringModule()?.bindEvents.call(this)
 
     if (_this.editMarkers.on) {
       $(_this.containers.map).on(
@@ -7871,8 +9166,7 @@ export class MapSVGMap {
         ".mapsvg-marker",
         (e) => {
           e.originalEvent.preventDefault()
-          const id = $(e.target).attr("id")
-          const marker = this.markers.get(id)
+          const marker = this.getMarkerFromElement(e.currentTarget)
           const startCoords = getMouseCoords(e)
           marker.drag(startCoords, _this.scale)
 
@@ -7907,12 +9201,10 @@ export class MapSVGMap {
     if (!this.editRegions.on) {
       $(this.containers.map)
         .on("mouseover.common.mapsvg", ".mapsvg-marker", (e) => {
-          const id = e.target.id
-          this.mouseOverHandler.call(this, e, this.markers.get(id))
+          this.mouseOverHandler.call(this, e, this.getMarkerFromElement(e.currentTarget))
         })
         .on("mouseleave.common.mapsvg", ".mapsvg-marker", (e) => {
-          const id = e.target.id
-          this.mouseOutHandler.call(this, e, this.markers.get(id))
+          this.mouseOutHandler.call(this, e, this.getMarkerFromElement(e.currentTarget))
         })
     }
 
@@ -7920,9 +9212,7 @@ export class MapSVGMap {
       const doc = _this.eventDocument
       $(doc).on("keydown.scroll.mapsvg", function (e) {
         if (
-          !(
-            doc.activeElement.tagName === "INPUT" && $(doc.activeElement).attr("type") === "text"
-          ) &&
+          !isKeyboardControlTarget(e, doc) &&
           !_this.isScrolling &&
           e.keyCode == 32
         ) {
@@ -7989,27 +9279,11 @@ export class MapSVGMap {
               !this.scroll.touchScrollStart ||
               this.scroll.touchScrollStart === $(this.eventWindow).scrollTop()
             ) {
-              const id = e.target.id
-              this.markerClickHandler.call(this, e, this.markers.get(id))
+              this.markerClickHandler.call(this, e, this.getMarkerFromElement(e.currentTarget))
             }
           },
         )
-        $(_this.containers.map).on(
-          "touchend.common.mapsvg mouseup.common.mapsvg",
-          ".mapsvg-marker-cluster",
-          function (e) {
-            if (e.cancelable) {
-              e.preventDefault()
-            }
-            if (
-              !_this.scroll.touchScrollStart ||
-              _this.scroll.touchScrollStart == $(_this.eventWindow).scrollTop()
-            ) {
-              const cluster = $(this).data("cluster")
-              _this.zoomTo(cluster.markers)
-            }
-          },
-        )
+
         // }
       } else {
         if (_this.clickAddsMarker)
@@ -8069,24 +9343,19 @@ export class MapSVGMap {
           } else if (
             e.target &&
             $(e.target).attr("class") &&
-            $(e.target).attr("class").indexOf("mapsvg-marker") != -1 &&
-            $(e.target).attr("class").indexOf("mapsvg-marker-cluster") === -1
+            $(e.target).hasClass("mapsvg-marker")
           ) {
             if (_this.editMarkers.on) {
               return
             }
-            const id = $(e.target).closest(".mapsvg-marker").attr("id") || e.target.id
-            obj = _this.markers.get(id)
+            obj = _this.getMarkerFromElement(e.target)
             _this.setObjectClickedBeforeScroll(obj)
           } else if (
-            e.target &&
-            $(e.target).attr("class") &&
-            $(e.target).attr("class").indexOf("mapsvg-marker-cluster") != -1
+            e.target && (obj = _this.clusteringModule()?.hit(e.target))
           ) {
             if (_this.editMarkers.on) {
               return
             }
-            obj = $(e.target).data("cluster")
             _this.setObjectClickedBeforeScroll(obj)
           }
           if (e.type == "mousedown") {
@@ -8116,6 +9385,60 @@ export class MapSVGMap {
         this.controllers.tooltips.region.close()
       },
     )
+  }
+
+  /**
+   * Lazy-loads the WooCommerce cart module (only when WooCommerce is active)
+   * and binds add-to-cart handlers to forms in the rendered container.
+   *
+   * The chunk is only downloaded when the server sets `options.woocommerce`.
+   */
+  bindWooCart(container?: HTMLElement | null): void {
+    if (!this.options.woocommerce || !container) {
+      return
+    }
+    this.initWooCart().then(() => this.wooCart && this.wooCart.bindForms(container))
+  }
+
+  /**
+   * Inlines theme SVG sprite icons inside Woo add-to-cart markup
+   * (Shadow DOM cannot resolve light-DOM `#id` references via `<use>`).
+   */
+  inlineWooSvgUses(container?: HTMLElement | null): void {
+    if (!this.options.woocommerce || !container) {
+      return
+    }
+    inlineSvgUses(container, (this as any).eventDocument || document)
+  }
+
+  /**
+   * True when any map template source mentions add_to_cart_html
+   * (controllers often receive a compiled Handlebars fn, not the HTML string).
+   */
+  templatesUseAddToCartHtml(): boolean {
+    const templates = this.options.templates
+    if (!templates) {
+      return false
+    }
+    for (const name of Object.keys(templates)) {
+      if (getTemplateHtml(templates[name], name).includes("add_to_cart_html")) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private initWooCart(): Promise<void> {
+    if (this.wooCart) {
+      return Promise.resolve()
+    }
+    if (!this.wooCartLoading) {
+      this.wooCartLoading = import("../WooCommerce/WooCart").then(({ default: WooCartController }) => {
+        this.wooCart = new WooCartController({ mapsvg: this })
+        this.wooCart.init()
+      })
+    }
+    return this.wooCartLoading
   }
 
   setLabelsRegions(options?: any): void {
@@ -8287,15 +9610,7 @@ export class MapSVGMap {
         if (elem.getAttribute("data-stroke-width")) {
           elem.style["stroke-width"] = elem.getAttribute("data-stroke-width")
         }
-        if (elem.getAttribute("id")) {
-          if (
-            !this.options.regionPrefix ||
-            (this.options.regionPrefix &&
-              elem.getAttribute("id").indexOf(this.options.regionPrefix) === 0)
-          ) {
-            this.regionAdd(elem)
-          }
-        }
+        if (isSvgRegionElement(elem, this.options.regionPrefix || "")) this.regionAdd(elem)
       })
   }
   /**
@@ -8315,21 +9630,9 @@ export class MapSVGMap {
         if (statuses && typeof data.status !== "undefined" && data.status !== null) {
           region.setStatus(data.status)
         }
-      } else {
-        const filteredStatus = this.options.regionsDynamicStatus?.filtered
-        if (
-          filteredStatus ||
-          filteredStatus === 0 ||
-          (this.options.menu.source === "regions" &&
-            this.options.menu.filterout &&
-            this.options.menu.filterout.field === "status" &&
-            this.options.menu.filterout.val) ||
-          this.options.menu.filterout.val === 0
-        ) {
-          const status =
-            filteredStatus || filteredStatus === 0
-              ? filteredStatus
-              : this.options.menu.filterout.val
+      } else if (!this.options.regionDataRules) {
+        const status = this.getFilteredDynamicStatus(region)
+        if (status !== undefined && status !== null && status !== "") {
           region.setStatus(status)
         }
       }
@@ -8344,56 +9647,14 @@ export class MapSVGMap {
     }
     if (
       this.options.filters.on &&
-      this.options.filters.source === "regions" &&
+      this.componentSource("filters") === "regions" &&
       this.controllers.filters &&
       this.controllers.filters.hideFilters
     ) {
       this.controllers.filters.setFiltersCounter()
     }
     this.updateFiltersState()
-  }
-
-  /**
-   * Fix "fit markers" view world screen offset
-   * @private
-   */
-  fixMarkersWorldScreen(): void {
-    return
-    if (this.googleMaps.map)
-      setTimeout(() => {
-        const markers = { left: 0, right: 0, leftOut: 0, rightOut: 0 }
-        if (this.markers.length > 1) {
-          this.markers.forEach((m: Marker) => {
-            if (
-              $(m.element).offset().left <
-              $(this.containers.map).offset().left + this.containers.map.clientWidth / 2
-            ) {
-              markers.left++
-              if ($(m.element).offset().left < $(this.containers.map).offset().left) {
-                markers.leftOut++
-              }
-            } else {
-              markers.right++
-              if (
-                $(m.element).offset().left >
-                $(this.containers.map).offset().left + this.containers.map.clientWidth
-              ) {
-                markers.rightOut++
-              }
-            }
-          })
-
-          if (
-            (markers.left === 0 && markers.rightOut) ||
-            (markers.right === 0 && markers.leftOut)
-          ) {
-            const k = markers.left === 0 ? 1 : -1
-            const ww =
-              (this.svgDefault.viewBox.width / this.converter.mapLonDelta) * 360 * this.getScale()
-            this.googleMaps.map.panBy(k * ww, 0)
-          }
-        }
-      }, 600)
+    if (this.options.regionDataRules) this.reloadAllRegionStyles()
   }
 
   /**
@@ -8429,7 +9690,7 @@ export class MapSVGMap {
   }
 
   getContainer(name: string): HTMLElement {
-    return this.containers[name]
+    return this.getLocationContainer(name) || this.containers[name]
   }
 
   private renderSvgData(xmlData) {
@@ -8490,22 +9751,7 @@ export class MapSVGMap {
       })
   }
 
-  private setFilterOut() {
-    if (!this.objectsRepository) {
-      return
-    }
-    if (this.options.menu.filterout.field) {
-      const f = {}
-      f[this.options.menu.filterout.field] = this.options.menu.filterout.val
-      if (this.options.menu.source == "regions") {
-        // this.regionsRepository.query.setFilterOut(f);
-      } else {
-        this.objectsRepository.query.setFilterOut(f)
-      }
-    } else {
-      this.objectsRepository.query.setFilterOut(null)
-    }
-  }
+  private setFilterOut() { return this.directoryModule()?.setFilterOut.call(this, this.directoryServices()) }
 
   private getGeoViewBoxFromSvgTag(svgTag: SVGSVGElement): GeoViewBox | null {
     const geo = $(svgTag).attr("mapsvg:geoViewBox") || $(svgTag).attr("mapsvg:geoviewbox")
@@ -8677,8 +9923,10 @@ export class MapSVGMap {
 
     if (!this.inBackend && this.options.actions?.map?.afterLoad?.loadPost) {
       const slug = new URL(window.location.href).pathname.replace(/\/$/, "").split("/").pop()
-      const repoName = this.options.actions.map.afterLoad.loadPost
-      this[repoName].find({ filters: { post: { name: slug } } })
+      const hasPost = (repository) => repository?.getSchema?.()?.getFields?.().some(field => field.type === "post") ?? false
+      const repoName = linkedPostRepository(this.options.actions.map.afterLoad.loadPost,
+        hasPost(this.objectsRepository), hasPost(this.regionsRepository))
+      if (repoName && slug) this[repoName]?.find({ filters: { post: { name: slug } } })
     }
 
     this.selectObjectsByIdFromUrl()
@@ -8688,13 +9936,13 @@ export class MapSVGMap {
     setTimeout(() => {
       // this.movingItemsAdjustScreenPosition()
       // this.adjustStrokes()
-      if (isPhone() && this.options.menu.on && this.options.menu.hideOnMobile) {
+      if (!isTreeLayoutMode(this.options) && isPhone() && (hasRuntimeFeature("directory") && this.options.menu.on) && this.options.menu.hideOnMobile) {
         switch (this.options.menu.showFirst) {
           case "map":
-            this.controllers.toolbar.show("map")
+            this.controllers.toolbar?.show("map")
             break
           case "directory":
-            this.controllers.toolbar.show("menu")
+            this.controllers.toolbar?.show("menu")
             break
           default:
             break
@@ -8708,6 +9956,8 @@ export class MapSVGMap {
     }, 100)
 
     this.loaded = true
+    this.startDatabaseAutoRefetch()
+    this.startRegionsAutoRefetch()
     this.events.trigger(MapEventType.AFTER_INIT, { mapsvg: this })
   }
 
@@ -8811,10 +10061,10 @@ export class MapSVGMap {
       $(_this.containers.map).append(_this.$gauge.container)
     }
 
-    if (!_this.options.choropleth.on && _this.$gauge.container.is(":visible")) {
+    if ((!_this.options.choropleth.on || this.options.regionDataRules) && _this.$gauge.container.is(":visible")) {
       _this.$gauge.container.hide()
       needsRedraw = true
-    } else if (_this.options.choropleth.on && !_this.$gauge.container.is(":visible")) {
+    } else if (_this.options.choropleth.on && !this.options.regionDataRules && !_this.$gauge.container.is(":visible")) {
       _this.$gauge.container.show()
       needsRedraw = true
       this.regionsRepository.events.on(RepositoryEvent.AFTER_UPDATE, this.redrawGauge)
@@ -8907,6 +10157,40 @@ export class MapSVGMap {
   }
   setRegionsDynamicStatus(value: { filtered?: string; noObjects?: string }) {
     deepMerge(this.options.regionsDynamicStatus, value)
+    this.reapplyRegionsDynamicStatus()
+  }
+
+  setRegionsDynamicStatusOrder(order: string[]): void {
+    if (Array.isArray(order) && order.length) {
+      this.options.regionsDynamicStatusOrder = order
+      this.reapplyRegionsDynamicStatus()
+    }
+  }
+
+  setStatusSyncOn(on: boolean): void {
+    this.options.statusSyncOn = !!on
+    this.reapplyRegionsDynamicStatus()
+  }
+
+  setStatusSyncField(field: string): void {
+    this.options.statusSyncField = field || ""
+    this.reapplyRegionsDynamicStatus()
+  }
+
+  setStatusSyncMultiStrategy(value: string): void {
+    this.options.statusSyncMultiStrategy = value === "special" ? "special" : "priority"
+    this.reapplyRegionsDynamicStatus()
+  }
+
+  setStatusSyncMap(value: Array<{ value: string; status: string }>): void {
+    this.options.statusSyncMap = Array.isArray(value) ? value : []
+    this.reapplyRegionsDynamicStatus()
+  }
+
+  /**
+   * Recomputes region base statuses then re-applies the dynamic-status rules (front-end preview).
+   */
+  private reapplyRegionsDynamicStatus(): void {
     if (this.regionsRepository.getLoaded().length > 0) {
       this.reloadRegionsFull()
       this.objectsLoadedToMapHandler()

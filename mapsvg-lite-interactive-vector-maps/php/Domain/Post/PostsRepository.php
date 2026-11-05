@@ -9,6 +9,7 @@ class PostsRepository
 
     function get_custom_posts($data)
     {
+        \MapSVG\Core\PostDataFeature::assertEnabled();
         $args = array(
             'post_type' => 'post', // You can replace 'post' with your custom post type
             'posts_per_page' => 10, // Number of posts to return
@@ -44,6 +45,7 @@ class PostsRepository
      */
     public function find($query)
     {
+        \MapSVG\Core\PostDataFeature::assertEnabled();
 
         $db = Database::get();
 

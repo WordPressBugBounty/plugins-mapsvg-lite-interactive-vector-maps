@@ -35,18 +35,38 @@
    <div class="form-group mb-3 ">
        <label class="form-label">Search by ZIP/postcode only</label>
        <div>
-           {{premiumFeatureAlert}}
+           <!-- START zip_search -->
+           <div class="form-switch form-switch-md">
+            <input type="checkbox" class="form-check-input" name="searchByZip"  {{#if searchByZip}}checked{{/if}} />
+           </div>
+           <!-- END REPLACE {{premiumFeatureAlert}} -->
            <p class="form-text">
                Enable this if you don't want autosuggestion drop-down with the list of addresses to appear when user is typing in the search field.
            </p>
        </div>
    </div>
 
-    
+    <!-- START zip_search -->
+   <div class="form-group mb-3 ">
+       <label class="form-label">ZIP/postcode length</label>
+       <div>
+           <input type="text" class="form-control" name="zipLength"  value="{{zipLength}}" />
+           <p class="form-text">
+               Every country has a different postcode length. If you enabled "Search by ZIP/postcode only" then
+               MapSVG will do the search only when the required number of characters is entered in the search field.
+           </p>
+       </div>
+   </div>
+   <!-- END REPLACE -->
 
    <div class="form-group mb-3 ">
        <label class="form-label">Limit search results by country</label>
-       {{premiumFeatureAlert}}
+       <!-- START limit_search_by_country -->
+       <select class="mapsvg-select2 form-control" name="country" style="width:100%;">
+           <option>...</option>
+           {{#each countries}}<option {{#ifeq id ../country}}selected{{/ifeq}} value="{{id}}">{{title}}</option>{{/each}}
+       </select>
+       <!-- END REPLACE {{premiumFeatureAlert}} -->
    </div>
 
 

@@ -123,7 +123,12 @@ export default function migration(options) {
 
   // new templates
   if (options.templates) {
-    options.templates["directory"] = `{{#if categories}}
+    const dirItemRaw = options.templates["directoryItem"]
+    const dirItemHtml =
+      typeof dirItemRaw === "string" ? dirItemRaw : (dirItemRaw && dirItemRaw.html) || ""
+
+    options.templates["directory"] = {
+      html: `{{#if categories}}
   {{#each categories}}
       {{>directoryCategoryItem}}
   {{/each}}
@@ -134,12 +139,18 @@ export default function migration(options) {
   {{#unless items.length}}
       <div class="mapsvg-no-results">{{noResultsLabel}}</div>
   {{/unless}}
-{{/if}}`
+{{/if}}`,
+      css: "",
+      type: "default",
+    }
 
-    options.templates["directoryItem"] =
-      `<div id="mapsvg-directory-item-{{toSnakeCase id}}" class="mapsvg-directory-item" data-object-id="{{id}}">${options.templates["directoryItem"]}</div>`
-    options.templates["categoryItem"] =
-      `<div id="mapsvg-category-item-{{value}}" class="mapsvg-category-item" data-category-value="{{value}}">
+    options.templates["directoryItem"] = {
+      html: `<div id="mapsvg-directory-item-{{toSnakeCase id}}" class="mapsvg-directory-item" data-object-id="{{id}}">${dirItemHtml}</div>`,
+      css: "",
+      type: "partial",
+    }
+    options.templates["categoryItem"] = {
+      html: `<div id="mapsvg-category-item-{{value}}" class="mapsvg-category-item" data-category-value="{{value}}">
   <span class="mapsvg-category-label">{{label}}</span>
   <span class="mapsvg-category-counter">{{counter}}</span>
   <span class="mapsvg-chevron"></span>
@@ -148,7 +159,10 @@ export default function migration(options) {
   {{#each items}}
     {{>directoryItem}}
   {{/each}}  
-</div>`
+</div>`,
+      css: "",
+      type: "partial",
+    }
   }
   return options
 }

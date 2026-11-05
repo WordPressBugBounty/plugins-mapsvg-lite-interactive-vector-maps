@@ -95,7 +95,8 @@ class Map extends Model implements \JsonSerializable
 		if (!isset($this->options['database'])) {
 			$this->options['database'] = ['pagination' => ["on" => true, "perpage" => 30]];
 		} else {
-			if (!isset($this->options['database']['schemas'])) {
+			// New repository objects have no ID yet. Creation assigns their private sources after insert.
+			if (!isset($this->options['database']['schemas']) && (int) $this->id > 0 && !$this->hasQuerySources()) {
 				$this->options['database']['schemas'] = [
 					"regions" => ["name" => "regions_" . $this->id],
 					"objects" => ["name" => "objects_" . $this->id]
@@ -114,6 +115,16 @@ class Map extends Model implements \JsonSerializable
 			}
 			$this->setTitle($this->options['title']);
 		}
+	}
+
+	private function hasQuerySources(): bool
+	{
+		if (empty($this->options['scenes'])) return false;
+		foreach ($this->options['scenes'] as $page) foreach (['objects', 'regions'] as $role) {
+			$id = $page['dataBindings'][$role]['queryId'] ?? null;
+			if (!$id || in_array($id, ['getObjects', 'getRegions'], true)) return false;
+		}
+		return true;
 	}
 
 	private function validateSchemasStructure($schemas)
@@ -142,7 +153,32 @@ class Map extends Model implements \JsonSerializable
 		return true;
 	}
 
-	public function getRegions()
+	/** Retained v8 builtins only; current bindings derive their source from Query. */
+	public function getLegacyBindingRepository(string $role)
+	{
+		return $role === 'regions' ? $this->getLegacyRegions() : $this->getLegacyObjects();
+	}
+
+	private function getBindingRepository(string $role)
+	{
+		if ($this->optionsBroken || !is_array($this->options)) return null;
+		if (AppEngine::version($this->options) !== 8 && \MapSVG\DataLayer\SavedQuery\GlobalQueriesFeature::isEnabled()) {
+			$pageId = \MapSVG\DataLayer\SavedQuery\PageBindingSource::defaultPageId($this->options);
+			$binding = \MapSVG\DataLayer\SavedQuery\PageBindingQuery::binding($this->options, $role, $pageId);
+			if (!in_array($binding['queryId'], ['getObjects', 'getRegions'], true)) {
+				$source = \MapSVG\DataLayer\SavedQuery\PageBindingSource::resolve($this, $role, $binding);
+				$repository = RepositoryFactory::get($source['schema']->name);
+				if ($role === 'regions' && $repository && method_exists($repository, 'setPrefix')) $repository->setPrefix($this->options['regionPrefix'] ?? '');
+				return $repository;
+			}
+		}
+		return $this->getLegacyBindingRepository($role);
+	}
+
+	public function getRegions() { return $this->getBindingRepository('regions'); }
+	public function getObjects() { return $this->getBindingRepository('objects'); }
+
+	private function getLegacyRegions()
 	{
 		if ($this->optionsBroken || !is_array($this->options)) {
 			return null;
@@ -172,7 +208,7 @@ class Map extends Model implements \JsonSerializable
 		return $this->regions;
 	}
 
-	public function getObjects()
+	private function getLegacyObjects()
 	{
 		if ($this->optionsBroken || !is_array($this->options)) {
 			return null;
@@ -246,6 +282,7 @@ class Map extends Model implements \JsonSerializable
 
 		$data['options']['id'] = $this->id;
 		$data['options']['version'] = $this->version;
+		$data['options']['woocommerce'] = WooCommerceIntegration::isActive();
 
 		return $data;
 	}
@@ -376,6 +413,10 @@ class Map extends Model implements \JsonSerializable
 			'mobileView.labelMap', 'mobileView.labelList', 'mobileView.labelClose',
 			'filters.showButtonText', 'filters.clearButtonText', 'filters.searchButtonText',
 			'menu.searchPlaceholder', 'menu.noResultsText', 'regionStatuses.*.label',
+			'regionDataRules.rows.*.label', 'regionDataRules.legend.title',
+			'regionDataRules.legend.text', 'regionDataRules.legend.description',
+			'regionDataRules.legend.lowLabel', 'regionDataRules.legend.highLabel', 'regionDataRules.exceptions.*.label',
+			'markerDataRules.rows.*.label',
 			'choropleth.labels.low', 'choropleth.labels.high',
 			'choropleth.coloring.gradient.labels.low', 'choropleth.coloring.gradient.labels.high',
 			'choropleth.coloring.noData.description', 'choropleth.coloring.palette.outOfRange.description',
@@ -389,37 +430,31 @@ class Map extends Model implements \JsonSerializable
 		$paths[] = 'filtersSchema.*.options.*.options.*.label';
 		$paths[] = 'filtersSchema.*.optionsDict.*.label';
 		$paths[] = 'filtersSchema.*.optionsDict.*.options.*.label';
-		// Some element types store label strings; others store full choice objects.
-		if (isset($options['filtersSchema']) && is_array($options['filtersSchema'])) {
-			foreach ($options['filtersSchema'] as &$field) {
-				if (!is_array($field) || !isset($field['optionsDict']) || !is_array($field['optionsDict'])) continue;
-				foreach ($field['optionsDict'] as &$choice) {
-					if (is_scalar($choice)) {
-						$choice = sanitize_text_field((string)$choice);
-					}
-				}
-				unset($choice);
-			}
-			unset($field);
-		}
+		// Some elements keep scalar labels in optionsDict; object choices retain their flags.
+		self::sanitizeTextPath($options, ['filtersSchema', '*', 'optionsDict', '*'], true);
 		foreach ($paths as $path) {
 			self::sanitizeTextPath($options, explode('.', $path));
 		}
 		return $options;
 	}
 
-	private static function sanitizeTextPath(array &$data, array $path)
+	private static function sanitizeTextPath(&$data, array $path, bool $scalarOnly = false)
 	{
 		$key = array_shift($path);
-		$keys = $key === '*' ? array_keys($data) : [$key];
+		$isObject = $data instanceof \stdClass;
+		if ($isObject) $data = clone $data;
+		$values = $isObject ? get_object_vars($data) : $data;
+		$keys = $key === '*' ? array_keys($values) : [$key];
 		foreach ($keys as $name) {
-			if (!array_key_exists($name, $data)) {
+			if (!array_key_exists($name, $values)) {
 				continue;
 			}
+			if ($isObject) $value =& $data->{$name};
+			else $value =& $data[$name];
 			if (!$path) {
-				$data[$name] = is_scalar($data[$name]) ? sanitize_text_field((string)$data[$name]) : '';
-			} elseif (is_array($data[$name])) {
-				self::sanitizeTextPath($data[$name], $path);
+				if (!$scalarOnly || is_scalar($value)) $value = is_scalar($value) ? sanitize_text_field((string)$value) : '';
+			} elseif (is_array($value) || $value instanceof \stdClass) {
+				self::sanitizeTextPath($value, $path, $scalarOnly);
 			}
 		}
 	}
@@ -427,10 +462,10 @@ class Map extends Model implements \JsonSerializable
 	/** Authorize submitted code, preserving stored hooks when an ordinary save omits them. */
 	public static function prepareOptionsForWrite(array $options, array $previous = [])
 	{
-		if (!current_user_can('unfiltered_html')) {
-			foreach (['events', 'middlewares', 'onClick', 'mouseOver', 'mouseOut', 'menuOnClick', 'beforeLoad', 'afterLoad'] as $key) {
+		if (!current_user_can('unfiltered_html') || !\MapSVG\Core\JavascriptFeature::isEnabled()) {
+			foreach (AppCodePolicy::HOOKS as $key) {
 				if (array_key_exists($key, $options) && $options[$key] !== ($previous[$key] ?? null) && !self::isEmptyCode($options[$key])) {
-					throw new \Exception('Changing map JavaScript requires unfiltered_html.', 403);
+					AppCodePolicy::assertUnchanged($options, $previous);
 				}
 				if (array_key_exists($key, $previous)) {
 					$options[$key] = $previous[$key];
@@ -438,7 +473,25 @@ class Map extends Model implements \JsonSerializable
 					unset($options[$key]);
 				}
 			}
+			// Legacy runtime normalizes string templates into {html, css, js} entries.
+			// Omitted/empty JS must preserve the stored callback, like top-level hooks.
+			if (!array_key_exists('templates', $options) && isset($previous['templates'])) {
+				$options['templates'] = $previous['templates'];
+			}
+			if (isset($options['templates']) && is_array($options['templates'])) {
+				foreach ($options['templates'] as $name => &$template) {
+					$old = (array) ($previous['templates'][$name] ?? []);
+					if (is_string($template) && isset($old['js'])) $template = ['html' => $template];
+					if (!is_array($template)) continue;
+					if (!array_key_exists('js', $template) || self::isEmptyCode($template['js'])) {
+						if (array_key_exists('js', $old)) $template['js'] = $old['js'];
+						else unset($template['js']);
+					}
+				}
+				unset($template);
+			}
 		}
+		AppCodePolicy::assertUnchanged($options, $previous);
 		return self::sanitizeOptionsForWrite($options);
 	}
 
@@ -530,6 +583,21 @@ class Map extends Model implements \JsonSerializable
 	 */
 	function setRegionsTable($prefix = '', $updateTitles = null)
 	{
+		$regionsSchema = $this->getRegions()->getSchema();
+		// SVG sync targets the schema with bindings.svg (legacy: type === region).
+		if (!$regionsSchema->hasSvgBinding()) {
+			Logger::error(
+				'[SERVER-016] Regions schema is not SVG-bound: ' .
+				($regionsSchema->name ?? '') .
+				' — Read more: https://mapsvg.com/docs/errors#SERVER-016'
+			);
+		} elseif (!$regionsSchema->hasExplicitSvgBinding()) {
+			$regionsSchema->ensureSvgBinding();
+			$schemasRepo = RepositoryFactory::get('schema');
+			if ($schemasRepo) {
+				$schemasRepo->update($regionsSchema, true);
+			}
+		}
 
 		// Convert related URL of the file to absolute server path
 		if (strpos($this->svgFilePath, basename(WP_CONTENT_DIR)) !== false) {
@@ -580,6 +648,10 @@ class Map extends Model implements \JsonSerializable
 
 			if (!empty($nodes)) {
 				foreach ($nodes as $o) {
+					// Match the runtime's SVG-owned region opt-out; keep the shape in the file.
+					if (in_array(strtolower(trim((string) $o['data-mapsvg-region-exclude'])), array('true', '1'), true)) {
+						continue;
+					}
 
 					if (isset($o['id']) && !empty($o['id'])) {
 

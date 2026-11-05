@@ -1,11 +1,11 @@
 .mapsvg-form-field-select .select2-container .select2-selection--single {
-  height: 33px !important;
-  padding: 20px 32px 10px 32px !important;
+  height: 22px !important;
+  padding: 0 !important;
   border-radius: 0;
   border-color: transparent;
   border: none;
   background-color: transparent;
-  box-sizing: content-box;
+  box-sizing: border-box;
 }
 .mapsvg-filters-wrap
   .mapsvg-data-form-view
@@ -13,27 +13,25 @@
   height: auto;
 }
 .mapsvg-form-field-select .select2-container {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  inset: auto;
+  display: block;
 }
 
 .mapsvg-form-field-select {
   position: relative;
 }
 .mapsvg-form-field-select label {
-  position: absolute;
-  z-index: 1;
-  top: 16px;
-  left: 32px;
+  position: static;
 }
 .mapsvg-form-field-select
   .select2-container
   .select2-selection--single
   .select2-selection__rendered {
-  margin-top: 14px;
-  padding: 0;
+  margin-top: 0;
+  padding: 0 24px 0 0;
   line-height: 22px !important;
-  display: inline-block;
+  display: block;
 }
 
 .mapsvg-form-field-select .select2-selection__clear {
@@ -43,14 +41,20 @@
   transform: translateY(6px);
 }
 .mapsvg-form-builder .select2-selection.select2-selection--multiple {
-  transform: translate(2px, 13px);
+  transform: none;
   border: 0;
-  overflow: hidden;
+  /* The outer field owns the pill shape; this inner surface must not clip tags. */
+  border-radius: 0;
+  overflow: visible;
   height: auto;
+  min-height: 22px;
+  background-color: transparent;
 }
 .mapsvg-form-builder .select2-selection.select2-selection--multiple .select2-selection__choice {
   border-radius: 11px;
   padding: 0px 8px;
+  margin-top: 0;
+  line-height: 20px;
 }
 .mapsvg-form-builder
   .select2-selection.select2-selection--multiple
@@ -59,7 +63,8 @@
   transform: translate(-2px, -1px);
 }
 .mapsvg-form-builder .select2-selection.select2-selection--multiple .select2-search__field {
-  background-color: none;
+  height: 22px;
+  background-color: transparent;
 }
 .mapsvg-form-builder p.form-text {
   display: none;
@@ -79,15 +84,15 @@
 
 .mapsvg-form-field-select.mapsvg-form-field-select-multiple .select2-container {
   position: relative;
-  inset: none;
+  inset: auto;
 }
 
 .mapsvg-form-builder
   .select2-container--default
   .select2-selection--single
   .select2-selection__arrow {
-  height: var(--mapsvg-input-height);
-  right: 16px;
+  height: 22px;
+  right: 0;
 }
 
 .mapsvg-form-builder .select2-container.select2-container--default.select2-container--open {

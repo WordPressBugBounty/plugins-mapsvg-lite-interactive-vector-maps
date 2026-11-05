@@ -103,6 +103,8 @@ export class Model {
 
       switch (field.type) {
         case "region":
+        case "relation":
+          this._data[fieldName] = params[fieldName]
           this._data.regions = params[fieldName]
           break
         case "location":
@@ -266,7 +268,7 @@ export class Model {
   }
 
   getData(): { [key: string]: any } {
-    const data = {}
+    const data: { [key: string]: any } = {}
     for (const name in this._data) {
       // Loaded records may still contain a field removed by a schema edit.
       const field = this.schema.getField(name)
@@ -284,6 +286,10 @@ export class Model {
         data[name + "_text"] = field.getEnumLabel(data[name])
       }
     }
+    // The runtime relation contract is canonical even when the persisted CSV
+    // field uses a safe alias such as source_regions. Do not drop links merely
+    // because getField("regions") is absent from that Collection schema.
+    if (this._data.regions !== undefined) data.regions = this._data.regions
     return data
   }
   getRegions(regionsTableName: string): Array<{ id: string; title: string }> {

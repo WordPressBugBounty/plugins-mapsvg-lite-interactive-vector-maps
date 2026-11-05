@@ -12,7 +12,9 @@ import { Query } from "../Infrastructure/Server/Query.js"
 import { Schema } from "../Infrastructure/Server/Schema.js"
 import "./filters.css"
 import { FilterOptions } from "@/Map/OptionsInterfaces/MapOptions.js"
-import { setNestedProperty } from "@/Core/Utils.js"
+import { parseBoolean, setNestedProperty } from "@/Core/Utils.js"
+import { isRelationFieldType } from "@/Infrastructure/Server/SchemaField"
+import { filterFormValue, filterQueryValue } from "./filterValue"
 const $ = jQuery
 
 export enum FiltersEvent {
@@ -57,6 +59,7 @@ export class FiltersController extends DetailsController {
 
     this.name = "filters"
     this.classList = [
+      "mapsvg-controller-container",
       "mapsvg-filters-wrap",
       "mapsvg-filters-container",
       "mapsvg-controller-no-padding",
@@ -71,8 +74,50 @@ export class FiltersController extends DetailsController {
     this.searchButton = options.searchButton
     this.searchButtonText = options.searchButtonText
     this.schema = options.schema
+    this.modal = options.modal ?? false
     this.hideFilters = options.hideFilters
     this.query = options.query
+  }
+
+  /** Filters belong to their selected Page source, independently of Directory. */
+  private isRelationFilter(field: string): boolean {
+    const repository = this.map.getComponentBindingRole("filters") === "regions"
+      ? this.map.regionsRepository : this.map.objectsRepository
+    return isRelationFieldType(repository?.getSchema()?.getField(field)?.type)
+  }
+
+  private relationIds(value: any): string[] {
+    const table = this.map.regionsRepository.getSchema().name
+    if (value && !Array.isArray(value) && Array.isArray(value.region_ids)) {
+      if (value.table_name && value.table_name !== table) return []
+      value = value.region_ids
+    }
+    const ids = (Array.isArray(value) ? value : [value]).flatMap(item => {
+      if (item && typeof item === "object") {
+        if (item.tableName && item.tableName !== table) return []
+        item = item.value ?? item.id
+      }
+      return (typeof item === "string" && item !== "") || (typeof item === "number" && Number.isFinite(item))
+        ? [String(item)] : []
+    })
+    return Array.from(new Set(ids))
+  }
+
+  /** Restore the value shape each native control accepts, including first mount. */
+  private formData(query: Query): Record<string, any> {
+    const data = Object.fromEntries(Object.entries(query.filters || {}).map(([key, value]) => [key, filterFormValue(value)]))
+    for (const field of this.schema.getFields()) {
+      const parts = (field.parameterName || field.name || "").split(".")
+      if (parts.length > 1) parts.shift()
+      const name = parts[0] + parts.slice(1).map(part => `[${part}]`).join("")
+      if (!this.isRelationFilter(name)) continue
+      const ids = this.relationIds(data[name])
+      if (isRelationFieldType(field.type) || field.type === "checkboxes") data[name] = ids
+      else if (field.type === "select" && parseBoolean(field.multiselect)) {
+        data[name] = ids.map(value => ({ value, label: field.options?.find(option => String(option.value) === value)?.label || value }))
+      } else data[name] = ids[0] ?? null
+    }
+    return { ...data, search: query.search }
   }
 
   viewDidRedraw(): void {
@@ -92,45 +137,42 @@ export class FiltersController extends DetailsController {
       searchButtonText: this.searchButtonText,
       editMode: false,
       mapsvg: this.map,
-      data: { ...this.query.filters, search: this.query.search },
+      data: this.formData(this.query),
       admin: false,
       parent: this,
       events: {
         "change.formElement": (event) => {
           const { formElement, field } = event.data
-          let value = JSON.parse(JSON.stringify(event.data.value))
+          let value = event.data.value === undefined ? null : JSON.parse(JSON.stringify(event.data.value))
 
           if (formElement.type === "search") {
+            this.query.page = 1
             this.query.setSearch(value)
           } else {
             const filters: any = {}
 
-            if (value.length === 0) {
+            if (value == null || value.length === 0 || (formElement.type === "checkbox" && value === false)) {
               value = null
             }
 
-            if (field === "regions") {
-              if (!value || !value[0]) {
-                value = null
-              } else {
-                value = {
-                  table_name: this.map.regionsRepository.getSchema().name,
-                  region_ids: Array.isArray(value) ? value.map((v) => v.value) : [value],
-                }
-              }
+            if (this.isRelationFilter(field) || isRelationFieldType(formElement.type)) {
+              const ids = this.relationIds(value)
+              value = ids.length ? { table_name: this.map.regionsRepository.getSchema().name, region_ids: ids } : null
             } else if (
               field === "distance" &&
-              (!value.geoPoint || !value.geoPoint.lat || !value.geoPoint.lat)
+              (!value?.geoPoint || value.geoPoint.lat == null || value.geoPoint.lng == null)
             ) {
               value = null
             }
 
-            setNestedProperty(filters, field, value)
+            setNestedProperty(filters, field, filterQueryValue(formElement.filterOperator, value))
+            this.query.page = 1
             this.query.setFilters(filters)
           }
         },
         clear: (event) => {
           const { formElement, field, value } = event.data
+          this.query.page = 1
           this.query.clearFilters()
         },
         afterLoad: (event) => {
@@ -147,15 +189,7 @@ export class FiltersController extends DetailsController {
   }
 
   update(query: Query): void {
-    const _query = Object.assign({}, query.filters)
-    _query.search = query.search
-    if (_query.regions && _query.regions.region_ids) {
-      // @ts-expect-error type
-      _query.regions = _query.regions.region_ids.map((region) => {
-        return { value: region }
-      })
-    }
-    this.formBuilder && this.formBuilder.update(_query)
+    this.formBuilder && this.formBuilder.update(this.formData(query))
   }
 
   /**

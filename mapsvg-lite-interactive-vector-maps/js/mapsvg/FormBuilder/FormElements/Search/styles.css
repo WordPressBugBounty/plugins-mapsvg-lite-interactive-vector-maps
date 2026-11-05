@@ -1,0 +1,34 @@
+.mapsvg-form-field-search input {
+  height: 66px !important;
+  padding: 30px 32px 5px 32px !important;
+  border-radius: 33px !important;
+  border-color: #e5e5e5;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+.mapsvg-form-field-search {
+  position: relative;
+}
+.mapsvg-form-field-search label {
+  position: absolute;
+  z-index: 1;
+  top: 16px;
+  left: 32px;
+}
+.mapsvg-directory-search-wrap-margin {
+  position: relative;
+  height: 66px;
+}
+.mapsvg-directory-search:active,
+.mapsvg-directory-search:focus {
+  border: 1px solid #eee !important;
+}
+.mapsvg-directory-search:focus,
+.mapsvg-directory-search:active {
+  outline: 0 !important;
+  -webkit-appearance: none !important;
+  border: 0;
+  -webkit-box-shadow: none;
+  -moz-box-shadow: none;
+  box-shadow: none;
+}

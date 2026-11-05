@@ -280,21 +280,17 @@ Handlebars.registerHelper("default", function (options) {
 
 Handlebars.registerHelper("numberFormat", function (value, options) {
   // Helper parameters
-  const dl = options.hash["decimalLength"] || 2
-  const ts = options.hash["thousandsSep"] || " "
-  const ds = options.hash["decimalSep"] || "."
+  const dl = options.hash["decimalLength"] ?? 2
+  const ts = options.hash["thousandsSep"] ?? " "
+  const ds = options.hash["decimalSep"] ?? "."
 
   // Parse to float
   const valueFormatted = parseFloat(value)
 
-  // The regex
-  const re = "\\d(?=(\\d{3})+" + (dl > 0 ? "\\D" : "$") + ")"
-
-  // Formats the number with the decimals
-  const num = valueFormatted.toFixed(Math.max(0, ~~dl))
-
-  // Returns the formatted number
-  return (ds ? num.replace(".", ds) : num).replace(new RegExp(re, "g"), "$&" + ts)
+  // Group only the integer part, even when the decimal separator is empty.
+  const [integer, fraction] = valueFormatted.toFixed(Math.max(0, ~~dl)).split(".")
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, () => ts)
+  return fraction === undefined ? grouped : grouped + ds + fraction
 })
 
 Handlebars.registerHelper("shortcode", function (...args) {
@@ -392,10 +388,10 @@ Handlebars.registerHelper("shortcode_inline", function (...args) {
 
 Handlebars.registerHelper("post", function (value) {
   if (this.post) {
+    var home = (typeof mapsvg !== "undefined" && mapsvg.routes && mapsvg.routes.home) ? mapsvg.routes.home : ""
+    var src = home + "/_mapsvg/post/" + encodeURI(this.post.id)
     return new Handlebars.SafeString(
-      '<iframe width="100%" class="mapsvg-iframe-post"  src="/_mapsvg/post/' +
-        encodeURI(this.post.id) +
-        '"></iframe>',
+      '<iframe width="100%" class="mapsvg-iframe-post" src="' + src + '"></iframe>',
     )
   } else {
     return ""

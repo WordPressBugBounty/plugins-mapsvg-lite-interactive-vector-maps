@@ -1,0 +1,29 @@
+/**
+ * Light-DOM styles for the React admin host element and WP chrome.
+ * App (Tailwind/shadcn) CSS is injected into the shadow root separately.
+ */
+
+body.toplevel_page_mapsvg-config.mapsvg-react-admin {
+  overflow: hidden;
+}
+
+body.toplevel_page_mapsvg-config.mapsvg-react-admin #wpfooter {
+  display: none !important;
+}
+
+body.toplevel_page_mapsvg-config.mapsvg-react-admin #wpbody-content > * {
+  display: none !important;
+}
+
+body.toplevel_page_mapsvg-config.mapsvg-react-admin
+  #wpbody-content
+  > #mapsvg-admin-react-root {
+  display: block !important;
+}
+
+#mapsvg-admin-react-root {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: #fff;
+}

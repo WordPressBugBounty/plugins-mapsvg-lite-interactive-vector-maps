@@ -14,12 +14,16 @@ use JsonSerializable;
  */
 class Repository implements JsonSerializable
 {
+    public function __call($method, $arguments)
+    {
+        $callback = apply_filters('mapsvg_repository_method', null, $method);
+        if (!is_callable($callback)) throw new \BadMethodCallException('Repository method is unavailable: ' . $method);
+        return $callback($this, ...$arguments);
+    }
+
 
 	/** @var string Name of the Entity class */
 	public static $className = 'Object';
-
-	/* @var Database $db Database instance */
-	protected $db;
 
 	/* @var string $id Unique short name of the table */
 	public $id;
@@ -42,44 +46,17 @@ class Repository implements JsonSerializable
 
 	public $geocodingErrors;
 
-	/**
-	 * @var DataSource
-	 */
+	/** @var object Active concrete repository source selected by composition. */
 	public $source;
 
-	/**
-	 * Lazy-loaded property to check if ACF is active
-	 */
-	private static $isAcfActive = null;
+	/** @var \MapSVG\DataLayer\Post\WordPressPostEnricher|null */
+	private $v2PostEnricher;
 
-	/**
-	 * Lazy-loaded property to check if Metabox is active
-	 */
-	private static $isMetaboxActive = null;
+	/** @var array<string,mixed>|null Original input for the scoped controller update. */
+	private $controllerUpdateInput;
 
-	/**
-	 * Check if ACF is active
-	 * @return bool
-	 */
-	private static function isAcfActive()
-	{
-		if (self::$isAcfActive === null) {
-			self::$isAcfActive = function_exists('get_fields');
-		}
-		return self::$isAcfActive;
-	}
-
-	/**
-	 * Check if Metabox is active
-	 * @return bool
-	 */
-	private static function isMetaboxActive()
-	{
-		if (self::$isMetaboxActive === null) {
-			self::$isMetaboxActive = function_exists('rwmb_meta');
-		}
-		return self::$isMetaboxActive;
-	}
+	/** @var mixed Exact merged record belonging to the controller input scope. */
+	private $controllerUpdateRecord;
 
 	/**
 	 * @param Schema $schema
@@ -95,7 +72,10 @@ class Repository implements JsonSerializable
 
 		$this->id = $this->schema->name;
 		$this->geocodingErrors = [];
-		$this->source = $this->schema->isRemote() ? new ApiDataSource($this->schema) : new DbDataSource($this->schema);
+		$this->source =
+			\MapSVG\DataLayer\Compatibility\RepositoryDataSourceFactory::forSchema(
+				$this->schema
+			);
 	}
 
 	/**
@@ -184,7 +164,37 @@ class Repository implements JsonSerializable
 	 */
 	public function clear()
 	{
+		\MapSVG\Core\PostDataFeature::assertSchema($this->schema);
+		if ($this->schema->isRemote()) {
+			// Preserve the historical remote/API path exactly.
+			$this->source->truncate();
+			return;
+		}
+
+		if ($this->source instanceof
+			\MapSVG\DataLayer\Compatibility\PlasmaDataSource) {
+			$this->clearLocalCollection(false);
+			return;
+		}
+
+		// Temporary diagnostic rollback path.
 		$this->source->truncate();
+	}
+
+	protected function clearLocalCollection(
+		bool $clearObjectRelations
+	): int {
+		$dataLayer = \MapSVG\DataLayer\DataLayerFactory::createV2(
+			null,
+			['force' => true, 'observe' => false]
+		);
+		$service = \MapSVG\DataLayer\Workflow\CollectionClearServiceFactory::forSchema(
+			$dataLayer,
+			$this->schema,
+			$clearObjectRelations
+		);
+
+		return $service->clear();
 	}
 
 	/**
@@ -254,8 +264,8 @@ class Repository implements JsonSerializable
 	 */
 	public static function tableName(string $shortTableName)
 	{
-		$db = Database::get();
-		return $db->mapsvg_prefix . $shortTableName;
+		return (new \MapSVG\DataLayer\PlasmaProvider())->physicalPrefix()
+			. $shortTableName;
 	}
 
 	/**
@@ -264,7 +274,11 @@ class Repository implements JsonSerializable
 	 */
 	public function getTableName()
 	{
-		return $this->db->mapsvg_prefix . $this->id;
+		if (is_object($this->source)
+			&& method_exists($this->source, 'getTableName')) {
+			return $this->source->getTableName();
+		}
+		return static::tableName((string) $this->id);
 	}
 
 	/**
@@ -282,6 +296,7 @@ class Repository implements JsonSerializable
 	 */
 	public function create($data)
 	{
+		\MapSVG\Core\PostDataFeature::assertSchema($this->schema);
 
 		if (is_string($data)) {
 			$data = json_decode($data, true);
@@ -293,6 +308,7 @@ class Repository implements JsonSerializable
 			$object    = $data;
 		}
 
+		$this->validateRecordForWrite($object, 'create');
 		$dataForDB = $this->encodeParams($object->getData());
 
 		$data = $this->source->create($dataForDB);
@@ -308,6 +324,7 @@ class Repository implements JsonSerializable
 	 */
 	public function findById($id)
 	{
+		\MapSVG\Core\PostDataFeature::assertSchema($this->schema);
 		$pkField = $this->schema->getPrimaryKeyFieldName();
 		$data = $this->source->findOne([$pkField => $id]);
 
@@ -325,6 +342,7 @@ class Repository implements JsonSerializable
 	 */
 	public function findOne($where)
 	{
+		\MapSVG\Core\PostDataFeature::assertSchema($this->schema);
 		$data = $this->source->findOne($where);
 		if ($this->schema->isRemote()) {
 			return $data;
@@ -343,9 +361,21 @@ class Repository implements JsonSerializable
 	 */
 	public function find(?Query $query = null)
 	{
+		\MapSVG\Core\PostDataFeature::assertSchema($this->schema);
 		if (!$query) {
 			$query = new Query(array('perpage' => 0));
 		}
+
+		if ($this->source instanceof
+			\MapSVG\DataLayer\Compatibility\PlasmaDataSource) {
+			return $this->source->findPublic(
+				$query,
+				function (array $data) {
+					return $this->createObjectFromV2PublicData($data);
+				}
+			);
+		}
+
 		$data = $this->source->find($query);
 
 		if ($this->schema->isRemote()) {
@@ -383,6 +413,9 @@ class Repository implements JsonSerializable
 				"perpage" => $query->perpage,
 				"hasMore" => $hasMore
 			);
+			if ($query->withCount && $this->source instanceof DbDataSource) {
+				$response['count'] = $this->source->getLastCount();
+			}
 			return $response;
 		}
 	}
@@ -424,10 +457,53 @@ class Repository implements JsonSerializable
 	 */
 	public function update($object)
 	{
+		\MapSVG\Core\PostDataFeature::assertSchema($this->schema);
+		$this->validateRecordForWrite($object, 'update');
 		$params = $this->encodeParams($object);
 		$pkField = $this->schema->getPrimaryKeyFieldName();
 		$this->source->update($params, array($pkField => $params[$pkField]));
 		return is_object($object) ? $object : $this->newObject($object);
+	}
+
+	/**
+	 * @internal CollectionController keeps its existing full-object writer path,
+	 * but operation validation must inspect the caller's input, not server fields.
+	 * Full-record validation and concrete update overrides still run unchanged.
+	 *
+	 * @param mixed $object Existing record merged with the incoming input
+	 * @param array<string,mixed> $input Original controller Update input
+	 * @return mixed
+	 */
+	public function updateFromController($object, array $input)
+	{
+		\MapSVG\Core\PostDataFeature::assertSchema($this->schema);
+		$data = $this->validationRecordData($object);
+		$recordId = $data['id'] ?? null;
+		$inputId = $input['id'] ?? null;
+		if ($recordId === null || $inputId === null
+			|| !is_scalar($recordId) || !is_scalar($inputId)
+			|| (string) $recordId === ''
+			|| (string) $recordId !== (string) $inputId) {
+			throw new \MapSVG\DataLayer\Validation\OperationValidationException(
+				'update',
+				array(array(
+					'path' => array('id'),
+					'message' => 'Update input does not match the resolved record identity.',
+					'keyword' => 'identity',
+				))
+			);
+		}
+
+		$previousInput = $this->controllerUpdateInput;
+		$previousRecord = $this->controllerUpdateRecord;
+		$this->controllerUpdateInput = $input;
+		$this->controllerUpdateRecord = $object;
+		try {
+			return $this->update($object);
+		} finally {
+			$this->controllerUpdateInput = $previousInput;
+			$this->controllerUpdateRecord = $previousRecord;
+		}
 	}
 
 	/**
@@ -438,8 +514,105 @@ class Repository implements JsonSerializable
 	 */
 	public function delete($id)
 	{
+		\MapSVG\Core\PostDataFeature::assertSchema($this->schema);
 		$pkField = $this->schema->getPrimaryKeyFieldName();
 		return $this->source->delete(array($pkField => $id));
+	}
+
+	/**
+	 * Validate public/domain input before any storage mapping or writes.
+	 *
+	 * Update validation is two-stage: validate the patch contract, then merge
+	 * the patch with the current public record for full-record validation while
+	 * still persisting only the caller's original patch.
+	 *
+	 * @param mixed $record
+	 */
+	protected function validateRecordForWrite(
+		$record,
+		string $operation = 'write'
+	): void {
+		if (!$this->schema || $this->schema->isRemote()) {
+			return;
+		}
+
+		$data = $this->validationRecordData($record);
+		$fullRecord = $data;
+		$operationValidation =
+			($operation === 'create' || $operation === 'update')
+			&& \MapSVG\DataLayer\Validation\OperationValidationService::writeValidationEnabled(
+				$this->schema
+			);
+
+		if ($operationValidation) {
+			$validator =
+				new \MapSVG\DataLayer\Validation\OperationValidationService(
+					$this->schema
+				);
+
+			if ($operation === 'create') {
+				$validator->validateCreate($data);
+			} else {
+				$validator->validateUpdate(
+					$this->controllerUpdateInput !== null
+						&& $record === $this->controllerUpdateRecord
+						? $this->controllerUpdateInput
+						: $data
+				);
+				$fullRecord = $this->mergeUpdateForValidation($data);
+			}
+
+			if (\MapSVG\DataLayer\Validation\SystemModelSchemaRegistry::supports(
+				$this->schema
+			)) {
+				$validator->validateRecord($fullRecord);
+				return;
+			}
+		}
+
+		(new \MapSVG\DataLayer\Validation\RecordValidationService())
+			->validate($this->schema, $fullRecord, $operation);
+	}
+
+	/**
+	 * @param mixed $record
+	 * @return array<string,mixed>
+	 */
+	private function validationRecordData($record): array
+	{
+		if (is_object($record) && method_exists($record, 'getData')) {
+			return (array) $record->getData();
+		}
+		if (is_object($record)) {
+			return get_object_vars($record);
+		}
+		return (array) $record;
+	}
+
+	/**
+	 * @param array<string,mixed> $patch
+	 * @return array<string,mixed>
+	 */
+	private function mergeUpdateForValidation(array $patch): array
+	{
+		$primary = (string) $this->schema->getPrimaryKeyFieldName();
+		$id = $primary !== '' && array_key_exists($primary, $patch)
+			? $patch[$primary]
+			: ($patch['id'] ?? null);
+
+		if ($id === null || $id === '') {
+			return $patch;
+		}
+
+		$existing = $this->findById($id);
+		if (!$existing) {
+			return $patch;
+		}
+
+		return array_merge(
+			$this->validationRecordData($existing),
+			$patch
+		);
 	}
 
 
@@ -464,47 +637,40 @@ class Repository implements JsonSerializable
 	}
 
 	/**
-	 * Import CSV data to regions / database
+	 * Import decoded records into a collection
 	 */
 	public function import($data, $convertLatlngToAddress = false)
 	{
+		// Validate the complete public batch before encoding. This keeps a later
+		// invalid row from allowing earlier rows to trigger mapping/geocoding
+		// side effects before the import is rejected.
+		foreach ($data as $object) {
+			$this->validateRecordForWrite($object, 'import');
+		}
+
 		$_data  = array();
 		foreach ($data as $index => $object) {
-			$_data[$index] = $this->encodeParams($object, $convertLatlngToAddress);
+			$_data[$index] = $this->encodeParams(
+				$object,
+				$convertLatlngToAddress
+			);
 		}
 
 		$this->source->import($_data);
 
-		if (isset($_data[0]['regions'])) {
+		$hasRelationData = false;
+		if (!empty($_data[0]) && is_array($_data[0])) {
+			foreach ($this->schema->getRelationFields() as $field) {
+				$name = $field->name ?? '';
+				if ($name !== '' && isset($_data[0][$name])) {
+					$hasRelationData = true;
+					break;
+				}
+			}
+		}
+		if ($hasRelationData) {
 			$this->setRelationsForAllObjects();
 		}
-	}
-
-	/**
-	 * Streams a CSV file and bulk-inserts rows.
-	 *
-	 * Delegates all parsing to CsvImporter + field-type-specific FieldParsers.
-	 * After the import, rebuilds the region↔object relation table.
-	 *
-	 * @param string $filePath                Absolute path to the uploaded CSV file.
-	 * @param bool   $convertLatlngToAddress  Reverse-geocode lat/lng rows to get address text.
-	 * @param bool   $convertAddressToLatLng  Forward-geocode address strings to get lat/lng.
-	 * @param string $language                Language code for later geocoding requests.
-	 * @param string          $regionsTableName Short table name of the map's regions (e.g. "regions_115").
-	 * @param callable|null   $onBatchFlush     Optional callback after each INSERT batch (single-shot imports).
-	 * @return array{count: int, needs_geocoding: bool}
-	 * @throws \Exception on file / format errors.
-	 */
-	public function importFromCsv(string $filePath, bool $convertLatlngToAddress, bool $convertAddressToLatLng = true, string $language = 'en', string $regionsTableName = '', $onBatchFlush = null, bool $upsert = true): array
-	{
-		/** @var DbDataSource $source */
-		$source   = $this->source;
-		$importer = new CsvImporter($this->schema, $source);
-		$result   = $importer->import($filePath, $convertLatlngToAddress, $convertAddressToLatLng, $regionsTableName, $onBatchFlush, $upsert);
-
-		$this->setRelationsForAllObjects();
-
-		return $result;
 	}
 
 	public function setRelationsForAllObjects() {}
@@ -519,358 +685,104 @@ class Repository implements JsonSerializable
 	 */
 	public function encodeParams($data, $convertLatLngToAddress = false)
 	{
-
-		$this->geocodingErrors = [];
-
-		if (is_object($data) && method_exists($data, 'getData')) {
-			$data = $data->getData();
+		if ($this->source instanceof
+			\MapSVG\DataLayer\Compatibility\PlasmaDataSource) {
+			$preparer = $this->v2WritePreparer();
+			$result = $preparer->prepare(
+				$data,
+				(bool) $convertLatLngToAddress
+			);
+			$this->geocodingErrors = $result->geocodingErrorCodes();
+			return $result->storage();
 		}
 
-		// Map 'id' alias to the actual primary key column name
-		$pkField = $this->schema->getPrimaryKeyFieldName();
-		if ($pkField !== 'id' && isset($data['id']) && !isset($data[$pkField])) {
-			$data[$pkField] = $data['id'];
-			unset($data['id']);
-		}
-
-		$formattedData = array();
-		$fieldTypes = $this->schema->getFieldTypes();
-
-		foreach ($data as $key => $value) {
-			$field = $this->schema->getField($key);
-			if ($field) switch ($field->type) {
-				case 'post':
-					if (is_array($value)) {
-						$formattedData['post'] = $value['id'];
-					} elseif (is_object($value)) {
-						$formattedData['post'] = $value->id;
-					} else {
-						$formattedData['post'] = $value;
-					}
-					break;
-				case 'region':
-					if (!empty($data[$key]) && is_array($data[$key])) {
-						$formattedData[$key] = wp_json_encode($data[$key], JSON_UNESCAPED_UNICODE);
-					} else {
-						$formattedData[$key] = '';
-					}
-					break;
-				case 'status':
-				case 'select':
-				case 'radio':
-					$key_text = $key . '_text';
-					$fieldOptions = $this->schema->getFieldOptions($field->name);
-
-					if (isset($field->multiselect) && filter_var($field->multiselect, FILTER_VALIDATE_BOOLEAN)) {
-						$formattedData[$key] = wp_json_encode($data[$key], JSON_UNESCAPED_UNICODE);
-					} else {
-						$formattedData[$key] = '';
-						$formattedData[$key_text] = '';
-						$found = false;
-						foreach ($fieldOptions as $option) {
-							if ((string)$option['value'] === (string)$value || (string)$option['label'] === (string)$value) {
-								// Found a match! Use $options[$key]
-								$formattedData[$key] = $option['value'];
-								$formattedData[$key_text] = $option['label'];
-								break;  // Exit loop after finding match								
-							}
-						}
-					}
-					break;
-				case 'checkbox':
-					$formattedData[$key] = (int)($data[$key] === true || $data[$key] === 'true' || $data[$key] === '1' || $data[$key] === 1);
-					break;
-				case 'image':
-				case 'marker':
-					if (is_array($data[$key])) {
-						$formattedData[$key] = wp_json_encode($data[$key], JSON_UNESCAPED_UNICODE);
-					} else {
-						$formattedData[$key] = $data[$key];
-					}
-					break;
-				case 'location':
-					if (!empty($data[$key])) {
-						$location = array();
-
-						if (is_array($data[$key])) {
-							$location = $data[$key];
-						} else {
-							$location = json_decode($data[$key]);
-						}
-
-						if (isset($location['geoPoint']) && !empty($location['geoPoint'])) {
-							$formattedData['location_lat'] = $location['geoPoint']['lat'];
-							$formattedData['location_lng'] = $location['geoPoint']['lng'];
-						} else if (isset($location['svgPoint']) && !empty($location['svgPoint'])) {
-							$formattedData['location_x'] = $location['svgPoint']['x'];
-							$formattedData['location_y'] = $location['svgPoint']['y'];
-						}
-						if (isset($location['address'])) {
-							$formattedData['location_address'] = isset($location['address']) ? wp_json_encode($location['address'], JSON_UNESCAPED_UNICODE) : '';
-						}
-
-						$formattedData['location_img'] = isset($location['img']) ? $location['img'] : '';
-
-
-						if (!empty($location)) {
-
-							$addressYesCoordsNo = (isset($location['address']) && !empty($location['address']) && is_string($location['address']))
-								&& (!isset($location['geoPoint']) || empty($location['geoPoint']));
-							$addressNoCoordsYes = (!isset($location['address']) || empty($location['address']))
-								&& (isset($location['geoPoint']) && !empty($location['geoPoint']));
-
-							if ($addressYesCoordsNo || $addressNoCoordsYes) {
-								$locationField = $this->schema->getField($key);
-								$language = $locationField->language ?? 'en';
-								$geo = new Geocoding();
-								if ($addressNoCoordsYes) {
-									$response = $geo->get($location['geoPoint']['lat'] . ',' . $location['geoPoint']['lng'], true, $convertLatLngToAddress, $language);
-								} elseif ($addressYesCoordsNo) {
-									$response = $geo->get($location['address'], true, true, $language);
-								}
-
-								if ($response && isset($response['status'])) {
-
-									switch ($response['status']) {
-										case 'OK':
-											$address = array();
-
-											if ($addressNoCoordsYes && $convertLatLngToAddress) {
-												$result = $response['results'][1];
-											} else {
-												$result = $response['results'][0];
-											}
-
-											if ($addressYesCoordsNo) {
-												$formattedData['location_lat'] = $result['geometry']['location']['lat'];
-												$formattedData['location_lng'] = $result['geometry']['location']['lng'];
-											} else {
-												$formattedData['location_lat'] = $location['geoPoint']['lat'];
-												$formattedData['location_lng'] = $location['geoPoint']['lng'];
-											}
-											$address = array();
-											$address['address_formatted'] = $result['formatted_address'];
-											$address['formatted']        = $result['formatted_address'];
-											foreach ($result['address_components'] as $addr_item) {
-												$type = $addr_item['types'][0];
-												$address[$type] = $addr_item['long_name'];
-												if ($addr_item['short_name'] != $addr_item['long_name']) {
-													$address[$type . '_short'] = $addr_item['short_name'];
-												}
-											}
-
-											$formattedData['location_address']           = wp_json_encode($address, JSON_UNESCAPED_UNICODE);
-											$formattedData['location_geocoding_status'] = LocationGeocodingStatus::DONE;
-
-											break;
-										case 'ZERO_RESULTS':
-										case 'OVER_DAILY_LIMIT':
-										case 'OVER_QUERY_LIMIT':
-										case 'REQUEST_DENIED':
-										case 'INVALID_REQUEST':
-										case 'UNKNOWN_ERROR':
-										case 'CONNECTION_ERROR':
-										case 'NO_API_KEY':
-											if (count($this->geocodingErrors) < 5) {
-												$this->geocodingErrors[] =  $response['status'];
-											}
-										default:
-											null;
-											break;
-									}
-								}
-							}
-						}
-						if (! empty($formattedData['location_lat']) && ! empty($formattedData['location_lng'])
-							&& (float) $formattedData['location_lat'] !== 0.0
-							&& ! empty($formattedData['location_address'])) {
-							$formattedData['location_geocoding_status'] = LocationGeocodingStatus::DONE;
-						}
-					} else {
-						$formattedData['location_address'] = '';
-						$formattedData['location_lat'] = null;
-						$formattedData['location_lng'] = null;
-						$formattedData['location_x'] = null;
-						$formattedData['location_y'] = null;
-						$formattedData['location_img'] = '';
-						$formattedData['location_geocoding_status'] = LocationGeocodingStatus::SKIPPED;
-					}
-					break;
-				case 'json':
-					$formattedData[$key] = wp_json_encode($value, JSON_UNESCAPED_UNICODE);
-					break;
-				case 'datetime':
-					$formattedData[$key] = $value;
-					break;
-				default:
-					$formattedData[$key] = $value;
-					break;
-			}
-		}
-
-		return $formattedData;
+		$codec = $this->legacyRecordCodec();
+		$storage = $codec->encodeParams($data, $convertLatLngToAddress);
+		$this->geocodingErrors = $codec->geocodingErrors();
+		return $storage;
 	}
 
 	public function decodeParams($data)
 	{
-
-		if (!$data) {
-			return null;
-		}
-
-		$data_formatted = array();
-
-		$pkField = $this->schema->getPrimaryKeyFieldName();
-		$data_formatted['id'] = isset($data[$pkField]) ? $data[$pkField] : (isset($data['id']) ? $data['id'] : null);
-		$fieldTypes = $this->schema->getFieldTypes();
-
-
-		foreach ($fieldTypes as $field_name => $field_type) {
-			switch ($field_type) {
-				case 'status':
-					$data_formatted[$field_name] = $data[$field_name];
-					if (!empty($data[$field_name . '_text'])) {
-						$data_formatted[$field_name . '_text'] = $data[$field_name . '_text'];
-					}
-					break;
-				case 'radio':
-				case 'select':
-					if (!empty($data[$field_name])) {
-						if (strpos($data[$field_name], '[{') === 0) {
-							$data_formatted[$field_name] = json_decode(stripslashes($data[$field_name]));
-						} else {
-							$data_formatted[$field_name] = $data[$field_name];
-						}
-					}
-					if (!empty($data[$field_name . '_text'])) {
-						$data_formatted[$field_name . '_text'] = $data[$field_name . '_text'];
-					}
-					break;
-				case 'region':
-					if (!empty($data[$field_name])) {
-						$data_formatted[$field_name] = json_decode(stripslashes($data[$field_name]));
-					}
-					break;
-				case 'post':
-					if (!empty($data['post'])) {
-						$data_formatted['post'] = (int)$data['post'];
-						$data_formatted['post'] = get_post((int)$data['post']);
-						if ($data_formatted['post']) {
-							$data_formatted['post']->id = $data_formatted['post']->ID;
-
-							// $data_formatted['post']->post_content = wpautop($data_formatted['post']->post_content);
-							// $data_formatted['post']->post_content = apply_filters( 'the_content', do_blocks( preg_replace( '/\[mapsvg.*?\]/', '', $data_formatted['post']->post_content ) ) );
-
-							$data_formatted['post']->post_content = preg_replace('/\[mapsvg.*?\]/', '', $data_formatted['post']->post_content);
-
-							if (has_blocks($data_formatted['post']->post_content)) {
-								$blocks = parse_blocks($data_formatted['post']->post_content);
-								$content_markup = '';
-								foreach ($blocks as $block) {
-									// render_block renders a single block into a HTML string
-									$content_markup .= render_block($block);
-								}
-								global $wp_embed;
-								$content_markup = $wp_embed->autoembed(do_blocks($content_markup)); //render youtube block properly
-								$data_formatted['post']->post_content = wpautop($content_markup);
-							}
-
-							$data_formatted['post']->url = get_permalink($data_formatted['post']);
-							$data_formatted['post']->image = get_the_post_thumbnail_url($data_formatted['post']->ID, 'full');
-							$data_formatted['post']->images = array(
-								'thumbnail' => get_the_post_thumbnail_url($data_formatted['post']->ID, 'thumbnail'),
-								'medium' => get_the_post_thumbnail_url($data_formatted['post']->ID, 'medium'),
-								'large' => get_the_post_thumbnail_url($data_formatted['post']->ID, 'large'),
-								'full' => get_the_post_thumbnail_url($data_formatted['post']->ID, 'full')
-							);
-							// Get ACF fields
-							if (self::isAcfActive()) {
-								$data_formatted['post']->acf = get_fields($data['post']);
-							}
-							// Get Metabox fields
-							if (self::isMetaboxActive()) {
-								$metabox_fields = rwmb_get_object_fields($data_formatted['post']->ID);
-								$data_formatted['post']->metabox = [];
-								foreach ($metabox_fields as $field_id => $field) {
-									$data_formatted['post']->metabox[$field_id] = rwmb_get_value($field_id, [], $data_formatted['post']->ID);
-								}
-							}
-							$data_formatted['post']->meta = get_post_meta($data_formatted['post']->ID);
-
-							// Add all taxonomies
-							$taxonomies = get_object_taxonomies($data_formatted['post']->post_type);
-							$data_formatted['post']->taxonomy = array();
-							foreach ($taxonomies as $taxonomy) {
-								$terms = get_the_terms($data_formatted['post']->ID, $taxonomy);
-								if (!is_wp_error($terms) && !empty($terms)) {
-									$data_formatted['post']->taxonomy[$taxonomy] = $terms;
-								} else {
-									$data_formatted['post']->taxonomy[$taxonomy] = array();
-								}
-							}
-
-							// Allow users adding more data to the post object
-							$data_formatted['post'] = apply_filters('mapsvg_format_post_data', $data_formatted['post']);
-						}
-					}
-					break;
-				case 'checkbox':
-					$data_formatted[$field_name] = (bool)$data[$field_name];
-					break;
-				case 'image':
-				case 'marker':
-					if (!empty($data[$field_name])) {
-						$data_formatted[$field_name] = json_decode(stripslashes($data[$field_name]));
-					}
-					break;
-				case 'location':
-					if (($data['location_lat'] && $data['location_lng'] &&
-							(float)$data['location_lat'] !== (float)0 && (float)$data['location_lng'] !== (float)0)
-						||
-						($data['location_x'] && $data['location_y'])
-					) {
-						$addrRaw = isset($data['location_address']) ? json_decode($data['location_address']) : '';
-						if (is_object($addrRaw) && isset($addrRaw->address_formatted) && ! isset($addrRaw->formatted)) {
-							$addrRaw->formatted = $addrRaw->address_formatted;
-						}
-						$data_formatted[$field_name] = array(
-							'address' => $addrRaw ?: '',
-							'img'     => isset($data['location_img'])     ? $data['location_img'] : ''
-						);
-						if (!empty($data['location_lat']) && !empty($data['location_lng'])) {
-							$data_formatted[$field_name]['geoPoint'] = array('lat' => (float)$data['location_lat'], 'lng' => (float)$data['location_lng']);
-						}
-						if (!empty($data['location_x']) && !empty($data['location_y'])) {
-							$data_formatted[$field_name]['svgPoint'] = array('x' => (float)$data['location_x'], 'y' => (float)$data['location_y']);
-						}
-					} else {
-						$data_formatted[$field_name] = '';
-					}
-					break;
-				case 'datetime':
-					if (!empty($data[$field_name])) {
-						$data_formatted[$field_name] = $data[$field_name];
-					} else {
-						$data_formatted[$field_name] = '';
-					}
-					break;
-				case 'json':
-					if (!empty($data[$field_name])) {
-						$data_formatted[$field_name] = json_decode($data[$field_name], true);
-					} else {
-						$data_formatted[$field_name] = [];
-					}
-					break;
-				default:
-					$data_formatted[$field_name] = isset($data[$field_name]) ? $data[$field_name] : '';
-					break;
+		if ($this->source instanceof
+			\MapSVG\DataLayer\Compatibility\PlasmaDataSource) {
+			if (!$data) {
+				return null;
 			}
+			$public = $this->v2RecordMapper()->fromStorage((array) $data);
+			return $public === null
+				? null
+				: $this->createObjectFromV2PublicData($public);
 		}
 
-
-		return $this->newObject($data_formatted);
+		return $this->legacyRecordCodec()->decodeParams($data);
 	}
 
+	/**
+	 * Build one domain object from already-public v2 query data.
+	 *
+	 * Single-row findOne/findById still use the existing decodeParams() path.
+	 * List queries arrive here after SchemaRecordMapper, so only external
+	 * WordPress post enrichment remains to be applied.
+	 *
+	 * @param array<string,mixed> $data
+	 * @return object
+	 */
+	protected function createObjectFromV2PublicData(array $data)
+	{
+		$postField = $this->schema->getFieldByType('post');
+		if ($postField !== null && !empty($postField->name)) {
+			$name = (string) $postField->name;
+			if (array_key_exists($name, $data)) {
+				if ($this->v2PostEnricher === null) {
+					$this->v2PostEnricher =
+						new \MapSVG\DataLayer\Post\WordPressPostEnricher();
+				}
+				$data[$name] = $this->v2PostEnricher->enrich($data[$name]);
+			}
+		}
+		return $this->newObject($data);
+	}
+
+	private function v2RecordMapper(): \MapSVG\DataLayer\Mapping\SchemaRecordMapper
+	{
+		$dataLayer = $this->source->dataLayer();
+		$resolution = $dataLayer->resolveSchema($this->schema);
+
+		return new \MapSVG\DataLayer\Mapping\SchemaRecordMapper(
+			$this->schema,
+			\MapSVG\DataLayer\Mapping\RecordMappingProfile::forSchema(
+				$this->schema
+			),
+			$resolution->primaryKey()
+		);
+	}
+
+	private function v2WritePreparer(): \MapSVG\DataLayer\Relation\ObjectWritePreparationAdapter
+	{
+		$location = null;
+		if ($this->schema->getFieldByType('location') !== null) {
+			$location =
+				\MapSVG\DataLayer\Location\SynchronousLocationPreparationCanaryFactory::forSchema(
+					$this->schema
+				);
+		}
+
+		return new \MapSVG\DataLayer\Relation\ObjectWritePreparationAdapter(
+			$this->v2RecordMapper(),
+			$location
+		);
+	}
+
+	private function legacyRecordCodec(): \MapSVG\DataLayer\Compatibility\LegacyRepositoryRecordCodec
+	{
+		return new \MapSVG\DataLayer\Compatibility\LegacyRepositoryRecordCodec(
+			$this->schema,
+			function (array $data) {
+				return $this->newObject($data);
+			}
+		);
+	}
 
 	public function getSort($sort)
 	{
@@ -920,15 +832,19 @@ class Repository implements JsonSerializable
 	 */
 	public function getDistinctValues($fieldName)
 	{
-		$table = $this->getTableName();
-		if (!Utils::isTableColumn($table, $fieldName)) {
+		if ($this->schema->isRemote() || !is_string($fieldName)) {
 			return [];
 		}
 
-		$db = Database::get();
-		// Column/table names verified via DESCRIBE + identifier checks.
-		$sql = "SELECT DISTINCT `{$fieldName}` FROM `{$table}` WHERE `{$fieldName}` IS NOT NULL AND `{$fieldName}` != ''";
-		$results = $db->get_col($sql, 0);
-		return $results ? $results : [];
+		$dataLayer = \MapSVG\DataLayer\DataLayerFactory::createV2(
+			null,
+			['force' => true, 'observe' => false]
+		);
+		$service = \MapSVG\DataLayer\Query\DistinctValueServiceFactory::forSchema(
+			$dataLayer,
+			$this->schema
+		);
+
+		return $service->values($fieldName);
 	}
 }

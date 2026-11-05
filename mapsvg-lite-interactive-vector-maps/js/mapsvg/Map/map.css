@@ -13,6 +13,46 @@
 .mapsvg-wrap-all * {
   box-sizing: border-box;
 }
+.mapsvg-layout-grid {
+  display: grid;
+  width: 100%;
+}
+.mapsvg-layout-slot {
+  min-width: 0;
+  min-height: 0;
+}
+.mapsvg-layout-slot-content,
+.mapsvg-layout-frame,
+.mapsvg-layout-component {
+  width: 100%;
+  min-width: 0;
+}
+.mapsvg-layout-slot-content {
+  min-height: 100%;
+  position: relative;
+}
+/* The tree host owns dimensions; retained controller/legacy inline sizes cannot
+   override Auto/Fill/Fixed. Portals/custom mounts stay outside this boundary. */
+.mapsvg-layout-component > .mapsvg-controller-container {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+  width: 100% !important;
+  height: auto !important;
+  flex: 0 0 auto;
+}
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-controller-container {
+  flex: 1 1 auto;
+}
+.mapsvg-layout-component > .mapsvg-controller-container.mapsvg-relative > .mapsvg-controller-view {
+  height: auto;
+}
+.mapsvg-layout-component[data-mapsvg-position="absolute"] > .mapsvg-controller-container:not(.mapsvg-invisible) {
+  pointer-events: auto;
+}
+/* Nested Details must lift its Frame above sibling chrome while the retained view is open. */
+.mapsvg-layout-frame:has([data-mapsvg-component-open="true"]) { z-index: 30 !important; }
 .mapsvg-wrap {
   position: relative;
   box-sizing: border-box;
@@ -212,7 +252,7 @@
   font-size: 12px !important;
   line-height: 1;
   color: #999;
-  font-family: "Helvetica", sans-serif;
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
 }
 .mapsvg-loading-text:empty {
   display: none;
@@ -366,6 +406,77 @@
   pointer-events: none;
 } */
 
+.mapsvg-data-rules-legend {
+  background: #fff;
+  color: #111;
+  padding: 10px;
+  font: 12px/1.5 var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
+  border: 1px solid #ddd;
+  max-width: 100%;
+  overflow: auto;
+  pointer-events: auto;
+}
+.mapsvg-data-rules-legend.mapsvg-legend-inline {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 3;
+  max-width: calc(100% - 24px);
+  max-height: 40%;
+}
+.mapsvg-data-rules-legend-row { display: flex; align-items: center; gap: 6px; }
+.mapsvg-data-rules-legend-swatch { display: inline-block; width: 12px; height: 12px; border: 1px solid #ddd; flex-shrink: 0; }
+.mapsvg-data-rules-legend-gradient { width: 160px; max-width: 100%; height: 12px; margin-top: 4px; }
+.mapsvg-data-rules-legend-bounds { display: flex; justify-content: space-between; }
+.mapsvg-layout-component > .mapsvg-data-rules-legend {
+  min-height: 0;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+}
+.mapsvg-layout-component > .mapsvg-layers-control {
+  position: relative;
+  margin: 0;
+  max-width: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  height: auto;
+}
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-data-rules-legend,
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-layers-control { flex: 1 1 auto; }
+.mapsvg-layers-slotted .mapsvg-layers-label { flex: 0 0 auto; }
+.mapsvg-layers-slotted .mapsvg-layers-list-wrap {
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.mapsvg-layers-scroll { height: 100%; overflow: auto; }
+.mapsvg-layers-slotted .mapsvg-layers-scroll {
+  height: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  pointer-events: auto;
+}
+/* An authored surface color follows the visible inline panel, not its old full-height hit area. */
+.mapsvg-layers-control.mapsvg-presentation-background:not(.mapsvg-layers-slotted) { height: auto; overflow: auto; }
+.mapsvg-layers-control.mapsvg-presentation-background .mapsvg-layers-list-wrap { position: relative; inset: auto; }
+.mapsvg-layers-control.mapsvg-presentation-background .mapsvg-layers-scroll { height: auto; }
+.mapsvg-layers-control.mapsvg-presentation-background .mapsvg-layers-label,
+.mapsvg-layers-control.mapsvg-presentation-background .mapsvg-layers-item { background: transparent; }
+.mapsvg-layers-control input.ios8-switch {
+  display: block;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+.mapsvg-layers-control input.ios8-switch:focus-visible + label { outline: 2px solid var(--mapsvg-accent); outline-offset: 2px; }
 .mapsvg-choropleth-legend {
   background-color: #ffffff;
   border-radius: 3px;
@@ -378,7 +489,7 @@
   line-height: 15px !important;
   color: #666666;
   padding: 0px 0px;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   font-weight: normal;
   -webkit-box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.5);
   -moz-box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.5);
@@ -496,11 +607,7 @@
   border-radius: 5px;
   font-size: 13px;
   margin-right: 4px;
-  font-family:
-    Helvetica Neue,
-    Helvetica,
-    Arial,
-    sans-serif;
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
@@ -578,7 +685,7 @@
   display: inline-block;
   padding: 5px 14px;
   line-height: 1.5;
-  font-family: Helvetica;
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   box-shadow: none;
   text-decoration: none;
   font-size: 13px;
@@ -634,7 +741,7 @@
   padding: 10px;
   height: 100%;
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
 }
 .mapsvg-layers-control.closed {
   pointer-events: none;
@@ -675,11 +782,7 @@
   height: 23px;
   line-height: 23px;
   background: rgba(255, 255, 255, 0.7);
-  font-family:
-    Helvetica Neue,
-    Helvetica,
-    Arial,
-    sans-serif;
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   padding: 0 7px;
   cursor: pointer;
   -webkit-user-select: none;
@@ -833,7 +936,7 @@
 .mapsvg-no-results {
   padding: 10px;
   color: #666;
-  font-family: "Helvetica", "sans-serif";
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   font-size: 14px;
   font-weight: normal;
 }
@@ -1091,7 +1194,7 @@ iframe.mapsvg-iframe-post {
   line-height: 15px !important;
   color: #666666;
   padding: 0px 0px;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   font-weight: normal;
   -webkit-box-shadow: 0px 0px 8px 0px rgb(0 0 0 / 50%);
   -moz-box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.5);
@@ -1278,7 +1381,7 @@ iframe.mapsvg-iframe-post {
   line-height: 15px !important;
   color: #666666;
   padding: 0px 0px;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   font-weight: normal;
   -webkit-box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.5);
   -moz-box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.5);
@@ -1486,3 +1589,41 @@ body.mapsvg-modal-fullscreen {
 .tt-menu.tt-open {
   z-index: 999999999;
 }
+
+/* Tree toolbar visibility belongs to its Layout container, including custom breakpoints. */
+.mapsvg-toolbar-tree {
+  display: flex;
+  flex-direction: column;
+}
+.mapsvg-toolbar-tree .mapsvg-mobile-buttons,
+.mapsvg-toolbar-tree .mapsvg-button-map,
+.mapsvg-toolbar-tree .mapsvg-button-menu { display: block; }
+.mapsvg-toolbar-tree .mapsvg-mobile-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mapsvg-toolbar-tree .mapsvg-button-menu { order: 1; }
+.mapsvg-toolbar-tree .mapsvg-mobile-buttons > button {
+  position: relative;
+  inset: auto;
+  min-width: 0;
+  padding: 0 12px;
+  line-height: normal;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-toolbar-tree .mapsvg-controller-view,
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-toolbar-tree .mapsvg-controller-view-wrap,
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-toolbar-tree .mapsvg-controller-view-wrap > div,
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-toolbar-tree .mapsvg-auto-height,
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-toolbar-tree .mapsvg-auto-height > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+.mapsvg-layout-component[data-mapsvg-stack-bounded="true"] > .mapsvg-toolbar-tree .mapsvg-mobile-buttons {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+.mapsvg-mobile-buttons > button { font: inherit; line-height: 50px; padding: 0; appearance: none; background-color: transparent; }

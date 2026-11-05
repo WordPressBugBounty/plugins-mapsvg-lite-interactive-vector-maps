@@ -65,7 +65,14 @@ class Database
 		return self::$dbInstance;
 	}
 
-	
+	// START common
+	public function getCaller()
+	{
+		$dbt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 4);
+		$caller = isset($dbt[3]['function']) ? $dbt[3]['function'] : '';
+		return $caller;
+	}
+	// END
 
 	public function handleError($string = '')
 	{

@@ -121,12 +121,43 @@ class SVGFile extends File
 	public static function sanitize($body)
 	{
 		if (isset($body)) {
+			// Geographic calibration is non-executable metadata outside the vendor whitelist.
+			// Keep only four finite numeric coordinates; all other attributes still use its policy.
+			$geoViewBox = self::validatedGeoViewBox((string) $body);
 			$sanitizer = new Sanitizer();
 			$body = $sanitizer->sanitize($body);
 			if (!$body) {
 				throw new \Exception('SVG file sanitization failed', 400);
 			}
+			if ($geoViewBox !== null) {
+				$document = new \DOMDocument();
+				if ($document->loadXML($body, LIBXML_NONET) && $document->documentElement) {
+					$document->documentElement->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:mapsvg', 'http://mapsvg.com');
+					$document->documentElement->setAttribute('mapsvg:geoViewBox', $geoViewBox);
+					$body = $document->saveXML();
+				}
+			}
 		}
 		return $body;
 	}
+	private static function validatedGeoViewBox(string $body): ?string
+	{
+		if (strpos($body, 'geoViewBox') === false || preg_match('/<!\s*(?:DOCTYPE|ENTITY)\b/i', $body)) return null;
+		$previous = libxml_use_internal_errors(true);
+		try {
+			$document = new \DOMDocument();
+			if (!$document->loadXML($body, LIBXML_NONET) || !$document->documentElement
+				|| $document->documentElement->namespaceURI !== 'http://www.w3.org/2000/svg'
+				|| $document->documentElement->localName !== 'svg') return null;
+			$value = $document->documentElement->getAttributeNS('http://mapsvg.com', 'geoViewBox');
+			$parts = preg_split('/[\s,]+/', trim($value));
+			if (count($parts) !== 4) return null;
+			foreach ($parts as $part) if (!is_numeric($part) || !is_finite((float) $part)) return null;
+			return implode(' ', $parts);
+		} finally {
+			libxml_clear_errors();
+			libxml_use_internal_errors($previous);
+		}
+	}
+
 }

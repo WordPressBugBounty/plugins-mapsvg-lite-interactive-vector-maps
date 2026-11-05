@@ -2,11 +2,21 @@
 
 namespace MapSVG;
 
+// Explicit require because the recursive autoloader matches only by basename
+// and cannot resolve sub-namespace paths like MapSVG\Core\*.
+require_once __DIR__ . '/Core/ModuleInterface.php';
+require_once __DIR__ . '/Core/ModuleRegistry.php';
+require_once __DIR__ . '/Core/PaidAddonRegistry.php';
+
+use MapSVG\Core\ModuleRegistry;
+use MapSVG\Core\PaidAddonRegistry;
+
 /**
  * Register WordPress actions, filters, and custom cron callbacks for MapSVG.
  *
  * Intended for lifecycle/bootstrap hooks kept separate from {@see Router}.
- * Call {@see PluginHooks::boot()} from the main plugin bootstrap after DB upgrade.
+ * Register early from the main bootstrap; DB upgrade runs on init priority -100,
+ * before these init consumers, while module declarations still use plugins_loaded.
  */
 final class PluginHooks
 {
@@ -16,7 +26,13 @@ final class PluginHooks
     /** @var bool */
     private $hooksRegistered = false;
 
-    private function __construct() {}
+    /** @var ModuleRegistry */
+    private ModuleRegistry $moduleRegistry;
+
+    private function __construct()
+    {
+        $this->moduleRegistry = new ModuleRegistry();
+    }
 
     /**
      * Singleton instance (useful if something needs the same object reference WP holds).
@@ -49,6 +65,93 @@ final class PluginHooks
         }
         $this->hooksRegistered = true;
 
+        // Paid add-ons declare themselves at plugins_loaded priority 5.
+        // Resolve the complete candidate set before any paid code is allowed to boot,
+        // so conflicts never depend on WordPress plugin load order.
+        add_action('plugins_loaded', function (): void {
+            $paidAddons = PaidAddonRegistry::instance();
+            $paidAddons->resolve();
+
+            $error = $paidAddons->error();
+            if ($error !== null) {
+                add_action('admin_notices', function () use ($error): void {
+                    echo '<div class="notice notice-error"><p>' .
+                        esc_html($error['message']) .
+                        '</p></div>';
+                });
+            }
+        }, 10);
+
+        // Base artifacts load their manifest-owned modules. Transitional full
+        // artifacts use the materialized bootstrap; separately installed paid
+        // add-ons contribute their additional modules through their own bootstrap.
+        add_action('plugins_loaded', function (): void {
+            if (!defined('MAPSVG_PLAN')) {
+                return;
+            }
+
+            // Lite owns the shared AI module. Paid add-ons only contribute their
+            // additional capabilities, so the AI registration is loaded once.
+            if (MAPSVG_PLAN === 'mapsvg-lite') {
+                $baseBootstrap = MAPSVG_PLUGIN_DIR . '/mapsvg-modules.php';
+                if (is_readable($baseBootstrap)) {
+                    require_once $baseBootstrap;
+                } else {
+                    $sourceAi = MAPSVG_PLUGIN_DIR . '/paid/features/ai_assistant/php/module.php';
+                    $materialized = MAPSVG_PLUGIN_DIR . '/dist/mapsvg-paid-modules.php';
+                    if (is_readable($sourceAi)) require_once $sourceAi;
+                    elseif (is_readable($materialized)) require_once $materialized;
+                }
+                return;
+            }
+
+            // In a source checkout, load paid modules directly from /paid so PHP
+            // stays in sync with Vite/admin source changes. Release artifacts do not
+            // include /paid and therefore fall back to the materialized /dist bootstrap.
+            $sourcePaidModule = MAPSVG_PLUGIN_DIR .
+                DIRECTORY_SEPARATOR .
+                'paid' .
+                DIRECTORY_SEPARATOR .
+                'features' .
+                DIRECTORY_SEPARATOR .
+                'ai_assistant' .
+                DIRECTORY_SEPARATOR .
+                'php' .
+                DIRECTORY_SEPARATOR .
+                'module.php';
+
+            if (is_readable($sourcePaidModule)) {
+                require_once $sourcePaidModule;
+                if (MAPSVG_PLAN === 'mapsvg-demo') {
+                    require_once MAPSVG_PLUGIN_DIR . '/paid/features/demo_authorization/php/module.php';
+                }
+                require_once MAPSVG_PLUGIN_DIR . '/paid/features/map_features/php/module.php';
+                require_once MAPSVG_PLUGIN_DIR . '/paid/features/csv/php/module.php';
+                require_once MAPSVG_PLUGIN_DIR . '/paid/features/google_sheets/php/module.php';
+                require_once MAPSVG_PLUGIN_DIR . '/paid/features/javascript/php/module.php';
+                $runtimeBootstrap = MAPSVG_PLUGIN_DIR . '/dist/mapsvg-paid-runtime.php';
+                if (is_readable($runtimeBootstrap)) require_once $runtimeBootstrap;
+                return;
+            }
+
+            $standalonePaidBootstrap = MAPSVG_PLUGIN_DIR .
+                DIRECTORY_SEPARATOR .
+                'dist' .
+                DIRECTORY_SEPARATOR .
+                'mapsvg-paid-modules.php';
+
+            if (is_readable($standalonePaidBootstrap)) {
+                require_once $standalonePaidBootstrap;
+            }
+        }, 12);
+
+        // Selected paid add-ons / standalone materialized modules attach
+        // mapsvg/register callbacks before this fires at 15.
+        add_action('plugins_loaded', function (): void {
+            do_action('mapsvg/register', $this->moduleRegistry);
+            $this->moduleRegistry->boot();
+        }, 15);
+
         // This should be called before "rest_api_init"
         add_action('init', array($this, 'setupGutenberg'));
         add_action('init', array($this, 'setupElementor'));
@@ -64,37 +167,17 @@ final class PluginHooks
         // Background geocoding cron — must be registered on every request so WP Cron can fire it.
         add_action('mapsvg_geocode_batch', '\MapSVG\GeocodingQueue::process');
 
-        // Background CSV import cron — fallback for when the browser tab is closed mid-import.
-        add_action('mapsvg_csv_process_batch', '\MapSVG\ObjectsController::importCsvCron');
-
-        // Google Sheets auto-sync — recurring intervals are registered dynamically per hours (1–168).
-        add_filter('cron_schedules', '\MapSVG\GoogleSheetSync::registerCronSchedules');
-        // Google Sheets auto-sync cron — fires on the interval set per schema.
-        add_action('mapsvg_gs_sync', '\MapSVG\GoogleSheetSync::process');
-
-        // Stale import lock repair (debounced) and optional missing WP-Cron repair.
+        // WooCommerce loads as a separate plugin and may not be available yet.
+        // Defer registration so mapsvg_format_post_data hook is always attached.
         add_action(
-            'init',
+            'plugins_loaded',
             function () {
-                if (get_transient('mapsvg_repair_stale_import')) {
-                    return;
-                }
-                set_transient('mapsvg_repair_stale_import', 1, 60);
-                \MapSVG\SchemaImportLifecycle::repairStaleImports();
+                WooCommerceIntegration::boot();
             },
             20
         );
-        add_action(
-            'init',
-            function () {
-                if (get_transient('mapsvg_repair_gs_cron')) {
-                    return;
-                }
-                set_transient('mapsvg_repair_gs_cron', 1, 120);
-                \MapSVG\GoogleSheetSync::repairMissingScheduledEvents();
-            },
-            25
-        );
+
+
     }
 
     public function setupGutenberg()

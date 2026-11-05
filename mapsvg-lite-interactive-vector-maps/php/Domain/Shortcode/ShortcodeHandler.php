@@ -31,8 +31,11 @@ class ShortcodeHandler
 				// Register the blank slate template
 				blank_slate_add_template(
 					'blank-slate-template.php',
-					'mapsvg-lite'
-					
+					// START common
+					'mapsvg'
+					// REPLACE
+					// 'mapsvg-lite'
+					// END
 				);
 
 				// Add our template(s) to the dropdown in the admin
@@ -144,9 +147,7 @@ class ShortcodeHandler
 		}
 
 		$shortcodeName = Shortcode::getName($shortcode);
-		$allowedShortcodes = Options::get('allowed_shortcodes');
-
-		if (!in_array($shortcodeName, $allowedShortcodes)) {
+		if (!Shortcode::isAllowed($shortcode)) {
 			$shortcode = "Add \"$shortcodeName\" to the allowed shortcodes in the MapSVG settings.";
 		}
 
@@ -174,6 +175,8 @@ class ShortcodeHandler
 	{
 
 		self::loadBlankTemplate();
+		WooCommerceIntegration::setEmbedPostId($postId);
+
 		$args = [
 			'ID' => $postId,
 			'slug' => '_mapsvg',
@@ -207,8 +210,18 @@ class ShortcodeHandler
 	 */
 	public static function redirectToTemplate(): void
 	{
+		$shortcodeDir = MAPSVG_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'php' . DIRECTORY_SEPARATOR . 'Domain'
+			. DIRECTORY_SEPARATOR . 'Shortcode' . DIRECTORY_SEPARATOR;
 
-		$template_path = MAPSVG_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'php' . DIRECTORY_SEPARATOR . 'Domain' . DIRECTORY_SEPARATOR . 'Shortcode' . DIRECTORY_SEPARATOR . 'blank-template.php';
+		$productTemplate = WooCommerceIntegration::getEmbedTemplatePath();
+		$template_path = $productTemplate
+			?: $shortcodeDir . 'blank-template.php';
+
+		$withHeader = isset($_GET['withHeader']) && is_scalar($_GET['withHeader'])
+			&& filter_var(wp_unslash($_GET['withHeader']), FILTER_VALIDATE_BOOLEAN);
+		if ($withHeader) {
+			$template_path = $shortcodeDir . 'with-header-template.php';
+		}
 
 		if (file_exists($template_path)) {
 			include($template_path);

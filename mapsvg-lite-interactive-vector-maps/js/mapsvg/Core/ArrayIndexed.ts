@@ -1,8 +1,8 @@
 /**
  * Extension of the default Array class that adds indexing methods
  */
-class ArrayIndexed<T> extends Array<T> {
-  dict: { [key: string]: any }
+class ArrayIndexed<T extends Record<string, any>> extends Array<T> {
+  dict: { [key: string]: number }
   key: string
   options: { autoId: boolean; unique: boolean }
   nextId: number
@@ -38,7 +38,8 @@ class ArrayIndexed<T> extends Array<T> {
         if (missingIds) {
           this.forEach(function (item) {
             if (item[_this.key] == null) {
-              item[_this.key] = _this.nextId
+              const indexedItem: Record<string, unknown> = item
+              indexedItem[_this.key] = _this.nextId
               _this.nextId++
             }
           })
@@ -57,7 +58,8 @@ class ArrayIndexed<T> extends Array<T> {
       if (!this.options.unique || (this.options.unique && !this.get(item[this.key]))) {
         super.push(item)
         if (this.options.autoId === true) {
-          item[this.key] = this.nextId++
+          const indexedItem: Record<string, unknown> = item
+          indexedItem[this.key] = this.nextId++
         }
         this.dict[item[this.key]] = this.length - 1
       }
@@ -68,7 +70,7 @@ class ArrayIndexed<T> extends Array<T> {
   pop(): T | undefined {
     const item = this[this.length - 1]
     const id = item[this.key]
-    const length = super.pop()
+    super.pop()
     delete this.dict[id]
     this.reindex()
     return super.pop()
@@ -89,7 +91,7 @@ class ArrayIndexed<T> extends Array<T> {
     return this.findById(id)
   }
   findById(id: number | string): T | undefined {
-    const key: string | undefined = this.dict[id]
+    const key: number | undefined = this.dict[id]
     return typeof key === "undefined" ? undefined : this[key]
   }
 

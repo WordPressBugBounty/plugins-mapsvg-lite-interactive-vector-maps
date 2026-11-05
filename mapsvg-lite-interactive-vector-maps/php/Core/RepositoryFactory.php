@@ -57,9 +57,9 @@ class RepositoryFactory
 
     $repo = static::getRepoForSchema("schema");
     $schemaInDb = $repo->findByName($schema->name);
-    if (!$schemaInDb) {
-      $repo->create($schema);
-    }
+    // Catalog writes clone their input. Repositories must use the persisted
+    // schema (including its ID and existing fields), never the default template.
+    $schema = $schemaInDb ?: $repo->create($schema);
 
     return static::getRepo($schema);
   }
@@ -73,9 +73,14 @@ class RepositoryFactory
 
 
     if ($schema->remote) {
-      throw new \Error("Remote repository is unavaiable in Lite version");
-      
+      // START data_source_api
+      return new RemoteRepository($schema);
+      // REPLACE
+      // throw new \Error("Remote repository is unavaiable in Lite version");
+      // END
     } else {
+      $extension = apply_filters('mapsvg_repository_for_schema', null, $schema);
+      if ($extension !== null) return $extension;
       $name = $schema->objectNameSingular;
 
       switch ($name) {
@@ -88,14 +93,19 @@ class RepositoryFactory
         case "region":
           $repo = new RegionsRepository($schema);
           break;
-        
-        
+        // START debug  
+        case "log":
+          $repo = new LogsRepository($schema);
+          break;
+        // END
+        // START tokens
+        case "token":
+          $repo = new TokenRepository($schema);
+          break;
+        // END
         case "postType":
 
           $repo = new PostTypesRepository($schema);
-          break;
-        case "importSetting":
-          $repo = new ImportSettingsRepository($schema);
           break;
         case "object":
         default:
@@ -169,6 +179,17 @@ class RepositoryFactory
       throw new \Exception("Invalid JSON in schema file: " . esc_html($schema_file));
     }
 
-    return new Schema($schemaJSON);
+    return static::materializeDefaultSchema($schemaJSON, $name);
+  }
+
+  private static function materializeDefaultSchema(array $definition, string $name): Schema
+  {
+    // Type inference generates endpoints from name during construction. The
+    // private collection's concrete name must precede that inference.
+    if (is_string($definition['name'] ?? null)
+      && strpos($definition['name'], '%MAP_ID%') !== false) {
+      $definition['name'] = $name;
+    }
+    return new Schema($definition);
   }
 }

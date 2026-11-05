@@ -16,6 +16,8 @@ class Query {
 	public $search = '';
 	public $searchFallback = false;
 	public $withSchema = false;
+	/** Internal opt-in count for authenticated Collection browsing. */
+	public $withCount = false;
 	public $page    = 1;
 	public $perpage = 30;
 	public $sort    = array();
@@ -30,6 +32,20 @@ class Query {
 		}
 		if(isset($params['filterout'])){
 			$this->filterout = (array)$params['filterout'];
+		}
+		if(isset($params['fields'])){
+			if (is_string($params['fields'])) {
+				$this->fields = array_values(array_filter(array_map(
+					'trim',
+					explode(',', $params['fields'])
+				), 'strlen'));
+			} elseif (is_array($params['fields'])) {
+				$this->fields = array_values($params['fields']);
+			} else {
+				throw new \InvalidArgumentException(
+					'Query fields must be an array or comma-separated string.'
+				);
+			}
 		}
 		if(isset($params['page'])){
 			$this->page = (int)$params['page'];

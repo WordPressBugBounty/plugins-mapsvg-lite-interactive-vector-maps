@@ -26,16 +26,26 @@ class ComposerStaticInitf746eba839f955f4152933ee1a8572fe
         array (
             'Psr\\Http\\Message\\' => 17,
             'Psr\\Http\\Client\\' => 16,
+            'Plasma\\' => 7,
+        ),
+        'O' =>
+        array (
+            'Opis\\Uri\\' => 9,
+            'Opis\\String\\' => 12,
+            'Opis\\JsonSchema\\' => 16,
+        ),
+        'M' =>
+        array (
+            'MapSVG\\Shared\\' => 14,
+            'MapSVG\\DataLayer\\' => 17,
+            'MapSVG\\App\\' => 11,
+            'MapSVG\\' => 7,
         ),
         'G' =>
         array (
             'GuzzleHttp\\Psr7\\' => 16,
             'GuzzleHttp\\Promise\\' => 19,
             'GuzzleHttp\\' => 11,
-        ),
-        'C' =>
-        array (
-            'Clockwork\\' => 10,
         ),
     );
 
@@ -57,6 +67,38 @@ class ComposerStaticInitf746eba839f955f4152933ee1a8572fe
         array (
             0 => __DIR__ . '/..' . '/psr/http-client/src',
         ),
+        'Plasma\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/nlproduction/plasma/src',
+        ),
+        'Opis\\Uri\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/opis/uri/src',
+        ),
+        'Opis\\String\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/opis/string/src',
+        ),
+        'Opis\\JsonSchema\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/opis/json-schema/src',
+        ),
+        'MapSVG\\Shared\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/maps/shared/backend',
+        ),
+        'MapSVG\\DataLayer\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/php/DataLayer',
+        ),
+        'MapSVG\\App\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/maps/app/backend',
+        ),
+        'MapSVG\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/php',
+        ),
         'GuzzleHttp\\Psr7\\' =>
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/psr7/src',
@@ -68,10 +110,6 @@ class ComposerStaticInitf746eba839f955f4152933ee1a8572fe
         'GuzzleHttp\\' =>
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/guzzle/src',
-        ),
-        'Clockwork\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/itsgoingd/clockwork/Clockwork',
         ),
     );
 

@@ -1,0 +1,15 @@
+<script type="text/x-handlebars-template" id="mapsvg-filters-tmpl-search-view">
+  <div class="form-group mapsvg-form-field-search" {{#if width}}style="flex-basis: {{width}};"{{/if}}>
+
+         {{#if label}}
+             <label class="col-form-label mapsvg-filter-label">{{label}}</label>
+         {{/if}}
+
+         {{!-- <div class="mapsvg-directory-search-wrap">
+             <div class="mapsvg-directory-search-wrap-margin" >
+
+             </div>
+         </div> --}}
+        <input type="text" class="mapsvg-directory-search" placeholder="{{placeholder}}" data-parameter-name="search" data-fallback="{{searchFallback}}" value="{{value}}"/>
+     </div>
+</script>

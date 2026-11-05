@@ -153,6 +153,54 @@ class FilesRepository
 	}
 
 	/**
+	 * Create an independent upload without replacing another map's SVG.
+	 * Reserve the chosen filename exclusively before the Filesystem API writes it,
+	 * so concurrent create-new requests cannot choose the same destination.
+	 */
+	public function createUnique($file)
+	{
+		$error = $this->checkUploadDir();
+		if ($error) {
+			throw new \Exception($error, 400);
+		}
+		$originalName = $file->name;
+		$reservation = false;
+		$path = '';
+		for ($attempt = 0; $attempt < 100; $attempt++) {
+			$name = $this->uniqueUploadName($originalName);
+			$path = $this->writeToFolder . DIRECTORY_SEPARATOR . $name;
+			$reservation = @fopen($path, 'x');
+			if ($reservation !== false) {
+				break;
+			}
+			clearstatcache(true, $path);
+			if (!file_exists($path)) {
+				throw new \Exception('Cannot reserve a filename for the SVG upload.', 400);
+			}
+		}
+		if ($reservation === false) {
+			throw new \Exception('Cannot reserve a unique SVG filename. Please retry.', 400);
+		}
+		fclose($reservation);
+		try {
+			$file->setName($name);
+			$file->setServerPath($path);
+			$file->updateRelativeUrl();
+			$this->save($file);
+		} catch (\Throwable $error) {
+			// Only this request's exclusive reservation belongs to this failed upload.
+			@unlink($path);
+			throw $error;
+		}
+		return $file;
+	}
+
+	protected function uniqueUploadName($name)
+	{
+		return wp_unique_filename($this->writeToFolder, $name);
+	}
+
+	/**
 	 * @param File  $file
 	 * @returns FileInterface
 	 * @throws \Exception
@@ -222,8 +270,11 @@ class FilesRepository
 			if ($copied) {
 				return $file;
 			} else {
-				throw new \Exception(esc_html__('Can\'t upload the file', 'mapsvg-lite'), 400);
-				
+				// START common
+				throw new \Exception(esc_html__('Can\'t upload the file', 'mapsvg'), 400);
+				// REPLACE
+				// throw new \Exception(esc_html__('Can\'t upload the file', 'mapsvg-lite'), 400);
+				// END
 			}
 		} else {
 			throw new \Exception(esc_html($mapsvg_error), 400);

@@ -16,7 +16,7 @@
 .mapsvg-filters-wrap,
 .select2-results,
 .mapsvg-form-builder input {
-  font-family: var(--mapsvg-font-family);
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   font-size: var(--mapsvg-font-size);
   line-height: var(--mapsvg-line-height);
   color: var(--mapsvg-text-primary);
@@ -28,12 +28,18 @@
 .select2-selection__choice {
   margin-bottom: 0;
 }
-.mapsvg-form-builder input[type="text"] {
+.mapsvg-form-builder input[type="text"],
+.mapsvg-form-builder input[type="number"] {
   width: 100%;
 }
-.mapsvg-form-builder input[type="text"] {
+.mapsvg-form-builder .mapsvg-text-filter-control {
+  display: block;
+  margin: 0;
+}
+.mapsvg-form-builder input[type="text"],
+.mapsvg-form-builder input[type="number"] {
   height: var(--mapsvg-input-height);
-  font-family: var(--mapsvg-font-family);
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   font-size: var(--mapsvg-font-size);
   line-height: var(--mapsvg-line-height);
   color: var(--mapsvg-text-primary);
@@ -68,11 +74,8 @@
   width: 30px;
 }
 
-/* .mapsvg-form-builder .select2-selection.select2-selection--multiple {
-  height: 35px;
-} */
 .mapsvg-form-builder .select2-selection.select2-selection--multiple .select2-search__field {
-  height: 33px;
+  height: calc(var(--mapsvg-input-height) - 2 * var(--mapsvg-border-width));
   margin: 0;
 }
 .mapsvg-form-builder
@@ -92,7 +95,9 @@
 }
 
 .mapsvg-filters-wrap input[type="text"]:focus,
-.mapsvg-filters-wrap input[type="text"]:active {
+.mapsvg-filters-wrap input[type="text"]:active,
+.mapsvg-filters-wrap input[type="number"]:focus,
+.mapsvg-filters-wrap input[type="number"]:active {
   border: var(--mapsvg-border) !important;
   outline: 0 !important;
   -webkit-appearance: none !important;
@@ -103,6 +108,8 @@
 }
 .mapsvg-form-builder .select2-container--default .select2-selection--multiple {
   border: var(--mapsvg-border);
+  border-radius: var(--mapsvg-border-radius);
+  min-height: var(--mapsvg-input-height);
 }
 .mapsvg-form-builder
   .select2-container--default.select2-container--focus
@@ -113,6 +120,25 @@
   height: auto;
   padding: 0;
   border: 0;
+}
+
+.mapsvg-form-builder .mapsvg-form-field-select-multiple,
+.mapsvg-filters-wrap .form-group {
+  /* A flex item's automatic min-content width must not grow with its tags. */
+  min-width: 0;
+  max-width: 100%;
+}
+.mapsvg-form-builder .select2-container {
+  min-width: 0;
+  max-width: 100%;
+}
+.mapsvg-filters-wrap .form-group.mapsvg-form-field-select {
+  /* Allocate rows independently of selected text. Narrow layouts wrap fields. */
+  flex-basis: 240px;
+}
+.mapsvg-filters-wrap .form-group:not(.mapsvg-filters-reset-container) {
+  /* Tall selections must not stretch neighboring Rounded pills. */
+  align-self: flex-start;
 }
 
 .mapsvg-form-builder
@@ -126,7 +152,38 @@
   .select2-container--default
   .select2-selection--multiple
   .select2-selection__rendered {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 5px;
+  white-space: normal;
+  overflow: visible;
   padding: 0 10px;
+}
+.mapsvg-form-builder
+  .select2-container--default
+  .select2-selection--multiple
+  .select2-selection__choice {
+  float: none;
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.mapsvg-form-builder .select2-selection--multiple .select2-search--inline {
+  float: none;
+  flex: 1 0 3ch;
+  min-width: 0;
+  max-width: 100%;
+}
+.mapsvg-form-builder .select2-selection--multiple .select2-search__field {
+  /* Select2 writes an inline pixel width while searching; the flex row owns it. */
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .mapsvg-form-builder .form-switch .form-check-label {
@@ -307,7 +364,7 @@
   padding: var(--mapsvg-space-xs) 15px var(--mapsvg-space-xs) 15px;
   font-weight: normal;
   width: 100%;
-  font-family: var(--mapsvg-font-family);
+  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);
   font-size: var(--mapsvg-font-size);
   line-height: var(--mapsvg-line-height);
   color: var(--mapsvg-text-primary); */

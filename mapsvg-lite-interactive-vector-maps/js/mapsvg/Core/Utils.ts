@@ -1,3 +1,6 @@
+import { parseBoolean } from "./parseBoolean"
+export { parseBoolean } from "./parseBoolean"
+
 /**
  * Checks if the current device supports touch events.
  * @returns {boolean} True if touch device, false otherwise.
@@ -98,30 +101,6 @@ export const getMouseCoords = (
  */
 export const ucfirst = (string) => {
   return string.charAt(0).toUpperCase() + string.slice(1)
-}
-
-/**
- * Parses a string to boolean.
- * @param {string} string
- * @returns {boolean|undefined}
- */
-export const parseBoolean = (string) => {
-  switch (String(string).toLowerCase()) {
-    case "on":
-    case "true":
-    case "1":
-    case "yes":
-    case "y":
-      return true
-    case "off":
-    case "false":
-    case "0":
-    case "no":
-    case "n":
-      return false
-    default:
-      return undefined
-  }
 }
 
 /**
@@ -315,8 +294,15 @@ export function functionFromString(string: string): SyntaxError | TypeError {
   if (fn.indexOf("{") == -1 || fn.indexOf("function") !== 0 || fn.indexOf("(") == -1) {
     return new SyntaxError("MapSVG user function error: no function body.")
   }
-  const fnBody = fn.substring(fn.indexOf("{") + 1, fn.lastIndexOf("}"))
-  const params = fn.substring(fn.indexOf("(") + 1, fn.indexOf(")"))
+  const paramsEnd = fn.indexOf(")")
+  // Template callbacks use a destructured context argument. Its opening brace
+  // belongs to the parameter list; the body starts after the closing parenthesis.
+  const bodyStart = fn.indexOf("{", paramsEnd + 1)
+  if (paramsEnd === -1 || bodyStart === -1) {
+    return new SyntaxError("MapSVG user function error: no function body.")
+  }
+  const fnBody = fn.substring(bodyStart + 1, fn.lastIndexOf("}"))
+  const params = fn.substring(fn.indexOf("(") + 1, paramsEnd)
   try {
     func = new Function(params, fnBody)
   } catch (err) {

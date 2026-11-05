@@ -2,100 +2,11 @@
 
 namespace MapSVG;
 
+use MapSVG\DataLayer\Schema\SchemaSqlDefinition;
+
 
 class SchemaController extends Controller
 {
-	/**
-	 * Returns import settings for a schema.
-	 *
-	 * @param \WP_REST_Request $request
-	 * @return \WP_REST_Response
-	 */
-	public static function getImportSettings(\WP_REST_Request $request): \WP_REST_Response
-	{
-		$schemaRepository = RepositoryFactory::get("schema");
-		$schema = $schemaRepository->findById((int) $request['id']);
-		if (!$schema) {
-			return self::render(['error' => 'Schema not found.'], 404);
-		}
-
-		$settings = ImportSettingsService::getForSchema($schema);
-		return self::render(['importSettings' => ImportSettingsService::forResponse($settings)], 200);
-	}
-
-	/**
-	 * Updates import settings for a schema.
-	 *
-	 * @param \WP_REST_Request $request
-	 * @return \WP_REST_Response
-	 */
-	public static function updateImportSettings(\WP_REST_Request $request): \WP_REST_Response
-	{
-
-		$schemaRepository = RepositoryFactory::get("schema");
-		$schema = $schemaRepository->findById((int) $request['id']);
-		if (!$schema) {
-			return self::render(['error' => 'Schema not found.'], 404);
-		}
-
-		$body = $request->get_params();
-		$allowed = [
-			'gsSync',
-			'gsAutoRefetch',
-			'gsSyncMode',
-			'gsCsvUrl',
-			'gsCsvHash',
-			'gsRefetchInterval',
-			'gsAutoId',
-			'gsIdFieldName',
-			'gsSheetName',
-			'gsGeocode',
-			'gsGeocodeConvertLatLngToAddress',
-			'gsGeocodeConvertAddressToLatLng',
-			'gsPaidGeocoding',
-			'gsAppScriptUrl',
-			'gsSecret',
-			'gsImportFinishedAt',
-			'gsImportStartedAt',
-			'gsImportLastUpdatedAt',
-			'gsImportEstimatedSeconds',
-			'gsImportSource',
-			'gsImportSourceValid',
-			'gsImportSkipFields'
-		];
-		$payload = [];
-		foreach ($allowed as $key) {
-			if (array_key_exists($key, $body)) {
-				$payload[$key] = $body[$key];
-			}
-		}
-
-
-		$settings = ImportSettingsService::updateForSchema($schema, $payload);
-		GoogleSheetSync::syncCronAfterImportSettingsChange($schema);
-		return self::render(['importSettings' => ImportSettingsService::forResponse($settings)], 200);
-	}
-
-	/**
-	 * Resets import settings for a schema to defaults.
-	 *
-	 * @param \WP_REST_Request $request
-	 * @return \WP_REST_Response
-	 */
-	public static function deleteImportSettings(\WP_REST_Request $request): \WP_REST_Response
-	{
-		$schemaRepository = RepositoryFactory::get("schema");
-		$schema = $schemaRepository->findById((int) $request['id']);
-		if (!$schema) {
-			return self::render(['error' => 'Schema not found.'], 404);
-		}
-
-		$repo = ImportSettingsService::repo();
-		$settings = ImportSettingsService::updateForSchema($schema, $repo->defaultPayloadForSchema($schema));
-		GoogleSheetSync::syncCronAfterImportSettingsChange($schema);
-		return self::render(['importSettings' => ImportSettingsService::forResponse($settings)], 200);
-	}
-
 	/**
 	 * Returns all schemas
 	 * @param \WP_REST_Request $request
@@ -127,7 +38,16 @@ class SchemaController extends Controller
 		} catch (\InvalidArgumentException $e) {
 			return self::render(['error' => $e->getMessage()], 400);
 		}
+		try { \MapSVG\Core\PostDataFeature::assertSchema($data); }
+        catch (\DomainException $error) { return self::render(['error' => $error->getMessage()], 403); }
 		$schemaRepository = RepositoryFactory::get("schema");
+
+		$validationError = static::validatePostSupports($data);
+		if ($validationError !== null) {
+			return new \WP_REST_Response(["data" => ["error" => $validationError]], 400);
+		}
+
+		static::normalizePostSupports($data);
 
 		// Sanitize objectNamePlural into a MySQL-safe table name suffix
 		$name = static::sanitizeSchemaName($data["objectNamePlural"] ?? '');
@@ -142,7 +62,11 @@ class SchemaController extends Controller
 		}
 
 		if (($data["type"] ?? '') === "post" && !empty($data["postType"])) {
-			if (!$schemaRepository->source->isUnique(['type' => 'post', 'postType' => $data['postType']])) {
+			$existingPostSchema = $schemaRepository->findOne([
+				'type' => 'post',
+				'postType' => $data['postType'],
+			]);
+			if ($existingPostSchema !== null) {
 				return new \WP_REST_Response([
 					"data" => [
 						"error" => "A data source for post type '" . $data["postType"] . "' already exists",
@@ -162,7 +86,13 @@ class SchemaController extends Controller
 			return self::render(['error' => $e->getMessage()], $e->getCode() ?: 400);
 		}
 
+		if (($data["type"] ?? '') === "post" && !empty($data["regionSupport"])) {
+			$schemaRepository->ensureRegionsField($response['schema']);
+		}
+
+
 		MappablePostTypes::syncOption();
+
 
 		return self::render($response, 200);
 	}
@@ -203,17 +133,35 @@ class SchemaController extends Controller
 			return self::render(['error' => $e->getMessage()], 400);
 		}
 
-		// if (isset($data['objectNamePlural'])) {
-		// 	// Replace dashes with underscores in the table name
-		// 	$data["name"] = str_replace('-', '_', $data["objectNamePlural"]);
-		// }
+        try {
+            \MapSVG\Core\PostDataFeature::assertSchema($data);
+            \MapSVG\Core\PostDataFeature::assertSchema($schemaRepository->findById((int) $request['id']));
+        } catch (\DomainException $error) { return self::render(['error' => $error->getMessage()], 403); }
 
-		// don't allow changing the name during update
+		$validationError = static::validatePostSupports($data);
+		if ($validationError !== null) {
+			return new \WP_REST_Response(["data" => ["error" => $validationError]], 400);
+		}
+
+		static::normalizePostSupports($data);
+
+		$data['id'] = (int) $request['id'];
+		$current = $schemaRepository->findById($data['id']);
+		if (!$current) return self::render(['error' => 'Schema not found.'], 404);
+
+		if (array_key_exists('name', $data)) {
+			if ($current && (!is_string($data['name']) || $data['name'] !== $current->getName())) {
+				return new \WP_REST_Response(["data" => ["error" => "Collection names are immutable. Create a new Collection and rebind references instead of renaming it."]], 409);
+			}
+		}
+		// The existing update path does not write the immutable name.
 		unset($data['name']);
 
-		$data['id'] = (int)$request['id'];
 		try {
-			$schemaRepository->update($data);
+			$schema = $schemaRepository->update($data);
+			if (($schema->type ?? '') === 'post' && !empty($schema->regionSupport)) {
+				$schemaRepository->ensureRegionsField($schema);
+			}
 		} catch (\InvalidArgumentException $e) {
 			return self::render(['error' => $e->getMessage()], $e->getCode() ?: 400);
 		}
@@ -239,19 +187,69 @@ class SchemaController extends Controller
 			return new \WP_REST_Response(["data" => ["error" => "Schema not found"]], 404);
 		}
 
-		if ($schema->type === "region") {
+		if ($schema->hasSvgBinding()) {
 			return new \WP_REST_Response(["data" => ["error" => "Region data sources cannot be deleted"]], 403);
 		}
 
-		if (!empty($schema->name)) {
-			GoogleSheetSync::clearForSchema($schema->name);
+		// Reject referenced Collections before clearing cron/sync or installation options.
+		try {
+			$schemaRepository->delete($schemaId);
+		} catch (\DomainException $error) {
+			return new \WP_REST_Response(["data" => ["error" => $error->getMessage()]], 409);
 		}
 
-		$schemaRepository->delete($schemaId);
+		if (!empty($schema->name)) {
+			do_action('mapsvg_schema_deleted', $schema);
+		}
+
+		(new DataToMapsRepository())->deleteBySchemaId($schemaId);
 
 		MappablePostTypes::syncOption();
 
 		return self::render([], 200);
+	}
+
+	/**
+	 * Post DS must enable at least one of marker/region support.
+	 *
+	 * @param array $data
+	 * @return string|null Error message or null if valid.
+	 */
+	private static function validatePostSupports(array $data): ?string
+	{
+		if (($data['type'] ?? '') !== 'post') {
+			return null;
+		}
+
+		$marker = !empty($data['markerSupport']);
+		$region = !empty($data['regionSupport']);
+		if (!$marker && !$region) {
+			return 'Enable Marker support and/or Region support for a WP Posts data source.';
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param array $data
+	 */
+	private static function normalizePostSupports(array &$data): void
+	{
+		if (($data['type'] ?? '') !== 'post') {
+			return;
+		}
+
+		if (!array_key_exists('markerSupport', $data)) {
+			$data['markerSupport'] = 1;
+		} else {
+			$data['markerSupport'] = (int) (bool) $data['markerSupport'];
+		}
+
+		if (!array_key_exists('regionSupport', $data)) {
+			$data['regionSupport'] = 0;
+		} else {
+			$data['regionSupport'] = (int) (bool) $data['regionSupport'];
+		}
 	}
 
 	/**

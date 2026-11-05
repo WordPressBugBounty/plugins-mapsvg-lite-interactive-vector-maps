@@ -1,143 +1,117 @@
-=== MapSVG - Vector maps, Image maps, Google Maps ===
+=== MapSVG - AI maps for WordPress ===
 Contributors: oyatek
-Tags: map, store locator, google maps, floorplan, image map
+Tags: ai maps, interactive map, google maps, floor plan, store locator
 Requires at least: 5.0
-Tested up to: 7.0.1
-Stable tag: 8.16.3
+Tested up to: 7.1.4
+Stable tag: 9.0.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Create interactive vector maps, floor plans, and image maps. Support for Google Maps integration, custom markers, tooltips, and popups.
+AI maps for WordPress. Turn one prompt into interactive SVG maps, image maps, floor plans or Google Maps.
 
 == Description ==
 
-MapSVG is a powerful WordPress mapping plugin that allows you to create interactive vector maps, floor plans, and image maps. Perfect for real estate websites, store locators, seating charts, and more.
+**Any map. One prompt.**
 
-* [WP-Admin Demo](https://mapsvg.com/demo)
+Describe the map you want. MapSVG AI helps you build and configure it directly in WordPress: connect your data, place it on the map, arrange the layout and set the styling. See the actual result in the preview, continue with another prompt or fine-tune it yourself in the visual editor.
 
-https://youtu.be/GXrGA9ecN-Y?si=ExhZthcs1AOn58IQ
+Create store locators, country maps, real estate maps, campus guides, event maps, interactive floor plans and more. Start with an included SVG map, upload your own SVG or image, or use Google Maps. Available tools and integrations depend on your plan.
 
-= Key Features (free version) =
+= Start with an idea =
 
-* SVG Vector Maps (100+ maps are included in the plugin)
-* Custom SVG files support (upload your own SVG files and turn them into interactive maps)
-* Google Maps
-* Custom overlays on Google Maps
-* Image Maps
-* Floor Plans
-* Store Locator (search by address)
-* Markers (add markers by entering an address)
-* Connect markers to clickable areas on the map (show all locations connected to a specific area in the popover window)
-* Map areas and markers working as links
-* Custom Tooltips, Popovers, Large scrollable modals
-* Database Integration
-* Custom Fields
-* Filters & Search
-* REST API Support
+Tell the assistant what you need, for example:
 
-= MapSVG vs other mapping plugin =
+* "Create a map of Poland with clickable regions and a tooltip for each region."
+* "Turn this floor plan into an interactive map with room names and details on click."
+* "Create a map of our locations with address search and custom markers."
 
-Below is the comparison of the free version of MapSVG to other popular free mapping plugins on WordPress.org.
+AI works through the editor's tools to create and update your map. Review the result, ask for changes and publish the draft when you are ready.
 
-### Unlimited maps
-* **MapSVG**: Unlimited number of maps
-* **Others**: 1 map
+= Three map formats =
 
-### Unlimited locations
-* **MapSVG**: Unlimited number of markers 
-* **Others**: Limited number of markers
+* **SVG maps**: Use 100+ included country and region maps, or upload your own vector artwork. Make areas clickable, connect them to your data and edit SVG geometry inside WordPress.
+* **Image maps**: Add interactive regions to floor plans, illustrations, venue plans and other images.
+* **Google Maps**: Show locations, markers and geographic overlays on a Google map. Google-powered maps and address search require your own configured Google Maps API key.
 
-### Map regions to locations connection
-* **MapSVG**: Connect markers to map clickable areas. Every area of the map can have one or many markers connected to it. Show the list of connected locations in the popover window.
-* **Others**: No connection between markers and map clickable areas
+= Start free with MapSVG Lite =
 
-### Internal Database
-* **MapSVG**: Custom database, with custom fields support
-* **Others**: You can only use a small set of pre-defined fields, such as title, description and address.
+* AI assistant with a free AI credit allowance.
+* SVG maps, image maps and Google Maps.
+* Unlimited maps and locations.
+* Built-in data Collections with custom fields and reusable records.
+* Interactive regions and markers, custom marker images and clickable links.
+* Tooltips, popovers and detail views for your map content.
+* Address search, country restrictions and postal-code search.
+* Visual map settings, responsive layouts and device previews.
+* Separate drafts and published configurations, with version history.
 
-### Views
-* **MapSVG**: Show custom fields, as formatted HTML, or show the fully rendered WP Post content - in the Tooltips / Popovers (unique feature of MapSVG)
-* **Others**: You can only show the coordinates of the marker in a small tooltip
+= More tools as your project grows =
 
-### Labels
-* **MapSVG**: Show marker labels (name or address of the location) and region labels (names of countries, states, etc.)
-* **Others**: No labels
+MapSVG Personal, Professional and Business add-ons expand Lite with features such as directories, advanced filters, CSV import, Google Sheets sync, WordPress content and custom fields, marker clustering, image galleries, linked maps and code editors. Feature availability and included AI usage depend on the plan.
 
-
-= MapSVG Premium Features =
-
-- **Directory**: Display a list of interactive items alongside the map.
-- **Custom Overlays**: Add custom overlays on Google Maps.
-- **Advanced Filters**: Enable fulltext search, search by category, zip code, by date.
-- **Country-Specific Address Search**: Restrict address searches by country.
-- **CSV Data Import**: Load data seamlessly from CSV files.
-- **Image Gallery Module**: Showcase images in a lightbox format.
-- **Parent/Child Maps**: Open an additional map upon clicking a region.
-- **Marker Clustering**: Group large amount of markers into clusters.
-- **Data Source: WordPressCPT**: Use WordPress CPTs as a data source.
-- **Data Source: Custom API**: Use JSON response from your own API as a data source.
-- **Code editor: CSS**: Edit CSS directly in the map editor, customize the look and feel of the map.
-- **Code editor: Handlebars Templates**: Get full control over the HTML of the popovers / tooltips / details view.
-- **Code editor: JavaScript**: Use built-in JavaScript editor for event handling, middleware customization, modify data before it is displayed on the map.
-- **Custom Marker Images**: Upload your own marker images.
-- **Chat Authorization**: Store the chat history. Get access to the same chats online any time on mapsvg.com/dashboard. 
-- **Priority Support**: Faster response time in the chat.
-- **Purchase Code for Updates**: Enable automatic updates from our servers with the purchase code for more frequent updates.
-- **One-Click wp-admin Access**: Grant support agents quick access to your wp-admin for faster issue resolution.
-
+[Explore MapSVG](https://mapsvg.com/) | [Compare plans](https://mapsvg.com/pricing/) | [Try the WordPress admin demo](https://mapsvg.com/demo) | [Documentation](https://mapsvg.com/docs/)
 
 == Installation ==
 
-1. Unzip the plugin folder
-2. Upload the plugin folder to `/wp-content/plugins` directory
-3. Activate the plugin through the 'Plugins' menu in WordPress
-4. Click on the MapSVG menu item
-5. Get your Google Maps API keys and add them to the MapSVG settings
-6. Create your first map
-7. Activate support chat
-8. Ask our AI bot any questions
+1. Install and activate MapSVG Lite from the WordPress Plugins screen, or upload its ZIP.
+2. Open MapSVG in your WordPress admin.
+3. Connect your MapSVG account to activate AI access and view your credit allowance.
+4. Describe the map you want, or choose "Create new map manually" to use the visual editor.
+5. Add a Google Maps API key only if your map uses Google Maps or Google-powered address services.
+6. Review your draft, publish it and embed the map on a page using its shortcode.
 
 == Frequently Asked Questions ==
 
-= Can I use my own SVG files? =
+= Can I create a map with one prompt? =
 
-Yes, you can upload any SVG file and turn it into an interactive map.
+Yes. Describe the result you want and let the AI assistant set up the map using the available editor tools. You can request further changes through chat or adjust the result manually. Use an included map, your own SVG or image, or Google Maps as the starting point. Some capabilities require a paid add-on.
 
-= Do you have a vector map of XYZ? = 
+= Can I use MapSVG without AI? =
 
-MapSVG has 100+ SVG vector maps inlcuded in the plugin. Also, MapSVG can create an interactive map from any custom SVG file. But it can't generate SVG maps from scratch and we don't provide map drawing services. If you need a specific map of some country, you can try to search on Google "blank svg map of XYZ", download the SVG file and then upload it to MapSVG.
+Yes. The visual editor remains available for manual map creation and editing.
 
-= Can I turn map areas into clickable links? =
+= How does the AI service work? =
 
-Yes, you can do that.
+The assistant uses MapSVG's hosted AI service. When you send a request, your prompt, relevant map context and any files you attach are sent to that service for processing. AI access requires a MapSVG account, an internet connection and available AI credits. The Usage panel shows your allowance and purchased credits.
 
-= Can I show another map on click on a map region? =
+= How much AI usage is included? =
 
-Yes, you can do that - but only in the Premium version.
+Lite includes a free AI allowance. Paid plans include additional usage, and extra credits can be purchased inside the plugin. Usage depends on the complexity of your requests. See the Usage panel and current plans for your allowance.
 
-= Can I show fields created with ACF plugin? =
+= Do I need a Google Maps API key? =
 
-You can show a full rendered post content in the modal window on click on a map region. If you WP theme page template shows ACF fields - you can show them in a modal window. If you want to show just some of the ACF fields, it is possible to do - but only in the Premium version.
+Only for Google Maps and Google-powered services such as address search. An SVG or image map without those services does not need a Google Maps key. Google's own usage and billing terms apply.
 
-= Can I create a store locator with MapSVG? =
+= Can I use my own SVG or image? =
 
-Yes, you can create store locator with search by address. But if you also need to show a clickable list of stores, you need to use MapSVG Premium.
+Yes. Upload a geographic map, floor plan, site plan or illustration, add interactive regions and connect them to your data. You can edit SVG geometry inside WordPress.
 
-= Can I use a custom marker image? =
+= Can I connect my own data? =
 
-You can - but only in the Premium version.
+Yes. Lite includes MapSVG Collections and custom fields. Paid add-ons offer further data tools and integrations, including CSV, Google Sheets and WordPress content. Available integrations depend on your plan.
 
-= Can I customize the look and feel of the map? =
+= Will editing a draft change my live map? =
 
-In the free version, you can use your WP theme's CSS file to customize the looks of the map.
-MapSVG Premium has an embedded CSV editor, which makes style editing more comfortable, because you can see the changes you make in real-time.
+Changes to a draft's map configuration stay in the draft until you publish it. Shared Collection records are different: editing those records can affect every map that uses them. Map version history is not a backup of shared data.
+
+= Where can I get support? =
+
+Use the Support button in MapSVG to open your Dashboard, then use the chat button in the bottom-right corner.
 
 = How can I report a security bug? =
 
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 9.0.0 =
+* **New map editor**: Redesigned workspace with live preview, responsive layouts and reusable data collections.
+* **Drafts and version history**: Edit drafts separately from published maps, keep version history and restore earlier versions. Existing published maps retain their original renderer until migrated.
+* **AI assistant**: Create and update maps through chat directly in the editor, with AI credit usage available inside the plugin.
+* **More free features**: Upload custom marker images, add links to regions and markers, restrict address searches by country and search by postal code.
+* **Google Maps**: Fixed marker positioning when panning across repeated copies of the world map.
+* **Reliability**: Improved SVG editing, draft recovery and compatibility with existing maps during upgrades.
 
 = 8.16.3 =
 * **Site stability**: Fixed site-wide fatal error after updating to 8.16.2 on some sites.
@@ -169,7 +143,7 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 * Fixed: **Mobile toolbar** — Map/List icons show correctly when Shadow DOM is enabled.
 * Fixed: **Pinch-zoom** — pinch-zoom no longer fails on some iPad browsers (including DuckDuckGo).
 * Fixed: **USA counties map** — corrected the Orange County spelling.
-* Fixed: **World map** — Oahu’s south-shore path now covers Sand Island / Honolulu Harbor so true WGS84 pins there sit on land. Gleap #237364
+* Fixed: **World map** — Oahu’s south-shore path now covers Sand Island / Honolulu Harbor so true WGS84 pins there sit on land.
 
 = 8.16.0 =
 * Improved: **Regions / SVG changes** — replacing or editing an SVG no longer deletes region records whose IDs disappeared. Those rows stay as orphans so you can copy their data, then remove them from Regions → Settings → Clean orphan region records.

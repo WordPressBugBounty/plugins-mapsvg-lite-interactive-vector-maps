@@ -13,13 +13,32 @@
             {{#each post_types}}<option {{#ifeq this ../post_type}}selected{{/ifeq}}>{{.}}</option>{{/each}}
         </select>
         <p class="form-text">
-            Use \{{post}} tag in a template to show full rendered post content.<br /><br />
+            Use \{{post}} or the ProductEmbed template to embed the linked post/product in an iframe
+            (recommended for variable products).<br /><br />
 
-            Also you can output individual fields:<br />
-            <em>\{{post.id}}</em><br />
+            Built-in templates (Templates tab — HTML | CSS):<br />
+            <em>ProductCard</em> — compact card UI; use with Details View + preset "Card".
+            Call as <em>\{{>ProductCard product=objects.0.post}}</em> (or pass <em>product=post</em>).<br />
+            <em>ProductEmbed</em> — full Woo/post iframe: <em>\{{>ProductEmbed product=objects.0.post}}</em>.<br /><br />
+
+            WooCommerce fields on the product object:<br />
             <em>\{{post.post_title}}</em><br />
+            <em>\{{post.price_html}}</em> (use <em>\{{{post.price_html}}}</em> for HTML)<br />
+            <em>\{{post.short_description}}</em><br />
+            <em>\{{post.add_to_cart_html}}</em> — Woo "Add to cart" form HTML (simple products; triple braces)<br />
+            <em>\{{post.book_now_url}}</em> — checkout URL that adds the product ("Book now" button)<br />
+            <em>\{{post.product_type}}</em><br />
+            <em>\{{post.use_product_embed}}</em> — true for variable/grouped/external (prefer ProductEmbed)<br /><br />
+
+            Buttons in ProductCard:<br />
+            <em>Book now</em> when <em>book_now_url</em> is set; otherwise <em>View product</em> link to <em>post.url</em>.
+            Add-to-cart form HTML is available via <em>add_to_cart_html</em> if you customize the template.<br /><br />
+
+            Also available:<br />
+            <em>\{{post.id}}</em><br />
             <em>\{{post.post_content}}</em><br />
-            <em>\{{post.url}}</em><br /><br />
+            <em>\{{post.url}}</em><br />
+            <em>\{{post.gallery.0.full}}</em><br /><br />
 
             ACF (Advanced Custom Fields) plugin is supported:<br />
             <em>\{{post.acf.my_field_name}}</em><br />
