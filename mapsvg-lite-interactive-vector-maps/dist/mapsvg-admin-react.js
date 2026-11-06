@@ -1,5 +1,5 @@
 import { r as e } from "./admin-chunks/rolldown-runtime-Dqa2HsxW.js";
-import { $t as t, Qt as n, Xt as r, Yt as i, _n as a, a as o, bi as s, hi as c, mr as l, n as u, o as d, pn as f, qt as p, r as m, t as h } from "./admin-chunks/admin-startup-DaxvU-L8.js";
+import { $t as t, Qt as n, Xt as r, Yt as i, _n as a, a as o, bi as s, hi as c, mr as l, n as u, o as d, pn as f, qt as p, r as m, t as h } from "./admin-chunks/admin-startup-CJQ1Yfhw.js";
 //#region src/main.tsx
 var g = /* @__PURE__ */ e(s(), 1), _ = n(), v = c(), y = "mapsvg-admin-react-root";
 function b() {

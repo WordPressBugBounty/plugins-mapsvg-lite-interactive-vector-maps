@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: ai maps, interactive map, google maps, floor plan, store locator
 Requires at least: 5.0
 Tested up to: 7.1.4
-Stable tag: 9.0.0
+Stable tag: 9.0.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -50,7 +50,7 @@ AI works through the editor's tools to create and update your map. Review the re
 
 MapSVG Personal, Professional and Business add-ons expand Lite with features such as directories, advanced filters, CSV import, Google Sheets sync, WordPress content and custom fields, marker clustering, image galleries, linked maps and code editors. Feature availability and included AI usage depend on the plan.
 
-[Explore MapSVG](https://mapsvg.com/) | [Compare plans](https://mapsvg.com/pricing/) | [Try the WordPress admin demo](https://mapsvg.com/demo) | [Documentation](https://mapsvg.com/docs/)
+[Explore MapSVG](https://mapsvg.com/) | [Documentation](https://mapsvg.com/docs/)
 
 == Installation ==
 
@@ -104,6 +104,9 @@ Use the Support button in MapSVG to open your Dashboard, then use the chat butto
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 9.0.1 =
+* **Lite**: Fixed “Clean orphan region records” failing with a JavaScript permission error.
 
 = 9.0.0 =
 * **New map editor**: Redesigned workspace with live preview, responsive layouts and reusable data collections.
@@ -459,6 +462,6 @@ Examples:
 == Upgrade Notice ==
 
 == Screenshots ==
-1. Adding a location
-2. Setting up actions
-3. Drawing clickable areas on Google Maps
+1. Start with a prompt in the AI chat
+2. Build and refine your map with AI and a live preview
+3. Customize your map with visual settings and components

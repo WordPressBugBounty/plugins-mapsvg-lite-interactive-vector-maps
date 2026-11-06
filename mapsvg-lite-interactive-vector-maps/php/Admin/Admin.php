@@ -16,6 +16,12 @@ class Admin
         $this->addHooks();
     }
 
+    /** Effective authoring permission, including the selected package's capability. */
+    private static function canEditJavaScript(): bool
+    {
+        return current_user_can('unfiltered_html') && \MapSVG\Core\JavascriptFeature::isEnabled();
+    }
+
     private function addHooks()
     {
         add_action('admin_menu', array($this, 'addWpAdminMenuItem'));
@@ -297,7 +303,7 @@ class Admin
                 'name' => wp_get_current_user()->display_name,
                 'email' => wp_get_current_user()->user_email,
                 'isAdmin' => current_user_can('manage_options'),
-                'canEditJavaScript' => current_user_can('unfiltered_html'),
+                'canEditJavaScript' => self::canEditJavaScript(),
             ),
             'options' => $options,
             'license' => $licenseBootstrap,
@@ -510,7 +516,7 @@ class Admin
                 "name" => $user_name,
                 "email" => $user_email,
                 "isAdmin" => current_user_can("manage_options"),
-                "canEditJavaScript" => current_user_can("unfiltered_html")
+                "canEditJavaScript" => self::canEditJavaScript()
             ),
             'maps' => $mapsRepo->find($query),
             'gitBranch' => "",
@@ -596,7 +602,7 @@ class Admin
                 "name" => $user_name,
                 "email" => $user_email,
                 "isAdmin" => current_user_can("manage_options"),
-                "canEditJavaScript" => current_user_can("unfiltered_html")
+                "canEditJavaScript" => self::canEditJavaScript()
             ),
             'phpIni' => array(
                 'post_max_size'       => ini_get('post_max_size'),

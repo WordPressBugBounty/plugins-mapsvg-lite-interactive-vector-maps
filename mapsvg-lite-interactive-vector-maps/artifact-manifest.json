@@ -2,7 +2,7 @@
   "name": "lite",
   "slug": "mapsvg-lite",
   "title": "MapSVG Lite",
-  "version": "9.0.0",
+  "version": "9.0.1",
   "assetSlug": "mapsvg-lite",
   "mode": "base",
   "pluginDirectory": "mapsvg-lite-interactive-vector-maps",
