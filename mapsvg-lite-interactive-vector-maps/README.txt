@@ -1,9 +1,9 @@
-=== MapSVG - AI maps for WordPress ===
+=== MapSVG - Vector maps, Google Maps, Image maps - with AI assistant ===
 Contributors: oyatek
-Tags: ai maps, interactive map, google maps, floor plan, store locator
+Tags: ai maps, interactive map, map, google maps, store locator
 Requires at least: 5.0
 Tested up to: 7.1.4
-Stable tag: 9.0.1
+Stable tag: 9.0.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -104,6 +104,9 @@ Use the Support button in MapSVG to open your Dashboard, then use the chat butto
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 9.0.2 =
+* Minor bugfix.
 
 = 9.0.1 =
 * **Lite**: Fixed “Clean orphan region records” failing with a JavaScript permission error.

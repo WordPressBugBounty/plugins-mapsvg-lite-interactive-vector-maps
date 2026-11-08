@@ -1147,7 +1147,7 @@ final class AiControlCenter
 			&& empty(AiRuntimeContext::snapshot($mapId)['mapsvg']['features']['javascript'])) {
 			throw new \RuntimeException('JavaScript authoring is unavailable in this MapSVG installation (javascript module required).', 403);
 		}
-		if (current_user_can('unfiltered_html')) return;
+		if (!AppCodePolicy::isRestricted()) return;
 		// A browser-provided preview cannot acknowledge its own forged code baseline.
 		$map = self::loadMap($mapId);
 		$canonical = is_array($map->options) ? $map->options : [];
@@ -1514,7 +1514,8 @@ final class AiControlCenter
 		// New user-facing maps should not inherit the legacy instructional demo card.
 		if (!empty($options['actions']['region']['click']['showDetails'])
 			&& !array_key_exists('detailsViewRegion', $options['templates'] ?? array())) {
-			$options['templates']['detailsViewRegion'] = array('html'=>'<h3>{{#if title}}{{title}}{{else}}{{id}}{{/if}}</h3>','css'=>'','js'=>'','type'=>'custom');
+			$html = \MapSVG\Core\CodeEditorFeature::isEnabled() ? '<h3>{{#if title}}{{title}}{{else}}{{id}}{{/if}}</h3>' : '{{title}}';
+			$options['templates']['detailsViewRegion'] = array('html'=>$html,'css'=>'','js'=>'','type'=>'custom');
 		}
 		$initial = NewMapDefaults::apply($options, NewMapDefaults::AI);
 		self::validateOptionsChange($initial, $initial, array('nodes', 'scenes', 'regionDataRules'));

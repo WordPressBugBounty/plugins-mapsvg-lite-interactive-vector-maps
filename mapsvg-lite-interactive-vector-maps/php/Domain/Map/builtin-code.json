@@ -1,0 +1,122 @@
+{
+  "css": "#mapsvg-map-%id% .mapsvg-tooltip {\n\n}\n#mapsvg-map-%id% .mapsvg-popover {\n\n}\n#mapsvg-map-%id% .mapsvg-details-container {\n\n}\n#mapsvg-map-%id% .mapsvg-directory-item {\n\n}\n#mapsvg-map-%id% .mapsvg-region-label {\n  /* background-color: rgba(255,255,255,.6); */\n  font-size: 11px;\n  padding: 3px 5px;\n  border-radius: 4px;\n}\n#mapsvg-map-%id% .mapsvg-marker-label {\n  padding: 3px 5px;\n  /*\n  border-radius: 4px;\n  background-color: white;\n  margin-top: -4px;\n  */\n}\n#mapsvg-map-%id% .mapsvg-filters-wrap {\n\n}\n\n\n\n\n\n\n",
+  "templates": {
+    "list": {
+      "html": "<div class=\"mapsvg-details-list\">\n            {{#each objects}}\n          <div class=\"mapsvg-details-list-item\">\n                  <div class=\"mapsvg-details-list-item-image\">\n                    <img src=\"{{images.0.thumbnail}}\" />\n                  </div>\n                <div class=\"mapsvg-details-list-item-info\">    m\t      \n                    <h6>{{title}}</h6>\n                    <p class=\"mapsvg-details-address\">{{location.address.formatted}}</p>   \n              <p class=\"mapsvg-details-category\">{{category_text}}</p>                                   \n                    <p>{{description}}</p>  \n                <div class=\"mapsvg-details-link\"><a href=\"{{link}}\">{{link}}</a></div>              \n                  </div>\t            \n              </div>\n            {{/each}}\n          </div>",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "default": {
+      "html": "<div class=\"mapsvg-details-flex\">\n        \n        <div class=\"mapsvg-details-hero\">\n          <img src=\"{{images.0.full}}\" class=\"mapsvg-details-hero-image\"/>\n        </div>\n        <div class=\"mapsvg-details-info\">\n          <h4 class=\"mapsvg-details-header\">{{#if title}} {{title}} {{else}} {{id}} {{/if}}</h4>\n          {{description}}\n        </div>\n      </div>    \n    ",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "post": {
+      "html": "{{post}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "ProductCard": {
+      "html": "<!--\n  ProductCard — WooCommerce product card (inline fields).\n\n  Recommended: Details View + style preset \"Card\".\n\n  Usage as partial (e.g. in Region Details):\n  [[>ProductCard product=objects.0.post]]\n\n  Replace [] symbols in the example with {}\n\n  Buttons:\n  - Add to cart — optional: replace the Book now block with [[[product.add_to_cart_html]]]\n    (Woo form HTML for simple purchasable products; use triple braces so HTML is not escaped).\n  - Book now — shown when product.book_now_url is set (checkout URL that adds the product).\n  - View product — fallback link to product.url when book_now_url is empty.\n  - Variable/grouped/external products: when product.use_product_embed is true, the full\n    Woo embed [[[product]]] is used instead of this card.\n-->\n{{#if product}}\n  {{#if product.use_product_embed}}\n    {{product}}\n  {{else}}\n    <article class=\"mapsvg-product-simple\">\n      <div class=\"mapsvg-product-gallery\">\n        {{#if product.gallery.0.full}}\n          <img src=\"{{product.gallery.0.full}}\" alt=\"{{product.post_title}}\" class=\"mapsvg-product-image\" loading=\"lazy\" />\n        {{/if}}\n      </div>\n\n      <div class=\"mapsvg-product-body\">\n        <h2 class=\"mapsvg-product-title\">{{product.post_title}}</h2>\n\n        {{#if product.sku}}\n          <div class=\"mapsvg-product-badges\">\n            <span class=\"mapsvg-product-badge\">{{product.sku}}</span>\n            {{#if product.is_on_sale}}\n              <span class=\"mapsvg-product-badge\">Sale</span>\n            {{/if}}\n          </div>\n        {{else}}\n          {{#if product.is_on_sale}}\n            <div class=\"mapsvg-product-badges\">\n              <span class=\"mapsvg-product-badge\">Sale</span>\n            </div>\n          {{/if}}\n        {{/if}}\n\n        {{#if product.short_description}}\n          <div class=\"mapsvg-product-excerpt\">{{{product.short_description}}}</div>\n        {{/if}}\n\n        <div class=\"mapsvg-product-footer\">\n          {{#if product.price_html}}\n            <div class=\"mapsvg-product-price-wrap\">\n              <span class=\"mapsvg-product-price-label\">Price</span>\n              <div class=\"mapsvg-product-price\">{{{product.price_html}}}</div>\n            </div>\n          {{/if}}\n\n          {{#if product.book_now_url}}\n            <div class=\"mapsvg-product-cart\">\n              <a class=\"mapsvg-product-cart-link\" href=\"{{product.book_now_url}}\">Book now</a>\n            </div>\n          {{else}}\n            <div class=\"mapsvg-product-cart\">\n              <a class=\"mapsvg-product-cart-link\" href=\"{{product.url}}\" target=\"_blank\" rel=\"noopener\">View product</a>\n            </div>\n          {{/if}}\n        </div>\n      </div>\n    </article>\n  {{/if}}\n{{/if}}",
+      "css": ".mapsvg-product-simple {\n  --ms-text: #111;\n  --ms-muted: #8a8a8e;\n  --ms-desc: #5c5c62;\n  --ms-line: #e4e4ea;\n  --ms-bg: #fff;\n  --ms-accent: #5c5890;\n  --ms-accent-hover: #4f4b7e;\n  --ms-grad-from: #c4c0ff;\n  --ms-grad-to: #6b6698;\n  --ms-btn-radius: 12px;\n\n  background: var(--ms-bg);\n  overflow: hidden;\n  color: var(--ms-text);\n  font-family: var(--mapsvg-font-family, Helvetica, Arial, sans-serif);\n  -webkit-font-smoothing: antialiased;\n  width: 100%;\n}\n\n.mapsvg-product-gallery {\n  position: relative;\n  margin: 0;\n  padding: 0;\n  height: fit-content;\n  display: block;\n  overflow: hidden;\n}\n\n.mapsvg-product-image {\n  width: 100%;\n  height: 100%;\n  display: block;\n  object-fit: cover;\n  object-position: center;\n}\n\n.mapsvg-product-body {\n  padding: 10px 20px 20px 15px;\n}\n\n.mapsvg-product-title {\n  margin: 0 0 10px;\n  font-size: 1.35rem;\n  line-height: 1.25;\n  font-weight: 700;\n  letter-spacing: -0.02em;\n}\n\n.mapsvg-product-badges {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 6px;\n  margin: 0 0 12px;\n}\n\n.mapsvg-product-badge {\n  display: inline-block;\n  padding: 3px 8px;\n  border: 1px solid var(--ms-line);\n  border-radius: 6px;\n  color: var(--ms-muted);\n  font-size: 0.68rem;\n  font-weight: 600;\n  letter-spacing: 0.04em;\n  text-transform: uppercase;\n  line-height: 1.4;\n}\n\n.mapsvg-product-excerpt {\n  margin: 0 0 18px;\n  color: var(--ms-desc);\n  font-size: 0.92rem;\n  line-height: 1.55;\n}\n\n.mapsvg-product-excerpt p {\n  margin: 0;\n}\n\n.mapsvg-product-footer {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 14px;\n}\n\n.mapsvg-product-price-wrap {\n  flex: 0 0 auto;\n  min-width: 0;\n}\n\n.mapsvg-product-price-label {\n  display: block;\n  margin: 0 0 2px;\n  font-size: 0.65rem;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  color: var(--ms-muted);\n}\n\n.mapsvg-product-price {\n  margin: 0;\n  font-size: 1.25rem;\n  line-height: 1.2;\n  font-weight: 700;\n  color: var(--ms-text);\n}\n\n.mapsvg-product-price del {\n  color: var(--ms-muted);\n  font-weight: 500;\n  font-size: 0.85em;\n  margin-right: 0.35em;\n}\n\n.mapsvg-product-price ins {\n  text-decoration: none;\n  color: var(--ms-text);\n  font-weight: 700;\n}\n\n.mapsvg-product-price .amount {\n  white-space: nowrap;\n}\n\n.mapsvg-product-cart {\n  flex: 1 1 auto;\n  margin: 0;\n  max-width: 62%;\n}\n\n.mapsvg-product-cart form.cart {\n  display: flex;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 0;\n  margin: 0;\n}\n\n.mapsvg-product-cart .quantity,\n.mapsvg-product-cart input.qty {\n  display: none !important;\n}\n\n.mapsvg-product-cart button,\n.mapsvg-product-cart .single_add_to_cart_button {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.45em;\n  width: 100%;\n  min-height: 46px;\n  border: 0;\n  border-radius: var(--ms-btn-radius);\n  padding: 0 18px;\n  background: var(--ms-accent);\n  color: #fff !important;\n  font-size: 0.95rem;\n  font-weight: 600;\n  letter-spacing: 0.01em;\n  cursor: pointer;\n  white-space: nowrap;\n  line-height: 1;\n}\n\n.mapsvg-product-cart button svg,\n.mapsvg-product-cart .single_add_to_cart_button svg {\n  display: block;\n  flex-shrink: 0;\n  width: 1.15em;\n  height: 1.15em;\n  stroke: currentColor;\n}\n\n.mapsvg-product-cart button:hover,\n.mapsvg-product-cart .single_add_to_cart_button:hover {\n  background: var(--ms-accent-hover);\n}\n\n.mapsvg-product-cart-link {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 100%;\n  min-height: 46px;\n  border-radius: var(--ms-btn-radius);\n  padding: 0 18px;\n  background: var(--ms-accent);\n  color: #fff !important;\n  font-size: 0.95rem;\n  font-weight: 600;\n  text-decoration: none !important;\n}\n\n.mapsvg-product-cart-link:hover {\n  background: var(--ms-accent-hover);\n  color: #fff !important;\n}\n",
+      "js": "",
+      "type": "default"
+    },
+    "ProductEmbed": {
+      "html": "<!--\n  ProductEmbed — full WooCommerce / post embed in an iframe.\n\n  Usage as partial:\n    [[>ProductEmbed product=objects.0.post]]\n\n  Replace [] symbols in the example with {}.\n\n  Prefer this for variable, grouped, and external products (or whenever\n  product.use_product_embed is true). For a compact card UI use ProductCard\n  with Details View + preset \"Card\".\n\n  Buttons inside the embed are rendered by WooCommerce itself (Add to cart,\n  variations, etc.), not by MapSVG template HTML.\n-->\n{{product}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "title": {
+      "html": "{{title}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "description": {
+      "html": "{{{description}}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "imageTitle": {
+      "html": "<div class=\"mapsvg-imageTitle-content\">\n  <div class=\"mapsvg-imageTitle-image\">\n    <img src=\"{{images.0.thumbnail}}\" />\n  </div>\n  <div class=\"mapsvg-imageTitle-title\">    \t      \n    {{title}}                                  \n  </div>\t            \n</div>",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "address": {
+      "html": "{{#if location.address.formatted}}\n        {{location.address.formatted}}\n      {{else}}\n        {{#if location.geoPoint.lat}}\n          {{location.geoPoint.lat}}, {{location.geoPoint.lng}}\n        {{/if}}\n      {{/if}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "popoverRegion": {
+      "html": "<div>\n  <p>This is the demo content of the <strong>Region Popover</strong>.</p>\n  <p>How to edit it: if you are in mapsvg control panel now, click on the following link to open the template editor for this view: <a href=\"#\" class=\"mapsvg-template-link\" data-template=\"popoverRegion\">Menu > Templates > Region Popover</a>.</p>\n  <p>More information about templates: <a href=\"https://mapsvg.com/docs/map-editor/templates\" target=\"_blank\">mapsvg.com/docs/map-editor/templates</a></p>\n</div>\n<hr />\n\n<!-- Region fields are available in this template -->\n<h5>{{#if title}} {{title}} {{else}} {{id}} {{/if}}</h5>\n<p>Status: {{status_text}}</p>\n\n<!-- Show all linked Database Objects: -->\n{{#each objects}}\n\n  <!-- DB Object are available inside of this block -->\n\n  <h5>{{title}}</h5>\n  <!-- When you need to render a field as HTML, use 3 curly braces instead of 2:-->\n  <p>{{{description}}}</p>\n  <p><em>{{location.address.formatted}}</em></p>\n\n  <!-- Show all images: -->\n  {{#each images}}\n    <!-- Image fields \"thumbnail\", \"medium\", \"full\" -->\n    <!-- are available in this block                -->\n    <img src=\"{{thumbnail}}\" />\n  {{/each}}\n\n{{/each}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "popoverMarker": {
+      "html": "<div>\n  <p>This is the demo content of the <strong>DB Object Popover</strong>.</p>\n  <p>How to edit it: if you are in mapsvg control panel now, click on the following link to open the template editor for this view: <a href=\"#\" class=\"mapsvg-template-link\" data-template=\"popover\">Menu > Templates > DB Object Popover</a>.</p>\n  <p>More information about templates: <a href=\"https://mapsvg.com/docs/map-editor/templates\" target=\"_blank\">mapsvg.com/docs/map-editor/templates</a></p>\n</div>\n<hr />\n\n<!-- DB Object fields are available in this template. -->\n<h5>{{title}}</h5>\n<!-- When you need to render a fields as HTML, use 3 curly braces instead of 2:-->\n<p>{{{description}}}</p>\n<p><em>{{location.address.formatted}}</em></p>\n\n<!-- Show all images: -->\n{{#each images}}\n  <!-- Image fields \"thumbnail\", \"medium\", \"full\" -->\n  <!-- are available in this block                -->\n  <img src=\"{{thumbnail}}\" />\n{{/each}}\n\n<!-- Show all linked Regions, comma-separated: -->\n<p> Regions: \n  {{#each regions}}\n    <!-- Region fields are available in this block -->\n    {{#if title}}\n      {{title}}\n    {{else}}\n      {{id}}\n    {{/if}}{{#unless @last}}, {{/unless}}\n  {{/each}}\n</p>",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "tooltipRegion": {
+      "html": "{{id}} - {{title}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "tooltipMarker": {
+      "html": "{{title}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "detailsView": {
+      "html": "<div>\n  <p>This is the demo content of the <strong>DB Object Details View</strong>.</p>\n  <p>How to edit it: if you are in mapsvg control panel now, click on the following link to open the template editor for this view: <a href=\"#\" class=\"mapsvg-template-link\" data-template=\"detailsView\">Menu > Templates > DB Object Details View</a>.</p>\n  <p>More information about templates: <a href=\"https://mapsvg.com/docs/map-editor/templates\" target=\"_blank\">mapsvg.com/docs/map-editor/templates</a></p>\n</div>\n<hr />\n\n<!-- DB Object fields are available in this template. -->\n<h5>{{title}}</h5>\n<!-- When you need to render a fields as HTML, use 3 curly braces instead of 2:-->\n<p>{{{description}}}</p>\n<p><em>{{location.address.formatted}}</em></p>\n\n<!-- Show all images: -->\n{{#each images}}\n  <!-- Image fields \"thumbnail\", \"medium\", \"full\" -->\n  <!-- are available in this block                -->\n  <img src=\"{{thumbnail}}\" />\n{{/each}}\n\n<!-- Show all linked Regions, comma-separated: -->\n<p> Regions: \n  {{#each regions}}\n    <!-- Region fields are available in this block -->\n    {{#if title}}\n      {{title}}\n    {{else}}\n      {{id}}\n    {{/if}}{{#unless @last}}, {{/unless}}\n  {{/each}}\n</p>",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "detailsViewRegion": {
+      "html": "<div>\n  <p>This is the demo content of the <strong>Region Details View</strong>.</p>\n  <p>How to edit it: if you are in mapsvg control panel now, click on the following link to open the template editor for this view: <a href=\"#\" class=\"mapsvg-template-link\" data-template=\"detailsViewRegion\">Menu > Templates > Region Details View</a>.</p>\n  <p>More information about templates: <a href=\"https://mapsvg.com/docs/map-editor/templates\" target=\"_blank\">mapsvg.com/docs/map-editor/templates</a></p>\n</div>\n<hr />\n\n<!-- Region fields are available in this template -->\n<h5>{{#if title}} {{title}} {{else}} {{id}} {{/if}}</h5>\n<p>Status: {{status_text}}</p>\n\n<!-- Show all linked Database Objects: -->\n{{#each objects}}\n\n  <!-- DB Object are available inside of this block -->\n\n  <h5>{{title}}</h5>\n  <!-- When you need to render a field as HTML, use 3 curly braces instead of 2:-->\n  <p>{{{description}}}</p>\n  <p><em>{{location.address.formatted}}</em></p>\n\n  <!-- Show all images: -->\n  {{#each images}}\n    <!-- Image fields \"thumbnail\", \"medium\", \"full\" -->\n    <!-- are available in this block                -->\n    <img src=\"{{thumbnail}}\" />\n  {{/each}}\n\n{{/each}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "labelMarker": {
+      "html": "{{#if location.address.formatted}}\n        {{location.address.formatted}}\n      {{else}}\n        {{#if location.geoPoint.lat}}\n          {{location.geoPoint.lat}}, {{location.geoPoint.lng}}\n        {{/if}}\n      {{/if}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "labelRegion": {
+      "html": "{{title}}",
+      "css": "",
+      "js": "",
+      "type": "default"
+    },
+    "labelLocation": {
+      "html": "You are here!",
+      "css": "",
+      "js": "",
+      "type": "default"
+    }
+  },
+  "presets": [
+    "<div class=\"mapsvg-details-list\">\n            {{#each objects}}\n          <div class=\"mapsvg-details-list-item\">\n                  <div class=\"mapsvg-details-list-item-image\">\n                    <img src=\"{{images.0.thumbnail}}\" />\n                  </div>\n                <div class=\"mapsvg-details-list-item-info\">    m\t      \n                    <h6>{{title}}</h6>\n                    <p class=\"mapsvg-details-address\">{{location.address.formatted}}</p>   \n              <p class=\"mapsvg-details-category\">{{category_text}}</p>                                   \n                    <p>{{description}}</p>  \n                <div class=\"mapsvg-details-link\"><a href=\"{{link}}\">{{link}}</a></div>              \n                  </div>\t            \n              </div>\n            {{/each}}\n          </div>",
+    "<div class=\"mapsvg-details-flex\">\n        \n        <div class=\"mapsvg-details-hero\">\n          <img src=\"{{images.0.full}}\" class=\"mapsvg-details-hero-image\"/>\n        </div>\n        <div class=\"mapsvg-details-info\">\n          <h4 class=\"mapsvg-details-header\">{{#if title}} {{title}} {{else}} {{id}} {{/if}}</h4>\n          {{description}}\n        </div>\n      </div>    \n    ",
+    "{{post}}",
+    "{{title}}",
+    "{{{description}}}",
+    "<div class=\"mapsvg-imageTitle-content\">\n  <div class=\"mapsvg-imageTitle-image\">\n    <img src=\"{{images.0.thumbnail}}\" />\n  </div>\n  <div class=\"mapsvg-imageTitle-title\">    \t      \n    {{title}}                                  \n  </div>\t            \n</div>",
+    "{{#if location.address.formatted}}\n        {{location.address.formatted}}\n      {{else}}\n        {{#if location.geoPoint.lat}}\n          {{location.geoPoint.lat}}, {{location.geoPoint.lng}}\n        {{/if}}\n      {{/if}}"
+  ]
+}

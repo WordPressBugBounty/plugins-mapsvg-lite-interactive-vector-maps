@@ -1,6 +1,7 @@
 <?php
 
 namespace MapSVG;
+require_once __DIR__ . '/../../Core/CodeEditorFeature.php';
 
 /**
  * Map class.
@@ -462,6 +463,12 @@ class Map extends Model implements \JsonSerializable
 	/** Authorize submitted code, preserving stored hooks when an ordinary save omits them. */
 	public static function prepareOptionsForWrite(array $options, array $previous = [])
 	{
+		if (!\MapSVG\Core\CodeEditorFeature::isEnabled()) {
+			// Legacy updates may omit code sections; omission cannot erase stored paid code.
+			foreach (['css', 'templates'] as $key) {
+				if (!array_key_exists($key, $options) && array_key_exists($key, $previous)) $options[$key] = $previous[$key];
+			}
+		}
 		if (!current_user_can('unfiltered_html') || !\MapSVG\Core\JavascriptFeature::isEnabled()) {
 			foreach (AppCodePolicy::HOOKS as $key) {
 				if (array_key_exists($key, $options) && $options[$key] !== ($previous[$key] ?? null) && !self::isEmptyCode($options[$key])) {

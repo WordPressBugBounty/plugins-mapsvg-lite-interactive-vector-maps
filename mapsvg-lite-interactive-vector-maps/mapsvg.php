@@ -1,9 +1,9 @@
 <?php
 /*
-Plugin Name: MapSVG Lite
+Plugin Name: MapSVG - Vector maps, Google Maps, Image maps - with AI assistant
 Plugin URI: https://mapsvg.com
 Description: AI maps for WordPress. Create interactive SVG maps, image maps, floor plans and Google Maps from one prompt.
-Version: 9.0.1
+Version: 9.0.2
 MapSVG Distribution: lite
 MapSVG Add-on API: 2
 Requires at least: 5.0
@@ -39,7 +39,7 @@ if (!defined('MAPSVG_PLAN')) {
     define('MAPSVG_PLAN', 'mapsvg-lite');
 }
 /** MapSVG version number */
-define('MAPSVG_VERSION', '9.0.1');
+define('MAPSVG_VERSION', '9.0.2');
 /**
  * Stable PHP contract version for separately packaged paid add-ons.
  * Bump only for an incompatible add-on bootstrap/module API change.

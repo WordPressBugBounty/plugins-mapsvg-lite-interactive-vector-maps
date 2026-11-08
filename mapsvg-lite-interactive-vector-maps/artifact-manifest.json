@@ -1,8 +1,8 @@
 {
   "name": "lite",
   "slug": "mapsvg-lite",
-  "title": "MapSVG Lite",
-  "version": "9.0.1",
+  "title": "MapSVG - Vector maps, Google Maps, Image maps - with AI assistant",
+  "version": "9.0.2",
   "assetSlug": "mapsvg-lite",
   "mode": "base",
   "pluginDirectory": "mapsvg-lite-interactive-vector-maps",

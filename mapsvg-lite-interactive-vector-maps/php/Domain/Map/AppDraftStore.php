@@ -305,8 +305,11 @@ final class AppDraftStore
                 $key = 'usermeta:' . $author . ':' . $mapId . ':' . hash('sha256', $this->json($payload));
                 if (!$this->db->get_var($this->db->prepare("SELECT id FROM `{$this->drafts}` WHERE legacy_key=%s", $key))) {
                     // Old usermeta was client-controlled. Restricted editors cannot migrate new code.
-                    if ((current_user_can('unfiltered_html') && \MapSVG\Core\JavascriptFeature::isEnabled()) || AppCodePolicy::scripts($payload['options']) == AppCodePolicy::scripts($production['options'])) {
+                    try {
+                        AppCodePolicy::assertUnchanged($payload['options'], $production['options']);
                         $this->addDraft($mapId, 'Recovered draft · user ' . $author, array_merge($production, ['options' => $payload['options']]), null, $author, $key);
+                    } catch (\RuntimeException $error) {
+                        if ($error->getCode() !== 403) throw $error;
                     }
                 }
             }
@@ -393,7 +396,7 @@ final class AppDraftStore
         return $this->atomic(function () use ($mapId, $draftId, $revision, $snapshot) {
             $this->lockApp($mapId);
             $meta = $this->metadata($mapId, $draftId, $revision);
-            if (!current_user_can('unfiltered_html') || !\MapSVG\Core\JavascriptFeature::isEnabled()) {
+            if (AppCodePolicy::isRestricted()) {
                 AppCodePolicy::assertUnchanged($snapshot['options'], $this->get($mapId, $draftId)['snapshot']['options']);
             }
             $source = isset($meta['source_version_id']) ? (int) $meta['source_version_id'] : null;
@@ -552,11 +555,11 @@ final class AppDraftStore
                 if ((int) $previous['draft_id'] !== $draftId || self::decodeSnapshot($previous['snapshot']) != $snapshot) throw new \RuntimeException('Publication request ID was already used.', 409);
                 return ['version_id' => (int) $previous['id'], 'revision' => $this->get($mapId, $draftId)['revision']];
             }
-            if (!current_user_can('unfiltered_html') || !\MapSVG\Core\JavascriptFeature::isEnabled()) {
+            if (AppCodePolicy::isRestricted()) {
                 AppCodePolicy::assertUnchanged($snapshot['options'], $this->production($mapId)['options']);
             }
             $meta = $this->metadata($mapId, $draftId, $revision);
-            if (!current_user_can('unfiltered_html') || !\MapSVG\Core\JavascriptFeature::isEnabled()) {
+            if (AppCodePolicy::isRestricted()) {
                 AppCodePolicy::assertUnchanged($snapshot['options'], $this->get($mapId, $draftId)['snapshot']['options']);
             }
             $source = isset($meta['source_version_id']) ? (int) $meta['source_version_id'] : null;

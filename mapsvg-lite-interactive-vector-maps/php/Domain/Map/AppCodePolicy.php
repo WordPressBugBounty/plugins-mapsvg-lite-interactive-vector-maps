@@ -2,14 +2,22 @@
 
 namespace MapSVG;
 require_once __DIR__ . "/../../Core/JavascriptFeature.php";
+require_once __DIR__ . '/AppPresentationPolicy.php';
 
-/** Executable slots in full authoring snapshots, including sparse Scene overrides. */
+/** Product/code permissions for full snapshots, including sparse Scene overrides. */
 final class AppCodePolicy
 {
     public const HOOKS = ['events', 'middlewares', 'onClick', 'mouseOver', 'mouseOut', 'menuOnClick', 'beforeLoad', 'afterLoad'];
 
+    public static function isRestricted(): bool
+    {
+        return !current_user_can('unfiltered_html') || !\MapSVG\Core\JavascriptFeature::isEnabled()
+            || !\MapSVG\Core\CodeEditorFeature::isEnabled();
+    }
+
     public static function assertUnchanged(array $options, array $previous): void
     {
+        AppPresentationPolicy::assertUnchanged($options, $previous);
         if (self::scripts($options) == self::scripts($previous)) return;
         if (!\MapSVG\Core\JavascriptFeature::isEnabled()) throw new \RuntimeException('JavaScript authoring is unavailable in this MapSVG installation.', 403);
         if (!current_user_can('unfiltered_html')) {
