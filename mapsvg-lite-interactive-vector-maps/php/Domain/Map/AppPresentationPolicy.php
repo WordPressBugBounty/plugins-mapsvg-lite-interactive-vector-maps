@@ -42,14 +42,22 @@ final class AppPresentationPolicy
         return $slots;
     }
 
+    /** Runtime setCss() substitutes %id% with the numeric map ID before Publish. */
+    private static function canonicalizeCss(string $value): string
+    {
+        return preg_replace('/#mapsvg-map-\d+/', '#mapsvg-map-%id%', $value) ?? $value;
+    }
+
     private static function builtin(array $path, $value): bool
     {
         if (!is_string($value)) return false;
         $catalog = self::catalog();
-        if ($path === ['css']) return $value === $catalog['css'];
+        $css = $path === ['css'] || end($path) === 'css';
+        $compare = $css ? self::canonicalizeCss($value) : $value;
+        if ($path === ['css']) return $compare === $catalog['css'];
         if ($path[0] === 'templates') {
             $default = $catalog['templates'][$path[1]][$path[2]] ?? null;
-            if ($value === $default) return true;
+            if ($compare === $default) return true;
         }
         return end($path) === 'html' && in_array($value, $catalog['presets'], true);
     }
