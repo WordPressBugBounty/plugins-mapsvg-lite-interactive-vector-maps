@@ -280,6 +280,9 @@ final class LocationNormalizer
                 'Location address must be an object, not a list.'
             );
         }
+        if (self::isBlankAddress($address)) {
+            return '';
+        }
 
         $formatted = $this->formattedAddress($address);
         if ($formatted === null) {
@@ -288,6 +291,64 @@ final class LocationNormalizer
             );
         }
         return $this->canonicalAddress($address, $formatted);
+    }
+
+    /**
+     * True when every address value is null, blank, or nested-blank.
+     * Legacy v8 SVG-only markers stored `{"state":"","state_short":"","zip":"","county":""}`.
+     *
+     * @param mixed $value
+     */
+    public static function isBlankAddress($value): bool
+    {
+        if ($value === null || $value === '' || $value === false) {
+            return true;
+        }
+        if (is_string($value)) {
+            return trim($value) === '';
+        }
+        if (is_object($value)) {
+            $value = get_object_vars($value);
+        }
+        if (!is_array($value)) {
+            return false;
+        }
+        foreach ($value as $item) {
+            if (!self::isBlankAddress($item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * True when stored `location_address` JSON is an object with no meaningful text.
+     * Non-JSON text, lists, and real component/formatted addresses are left alone.
+     *
+     * @param mixed $value
+     */
+    public static function isBlankStoredAddress($value): bool
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+        $json = trim($value);
+        if ($json === '') {
+            return false;
+        }
+
+        try {
+            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $error) {
+            return false;
+        }
+        if (!is_array($decoded)) {
+            return false;
+        }
+        if ($decoded !== array() && self::isList($decoded)) {
+            return false;
+        }
+        return self::isBlankAddress($decoded);
     }
 
     /** @param array<string,mixed> $address */

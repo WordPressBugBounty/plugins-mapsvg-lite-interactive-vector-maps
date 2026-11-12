@@ -1,3 +1,9 @@
 <?php
+
 namespace MapSVG;
-return function () {};
+
+return function () {
+
+    $db = Database::get();
+
+};

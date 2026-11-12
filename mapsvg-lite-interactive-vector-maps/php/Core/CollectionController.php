@@ -97,14 +97,10 @@ class CollectionController extends Controller
 
             $object = $repo->create($request[$name]);
         } catch (
-            \MapSVG\DataLayer\Validation\OperationValidationException
+            \InvalidArgumentException
             | \MapSVG\DataLayer\Validation\RecordValidationException $error
         ) {
-            return static::render(array(
-                'error' => $error->getMessage(),
-                'code' => $error->validationCode(),
-                'issues' => $error->issues(),
-            ), 422);
+            return static::writeValidationError($error);
         }
 
         $schema = $repo->getSchema();
@@ -193,13 +189,10 @@ class CollectionController extends Controller
                 ))->validateUpdate($patch);
             }
         } catch (
-            \MapSVG\DataLayer\Validation\OperationValidationException $error
+            \InvalidArgumentException
+            | \MapSVG\DataLayer\Validation\RecordValidationException $error
         ) {
-            return static::render(array(
-                'error' => $error->getMessage(),
-                'code' => $error->validationCode(),
-                'issues' => $error->issues(),
-            ), 422);
+            return static::writeValidationError($error);
         }
 
         $object = $repo->findById($patch['id']);
@@ -207,14 +200,10 @@ class CollectionController extends Controller
         try {
             $repo->updateFromController($object, $patch);
         } catch (
-            \MapSVG\DataLayer\Validation\OperationValidationException
+            \InvalidArgumentException
             | \MapSVG\DataLayer\Validation\RecordValidationException $error
         ) {
-            return static::render(array(
-                'error' => $error->getMessage(),
-                'code' => $error->validationCode(),
-                'issues' => $error->issues(),
-            ), 422);
+            return static::writeValidationError($error);
         }
 
         // WP Post CPT: sync location + regions meta.
@@ -298,6 +287,36 @@ class CollectionController extends Controller
         }
         $distinctValues = $repo->getDistinctValues($request['_field_name']);
         return static::render(['items' => $distinctValues], 200);
+    }
+
+    /**
+     * LocationNormalizer and other write guards throw InvalidArgumentException.
+     * Surface those as the same 422 envelope the editor already understands.
+     *
+     * @param \InvalidArgumentException|\MapSVG\DataLayer\Validation\RecordValidationException $error
+     */
+    private static function writeValidationError(\Throwable $error): \WP_REST_Response
+    {
+        if ($error instanceof \MapSVG\DataLayer\Validation\OperationValidationException
+            || $error instanceof \MapSVG\DataLayer\Validation\RecordValidationException) {
+            return static::render(array(
+                'error' => $error->getMessage(),
+                'code' => $error->validationCode(),
+                'issues' => $error->issues(),
+            ), 422);
+        }
+
+        $message = $error->getMessage();
+        $isLocation = strncmp($message, 'Location ', 9) === 0;
+        return static::render(array(
+            'error' => $message,
+            'code' => 'record_validation_failed',
+            'issues' => array(array(
+                'path' => $isLocation ? array('location') : array(),
+                'message' => $message,
+                'keyword' => $isLocation ? 'location' : 'invalid',
+            )),
+        ), 422);
     }
 
 
