@@ -23,6 +23,13 @@ class MapController extends Controller
 		 */
 		$mapsRepository = RepositoryFactory::get("map");
 		$query = new Query($request->get_params());
+		if (!current_user_can('edit_posts')) {
+			$ids = PublicReadAccess::mapIds();
+			if (isset($query->filters['id'])) {
+				$ids = array_values(array_intersect($ids, (array) $query->filters['id']));
+			}
+			$query->filters['id'] = $ids ?: [0];
+		}
 		$maps = $mapsRepository->find($query);
 
 		return self::render($maps);

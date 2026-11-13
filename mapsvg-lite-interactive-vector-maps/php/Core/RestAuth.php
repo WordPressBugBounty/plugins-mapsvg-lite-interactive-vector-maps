@@ -14,34 +14,37 @@ namespace MapSVG;
 class RestAuth
 {
     /**
-     * Public read-only MapSVG REST route prefixes.
-     *
-     * @var string[]
-     */
-    private const PUBLIC_GET_PREFIXES = array(
-        '/mapsvg/v1/objects',
-        '/mapsvg/v1/regions',
-        '/mapsvg/v1/collection',
-        '/mapsvg/v1/maps',
-    );
-
-    /**
      * Whether a REST route is a public MapSVG GET endpoint.
      *
      * Accepts either a rest_route query var ("/mapsvg/v1/objects/objects_2")
      * or a full request URI ("/wp-json/mapsvg/v1/objects/objects_2?...").
      */
-    public static function isPublicReadRoute(string $route): bool
+    public static function isPublicReadRoute(string $route, array $params = []): bool
     {
         $path = self::normalizeRoute($route);
         if ($path === '') {
             return false;
         }
 
-        foreach (self::PUBLIC_GET_PREFIXES as $prefix) {
-            if ($path === $prefix || strpos($path, $prefix . '/') === 0) {
-                return true;
+        // The catalog filters publication before paging; other GET subroutes may be editor-only.
+        if ($path === '/mapsvg/v1/maps') return true;
+        try {
+            if (preg_match('~\A/mapsvg/v1/maps/([1-9][0-9]*)(?:/svg)?\z~D', $path, $matches)) {
+                $query = [];
+                parse_str((string) parse_url($route, PHP_URL_QUERY), $query);
+                $query = array_merge($query, $params);
+                if (array_key_exists('mapsvg_version', $query)) {
+                    (new AppDraftStore())->publishedVersion((int) $matches[1], AppPublishedVersion::id($query['mapsvg_version']));
+                    return true;
+                }
+                return in_array((int) $matches[1], PublicReadAccess::mapIds(), true);
             }
+            if (preg_match('~\A/mapsvg/v1/(?:collection|objects|regions)/([A-Za-z0-9_-]+)(?:/([^/]+))?\z~D', $path, $matches)) {
+                return PublicReadAccess::collection($matches[1]);
+            }
+        } catch (\Throwable $error) {
+            // Failed access lookups never turn an authentication error into a public request.
+            return false;
         }
 
         return false;
@@ -50,11 +53,11 @@ class RestAuth
     /**
      * Whether a failed cookie-nonce check should be ignored for this request.
      */
-    public static function shouldAllowStaleNonce(string $errorCode, string $method, string $route): bool
+    public static function shouldAllowStaleNonce(string $errorCode, string $method, string $route, array $params = []): bool
     {
         return $errorCode === 'rest_cookie_invalid_nonce'
             && strtoupper($method) === 'GET'
-            && self::isPublicReadRoute($route);
+            && self::isPublicReadRoute($route, $params);
     }
 
     /**
@@ -71,7 +74,7 @@ class RestAuth
         }
 
         $method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string) $_SERVER['REQUEST_METHOD']) : '';
-        if (!self::shouldAllowStaleNonce($result->get_error_code(), $method, self::currentRestRoute())) {
+        if (!self::shouldAllowStaleNonce($result->get_error_code(), $method, self::currentRestRoute(), $_GET)) {
             return $result;
         }
 

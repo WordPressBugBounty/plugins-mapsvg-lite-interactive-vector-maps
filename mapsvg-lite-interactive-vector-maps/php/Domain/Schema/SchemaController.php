@@ -17,6 +17,13 @@ class SchemaController extends Controller
 		$schemaRepository = RepositoryFactory::get("schema");
 		$response   = array();
 		$query = new Query($request->get_params());
+		if (!current_user_can('edit_posts')) {
+			$names = PublicReadAccess::collectionNames();
+			if (isset($query->filters['name'])) {
+				$names = array_values(array_intersect($names, (array) $query->filters['name']));
+			}
+			$query->filters['name'] = $names ?: [''];
+		}
 		$response = $schemaRepository->find($query);
 
 		return new \WP_REST_Response($response, 200);
@@ -31,7 +38,7 @@ class SchemaController extends Controller
 	{
 		$schemaRepository = RepositoryFactory::get("schema");
 		$schema = $schemaRepository->findById((int) $request['id']);
-		if (!$schema) {
+		if (!$schema || (!current_user_can('edit_posts') && !PublicReadAccess::collection($schema->name))) {
 			return self::render(['error' => 'Schema not found.'], 404);
 		}
 

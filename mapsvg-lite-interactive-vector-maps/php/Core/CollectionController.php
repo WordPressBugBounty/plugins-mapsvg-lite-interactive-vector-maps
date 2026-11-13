@@ -19,6 +19,9 @@ class CollectionController extends Controller
 
     public static function index(\WP_REST_Request $request): \WP_REST_Response
     {
+        if ($error = PublicReadAccess::collectionError($request['_collection_name'])) {
+            return static::render(['error' => $error->get_error_message()], $error->get_error_data()['status']);
+        }
         $repo  = RepositoryFactory::get($request['_collection_name']);
         if ($repo && \MapSVG\Core\PostDataFeature::usesPosts($repo->schema) && !\MapSVG\Core\PostDataFeature::isEnabled()) {
             return static::render(['error' => 'WordPress data sources require a paid MapSVG add-on.'], 403);
@@ -57,7 +60,11 @@ class CollectionController extends Controller
 
     public static function get(\WP_REST_Request $request): \WP_REST_Response
     {
+        if ($error = PublicReadAccess::collectionError($request['_collection_name'])) {
+            return static::render(['error' => $error->get_error_message()], $error->get_error_data()['status']);
+        }
         $repo   = RepositoryFactory::get($request['_collection_name']);
+        if (!$repo) return static::render(['error' => 'Collection not found.'], 404);
         if ($repo && \MapSVG\Core\PostDataFeature::usesPosts($repo->schema) && !\MapSVG\Core\PostDataFeature::isEnabled()) {
             return static::render(['error' => 'WordPress data sources require a paid MapSVG add-on.'], 403);
         }

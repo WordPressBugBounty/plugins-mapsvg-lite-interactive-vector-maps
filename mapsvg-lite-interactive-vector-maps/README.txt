@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: ai maps, interactive map, map, google maps, store locator
 Requires at least: 5.0
 Tested up to: 7.1.4
-Stable tag: 9.0.5
+Stable tag: 9.0.6
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -105,11 +105,17 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 
 == Changelog ==
 
+= 9.0.6 =
+* **Lite**: Improved access checks for map and Collection data.
+* **Lite**: Fixed saving and publishing maps upgraded from v8 with default templates.
+
 = 9.0.5 =
 * **Lite**: Security improvements for Collection data and embedded content.
 * **Lite**: Fixed linked WordPress post fields in local Collections.
 * **Lite**: Fixed loading individual Collection schemas and Region filter labels.
 * **Lite**: Improved Google Maps zoom stability and overlapping marker interactions.
+* **Professional, Business, Pro, Elite, Envato and Demo**: Added smooth cluster split/merge animations and animated expansion of markers at the same location.
+* **Professional, Business, Pro, Elite, Envato and Demo**: Fixed cluster updates during rapid Google Maps zoom changes. These add-ons require Lite 9.0.5 or newer.
 
 = 9.0.4 =
 * Fixed saving records with empty location addresses after upgrading from v8.

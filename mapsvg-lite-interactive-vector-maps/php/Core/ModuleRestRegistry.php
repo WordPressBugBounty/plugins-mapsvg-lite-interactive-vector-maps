@@ -33,7 +33,7 @@ final class ModuleRestRegistry
         $this->register($owner, $route, self::scopeCollection($endpoints));
     }
 
-    /** Canonical and legacy Collection routes share this reserved-source boundary. */
+    /** Canonical and legacy Collection routes share reserved-source and publication checks. */
     public static function scopeCollection(array $endpoints): array
     {
         foreach ($endpoints as &$endpoint) {
@@ -45,6 +45,10 @@ final class ModuleRestRegistry
                 }
                 if (\MapSVG\RepositoryFactory::isInternalSchemaName($name)) {
                     return new \WP_Error('mapsvg_internal_collection', 'Internal repositories are not available through collection routes.', ['status' => 403]);
+                }
+                if (in_array($request->get_method(), ['GET', 'HEAD'], true)) {
+                    $error = \MapSVG\PublicReadAccess::collectionError($name);
+                    if ($error) return $error;
                 }
                 return call_user_func($permission, $request);
             };

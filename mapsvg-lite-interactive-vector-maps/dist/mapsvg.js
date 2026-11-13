@@ -1,2 +1,2 @@
-import"./tslib.es6-CTK27J72.js";export{z as Map,M as Mapsvg,m as mapsvgCore}from"./Mapsvg-B60D5cP2.js";
+import"./tslib.es6-BCh8EJiz.js";export{z as Map,M as Mapsvg,m as mapsvgCore}from"./Mapsvg-KP4W83Q5.js";
 //# sourceMappingURL=mapsvg.js.map

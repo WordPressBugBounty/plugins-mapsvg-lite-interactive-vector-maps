@@ -17,6 +17,17 @@ final class AppPresentationPolicy
         return $catalog;
     }
 
+    /** The frozen client and v8 migration supply these exact native HTML values. */
+    private static function legacyTemplates(): array
+    {
+        static $templates;
+        if ($templates === null) {
+            $frozen = json_decode(file_get_contents(__DIR__ . '/../../Core/legacy-v8-defaults.json'), true, 512, JSON_THROW_ON_ERROR);
+            $templates = $frozen['options']['templates'];
+        }
+        return $templates;
+    }
+
     /** Normalize legacy string templates and JSON dictionary transports. */
     private static function slots(array $options): array
     {
@@ -58,6 +69,7 @@ final class AppPresentationPolicy
         if ($path[0] === 'templates') {
             $default = $catalog['templates'][$path[1]][$path[2]] ?? null;
             if ($compare === $default) return true;
+            if ($path[2] === 'html' && $value === (self::legacyTemplates()[$path[1]] ?? null)) return true;
         }
         return end($path) === 'html' && in_array($value, $catalog['presets'], true);
     }
@@ -66,7 +78,10 @@ final class AppPresentationPolicy
     {
         foreach (array_unique(array_merge(array_keys($next), array_keys($old))) as $key) {
             $value = $next[$key] ?? null;
-            if ($value === ($old[$key] ?? null) || self::builtin(json_decode($key, true), $value)) continue;
+            $path = json_decode($key, true);
+            if ($value === ($old[$key] ?? null) || self::builtin($path, $value)) continue;
+            // Clearing a native default is not custom authoring; acknowledged custom code stays protected.
+            if ($value === null && self::builtin($path, $old[$key] ?? null)) continue;
             throw new \RuntimeException('Custom CSS/HTML templates require the MapSVG code_editor module.', 403);
         }
     }
