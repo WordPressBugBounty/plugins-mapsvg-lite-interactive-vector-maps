@@ -23,6 +23,22 @@ class SchemaController extends Controller
 	}
 
 	/**
+	 * Returns a schema by its catalog ID.
+	 * @param \WP_REST_Request $request
+	 * @return \WP_REST_Response
+	 */
+	public static function get($request)
+	{
+		$schemaRepository = RepositoryFactory::get("schema");
+		$schema = $schemaRepository->findById((int) $request['id']);
+		if (!$schema) {
+			return self::render(['error' => 'Schema not found.'], 404);
+		}
+
+		return self::render(['schema' => $schema], 200);
+	}
+
+	/**
 	 * Creates new schema
 	 * @param \WP_REST_Request $request
 	 * @return \WP_REST_Response

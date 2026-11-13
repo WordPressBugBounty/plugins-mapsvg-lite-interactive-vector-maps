@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Post;
 
-/** WordPress-owned legacy post payload enrichment with request-scoped caching. */
+/** Core linked-post enrichment with request-scoped caching; callers gate native WP/CPT sources. */
 final class WordPressPostEnricher implements PostEnricher
 {
     private int $maxUniquePosts;
@@ -25,7 +25,6 @@ final class WordPressPostEnricher implements PostEnricher
     /** @param mixed $postId @return mixed */
     public function enrich($postId)
     {
-        \MapSVG\Core\PostDataFeature::assertEnabled();
         $id = $this->postId($postId);
         if ($id === null) {
             return null;
@@ -47,7 +46,6 @@ final class WordPressPostEnricher implements PostEnricher
 
     public function enrichMany(array $postIds): array
     {
-        \MapSVG\Core\PostDataFeature::assertEnabled();
         $unique = array();
         foreach ($postIds as $postId) {
             $id = $this->postId($postId);

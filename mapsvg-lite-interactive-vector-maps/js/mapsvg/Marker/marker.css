@@ -91,3 +91,27 @@
 .mapsvg-marker-label:empty {
   display: none;
 }
+.mapsvg-marker-spread {
+  z-index: 3;
+  transition: none;
+}
+.mapsvg-marker-spread-closing {
+  pointer-events: none;
+}
+.mapsvg-marker-spread-source {
+  visibility: hidden;
+  pointer-events: none;
+}
+.mapsvg svg.mapsvg-marker-spread-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 2;
+}
+.mapsvg-marker-spread-lines line {
+  stroke: #666;
+  stroke-width: 1;
+}

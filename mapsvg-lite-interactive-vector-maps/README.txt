@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: ai maps, interactive map, map, google maps, store locator
 Requires at least: 5.0
 Tested up to: 7.1.4
-Stable tag: 9.0.4
+Stable tag: 9.0.5
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -104,6 +104,12 @@ Use the Support button in MapSVG to open your Dashboard, then use the chat butto
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 9.0.5 =
+* **Lite**: Security improvements for Collection data and embedded content.
+* **Lite**: Fixed linked WordPress post fields in local Collections.
+* **Lite**: Fixed loading individual Collection schemas and Region filter labels.
+* **Lite**: Improved Google Maps zoom stability and overlapping marker interactions.
 
 = 9.0.4 =
 * Fixed saving records with empty location addresses after upgrading from v8.

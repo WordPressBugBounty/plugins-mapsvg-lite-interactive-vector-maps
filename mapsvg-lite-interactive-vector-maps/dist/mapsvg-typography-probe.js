@@ -1,2 +1,2 @@
-import{_ as o}from"./tslib.es6-DG13vwf9.js";import{r as t}from"./themeTypography-BUk3MZMb.js";function e(){return o(this,void 0,void 0,(function*(){const o=t(document);window.parent.postMessage({type:"mapsvg:theme-typography",typography:o},window.location.origin)}))}"complete"===document.readyState?e():window.addEventListener("load",(()=>{e()}),{once:!0});
+import{_ as o}from"./tslib.es6-CTK27J72.js";import{r as t}from"./themeTypography-DTeQUKwi.js";function e(){return o(this,void 0,void 0,(function*(){const o=t(document);window.parent.postMessage({type:"mapsvg:theme-typography",typography:o},window.location.origin)}))}"complete"===document.readyState?e():window.addEventListener("load",(()=>{e()}),{once:!0});
 //# sourceMappingURL=mapsvg-typography-probe.js.map

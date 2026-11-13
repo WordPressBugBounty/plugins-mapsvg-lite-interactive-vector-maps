@@ -173,6 +173,7 @@ class ShortcodeHandler
 	 */
 	public static function renderPostEmbed(int $postId): void
 	{
+		ShortcodePage::getPublicPost($postId);
 
 		self::loadBlankTemplate();
 		WooCommerceIntegration::setEmbedPostId($postId);

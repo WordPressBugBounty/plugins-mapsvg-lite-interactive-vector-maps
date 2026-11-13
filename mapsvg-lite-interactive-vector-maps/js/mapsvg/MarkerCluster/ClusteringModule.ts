@@ -53,5 +53,6 @@ export interface ClusteringModule {
   hit: (target: HTMLElement) => import("./MarkerCluster").MarkerCluster | undefined
   setColors: (this: MapSVGMap) => void
   dispose: (this: MapSVGMap) => void
+  cancelTransitions?: (this: MapSVGMap) => void
   sync: (this: MapSVGMap, services: ClusterServices) => void
 }

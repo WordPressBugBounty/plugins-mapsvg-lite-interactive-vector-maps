@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace MapSVG\Core;
 
-/** Package policy, independent of WordPress record permissions. Catalog metadata is retained. */
+/** Native WP/CPT source policy. Linked post fields in local Collections are core-owned. */
 final class PostDataFeature
 {
     public static function isEnabled(): bool
@@ -14,10 +14,7 @@ final class PostDataFeature
     {
         $schema = is_array($schema) ? (object) $schema : $schema;
         if (!$schema) return false;
-        if (($schema->type ?? '') === 'post' || !empty($schema->postType)) return true;
-        $fields = method_exists($schema, 'getFields') ? $schema->getFields() : ($schema->fields ?? []);
-        foreach ($fields as $field) if ((((array) $field)['type'] ?? null) === 'post') return true;
-        return false;
+        return ($schema->type ?? '') === 'post' || !empty($schema->postType);
     }
     public static function assertEnabled(): void
     {

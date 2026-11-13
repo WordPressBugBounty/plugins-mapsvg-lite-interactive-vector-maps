@@ -18,7 +18,7 @@ final class WordPressPostIdResolver implements PostIdResolver
 
     public function resolveFilter(Schema $schema, array $filter): array
     {
-        \MapSVG\Core\PostDataFeature::assertEnabled();
+        \MapSVG\Core\PostDataFeature::assertSchema($schema);
         $allowed = array(
             'name',
             'post',
@@ -66,7 +66,7 @@ final class WordPressPostIdResolver implements PostIdResolver
 
     public function resolveSearch(Schema $schema, string $term): array
     {
-        \MapSVG\Core\PostDataFeature::assertEnabled();
+        \MapSVG\Core\PostDataFeature::assertSchema($schema);
         $args = $this->baseArgs($schema);
         $args['s'] = $term;
         return $this->run($args);

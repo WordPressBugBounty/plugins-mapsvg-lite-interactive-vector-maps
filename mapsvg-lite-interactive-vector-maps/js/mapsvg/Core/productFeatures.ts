@@ -20,7 +20,7 @@ export function mergeLiteFilterFields<T extends { type: string }>(previous: T[],
   return [...merged, ...queue]
 }
 
-/** Source metadata stays readable on downgrade; WordPress-backed rows do not. */
+/** Only native WP/CPT sources need this capability; local linked post fields are core-owned. */
 export function schemaUsesPostData(schema: { type?: unknown; postType?: unknown; getFields?: () => { type?: unknown }[]; fields?: { type?: unknown }[] } | null | undefined): boolean {
-  return !!schema && (schema.type === "post" || !!schema.postType || (schema.getFields?.() ?? schema.fields ?? []).some(field => field.type === "post"))
+  return !!schema && (schema.type === "post" || !!schema.postType)
 }

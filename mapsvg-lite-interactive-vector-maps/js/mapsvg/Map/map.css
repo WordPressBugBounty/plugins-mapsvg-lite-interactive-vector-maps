@@ -4,6 +4,8 @@
   height: 100px;
   position: relative;
   overflow: hidden;
+  /* The camera owns movement; native focus/scrollIntoView must not scroll the viewport. */
+  overflow: clip;
 }
 .mapsvg-wrap-all {
   text-align: left;

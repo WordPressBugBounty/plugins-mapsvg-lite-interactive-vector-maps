@@ -80,8 +80,8 @@ class ShortcodePage
 	private function getOrCreatePost()
 	{
 		// Try to find an existing post of type mapsvg_shortcode with this slug
-		if ($this->postId) {
-			$existing = [get_post($this->postId)];
+		if ($this->postId !== null) {
+			$existing = [self::getPublicPost($this->postId)];
 		} else {
 			$existing = get_posts([
 				'name' => $this->slug,
@@ -108,6 +108,18 @@ class ShortcodePage
 		}
 
 		return $post;
+	}
+
+	/** Post embeds expose only public content, including for logged-in administrators. */
+	public static function getPublicPost(int $postId): \WP_Post
+	{
+		$post = $postId > 0 ? get_post($postId) : null;
+		if (!$post || $post->post_status !== 'publish' || $post->post_password !== ''
+			|| !is_post_type_viewable($post->post_type)) {
+			wp_die('Post not found.', '', ['response' => 404]);
+		}
+		// Dynamic preview content must not mutate WordPress's cached post instance.
+		return clone $post;
 	}
 
 	/**

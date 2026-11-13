@@ -46,6 +46,10 @@ export class Marker extends MapObject {
   private svgPointBeforeDrag: SVGPoint
   private worldCopies: WorldCopies
   interactionElement?: HTMLElement
+  /** Render-only displacement while an overlapping group is expanded. */
+  screenOffset?: ScreenPoint
+  /** Transient cluster split/merge displacement; never included in Location or Worker data. */
+  clusterOffset?: ScreenPoint
 
   mapped?: boolean
   needToRemove?: boolean
@@ -236,6 +240,7 @@ export class Marker extends MapObject {
    * @param {SVGPoint} svgPoint
    */
   setSvgPoint(svgPoint: SVGPoint): void {
+    this.mapsvg.collapseMarkerSpread?.()
     this.svgPoint = svgPoint
 
     // if (this.location) {
@@ -316,12 +321,15 @@ export class Marker extends MapObject {
 
     this.updateVisibility()
 
+    const displayX = x + (this.screenOffset?.x ?? 0) + (this.clusterOffset?.x ?? 0)
+    const displayY = y + (this.screenOffset?.y ?? 0) + (this.clusterOffset?.y ?? 0)
+
     if (this.visible === true) {
-      this.element.style.transform = "translate(" + x + "px," + y + "px)"
+      this.element.style.transform = "translate(" + displayX + "px," + displayY + "px)"
 
       this.adjustLabelScreenPosition()
     }
-    this.worldCopies.update(x, y, this.mapsvg.converter.getWorldWidth(),
+    this.worldCopies.update(displayX, displayY, this.mapsvg.converter.getWorldWidth(),
       this.mapsvg.containers.map.clientWidth, this.mapsvg.containers.map.clientHeight, this.width, this.height)
   }
 
@@ -330,6 +338,10 @@ export class Marker extends MapObject {
     const offset = this.interactionElement?.parentElement === this.element.parentElement
       ? Number(this.interactionElement?.dataset.mapsvgWorldOffset || 0) : 0
     return this.screenPoint.x + this.width / 2 + offset
+  }
+
+  forEachRepresentation(callback: (element: HTMLElement) => void): void {
+    this.worldCopies.forEach(callback)
   }
 
   /**
@@ -464,12 +476,18 @@ export class Marker extends MapObject {
    * Deletes the Marker
    */
   delete(): void {
-    this.worldCopies.destroy()
+    this.mapsvg.collapseMarkerSpread?.()
+    this.detach()
     if (this.label) {
       this.label.remove()
       this.label = null
     }
     $(this.element).empty().remove()
+  }
+  /** Clustering detaches the presentation while retaining the semantic marker. */
+  detach(): void {
+    this.worldCopies.destroy()
+    this.element.remove()
   }
   /**
    * Sets parent DB object of the Marker
@@ -483,6 +501,7 @@ export class Marker extends MapObject {
    * Hides the Marker
    */
   hide(): void {
+    this.mapsvg.collapseMarkerSpread?.()
     $(this.element).addClass("mapsvg-marker-hidden")
     if (this.label) {
       $(this.label).hide()

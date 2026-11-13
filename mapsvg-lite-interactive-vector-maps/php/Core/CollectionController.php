@@ -84,6 +84,7 @@ class CollectionController extends Controller
             return static::render([], 400);
         }
 
+        $payload = CollectionFieldSanitizer::sanitizeObject($request[$name], $repo->getSchema());
         try {
             if (
                 \MapSVG\DataLayer\Validation\OperationValidationService::writeValidationEnabled(
@@ -92,10 +93,10 @@ class CollectionController extends Controller
             ) {
                 (new \MapSVG\DataLayer\Validation\OperationValidationService(
                     $repo->schema
-                ))->validateCreate((array) $request[$name]);
+                ))->validateCreate((array) $payload);
             }
 
-            $object = $repo->create($request[$name]);
+            $object = $repo->create($payload);
         } catch (
             \InvalidArgumentException
             | \MapSVG\DataLayer\Validation\RecordValidationException $error
@@ -177,7 +178,7 @@ class CollectionController extends Controller
         $name   = $repo->schema->objectNameSingular;
         $schema = $repo->getSchema();
 
-        $patch = (array) $request[$name];
+        $patch = (array) CollectionFieldSanitizer::sanitizeObject($request[$name], $schema);
         try {
             if (
                 \MapSVG\DataLayer\Validation\OperationValidationService::writeValidationEnabled(

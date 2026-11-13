@@ -1,6 +1,7 @@
 import { Controller } from "../Core/Controller"
 import { googleMapLanguage, resolveGoogleMapStyles } from "./GoogleMapsOptions"
 import { linkedPostRepository } from "./linkedPost"
+import { formatFilterTagChipText } from "./formatFilterTagValue"
 import { onlySurfaceColorChanges, SURFACE_COLOR_KEYS } from "./surfaceColors"
 import type { DirectoryModule } from "../Directory/DirectoryModule"
 import { hasRuntimeFeature, availableFilterFields } from "../Core/productFeatures"
@@ -80,6 +81,7 @@ import {
 import { MapObject, MapObjectEvent, MapObjectType } from "../MapObject/MapObject"
 import { Marker } from "../Marker/Marker"
 import { WorldCopies } from "../Marker/WorldCopies"
+import { MarkerSpread } from "../Marker/MarkerSpread"
 import type { MarkerCluster } from "../MarkerCluster/MarkerCluster"
 import type { ClusteringModule } from "../MarkerCluster/ClusteringModule"
 import { Model } from "../Model/Model"
@@ -600,6 +602,7 @@ export class MapSVGMap {
    * ```
    */
   markers: ArrayIndexed<Marker> = new ArrayIndexed("id", [], { unique: true })
+  private markerSpread?: MarkerSpread
   /**
    * Array of Marker clusters
    */
@@ -1567,6 +1570,7 @@ export class MapSVGMap {
    * Delete all markers
    */
   deleteMarkers() {
+    this.collapseMarkerSpread()
     while (this.markers.length) {
       this.markerDelete(this.markers[0])
     }
@@ -2705,9 +2709,15 @@ export class MapSVGMap {
 
     let isZooming = false
     let isMoving = false
+    let preserveMarkerSpread = false
 
     if (viewBox) {
       const next = viewBox instanceof ViewBox ? viewBox : new ViewBox(viewBox)
+      // Google also redraws its overlay on a click without changing the camera.
+      // Keep the expanded hit targets until an actual viewport change occurs.
+      preserveMarkerSpread = !!this.googleMaps.map && adjustGoogleMap === false &&
+        next.x === this.viewBox.x && next.y === this.viewBox.y &&
+        next.width === this.viewBox.width && next.height === this.viewBox.height
       isZooming = this.checkIfZoomIsNeeded(next)
       isMoving = next.x !== this.viewBox.x || next.y !== this.viewBox.y
       this.viewBox.update(next)
@@ -2792,16 +2802,16 @@ export class MapSVGMap {
       })
     }
 
-    this.movingItemsAdjustScreenPosition()
+    this.movingItemsAdjustScreenPosition(preserveMarkerSpread)
 
     if (isZooming) {
       this.adjustStrokes()
       this.throttle(this.toggleSvgLayerOnZoom, 50, this)
       if (hasRuntimeFeature("clustering") && this.options.clustering.on) {
-        // Google Maps is calling setViewBox 20-30 times per zoom cycle (400ms)
-        // until the animation finishes. So we have to use .throttle to avoid calling
-        // the expensive operation multiple times.
-        this.throttle(this.clusterizeOnZoom, 400, this)
+        // Google can move a former cluster entirely offscreen during a fast zoom.
+        // Submit each projected scale immediately; Worker request IDs reject stale replies.
+        if (this.googleMaps.map) this.clusterizeOnZoom()
+        else this.throttle(this.clusterizeOnZoom, 400, this)
       } else {
         this.events.trigger(MapEventType.ZOOM)
       }
@@ -2820,7 +2830,8 @@ export class MapSVGMap {
     if (!this.converter) {
       return new GeoPoint(0, 0)
     } else {
-      return this.converter.convertSVGToGeo(this.getCenterSvgPoint(fromZeroLevel, viewBox))
+      // Camera coordinates must retain full precision, especially at high Google zoom.
+      return this.converter.convertSVGToGeo(this.getCenterSvgPoint(fromZeroLevel, viewBox), false)
     }
   }
 
@@ -3160,9 +3171,22 @@ export class MapSVGMap {
 
   mouseWheelZoom(event: JQuery.MouseEventBase<any, any, any, any>): void {
     event.preventDefault()
+    if (this.canZoom === false) return
     // @ts-ignore - doesn't recognize .deltaY
     const d = Math.sign(-event.originalEvent.deltaY)
-    const center = this.getSvgPointAtClick(event.originalEvent)
+    if (!d) return
+    let point = this.getScreenPointAtClick(event.originalEvent)
+    if (this.options.googleMaps?.on) {
+      const element = $(event.originalEvent.target).closest(".mapsvg-marker")[0] as HTMLElement | undefined
+      const marker = element && this.markers.get(element.dataset.mapsvgCopyOf || element.id)
+      if (marker && !marker.screenOffset && !marker.clusterOffset) {
+        const anchor = this.converter.convertSVGToPixel(marker.svgPoint, point.x)
+        // Wheel coordinates can be integral while the pin's anchor is fractional.
+        // Keep an effectively exact tip hit from magnifying that subpixel mismatch.
+        if (Math.hypot(anchor.x - point.x, anchor.y - point.y) <= 1) point = anchor
+      }
+    }
+    const center = this.converter.convertPixelToSVG(point)
     d > 0 ? this.zoomIn(center) : this.zoomOut(center)
   }
 
@@ -4052,7 +4076,7 @@ export class MapSVGMap {
       this.containers.filterTags || $('<div class="mapsvg-filter-tags"></div>')[0]
     $(this.containers.filterTags).empty()
     $(this.containers.filterTags).off()
-    if (this.options.filters.on) {
+    if (this.filtersShouldBeShown()) {
       $(this.containers.filterTags).hide()
       return
     } else {
@@ -4108,24 +4132,31 @@ export class MapSVGMap {
     )
   }
 
+  private getRegionFilterTagLabel(regionId: string): string | undefined {
+    const region = this.getRegion(regionId)
+    const title = region?.title || region?.data?.getData?.()?.title ||
+      this.regionsRepository?.getLoadedObject?.(regionId)?.getData?.()?.title
+    return title ? String(title) : undefined
+  }
+
   private updateFilterTags() {
     this.seFilterTags()
-    if (this.options.filters.on) {
+    if (this.filtersShouldBeShown()) {
       return
     }
 
     const repo =
       this.componentSource("filters") === "regions" ? this.regionsRepository : this.objectsRepository
 
-    const tags: { label: string; value: string; name: string }[] = []
+    const tags: { text: string; name: string }[] = []
 
     if (repo.query.search) {
-      tags.push({ label: "", value: repo.query.search, name: "search" })
+      tags.push({ text: repo.query.search, name: "search" })
     }
 
     const { distance, ...filters } = repo.query.filters
     if (distance && distance.address) {
-      tags.push({ label: "", value: distance.address, name: "distance" })
+      tags.push({ text: distance.address, name: "distance" })
     }
 
     for (const field_name in filters) {
@@ -4136,34 +4167,24 @@ export class MapSVGMap {
       if (!repoField) {
         continue
       }
-      const fieldFormattedName = filterField ? filterField.label : (repoField.label ?? "")
       let fieldFormattedValue = field_value
       if (repoField.type === "post" && field_value && typeof field_value === "object" && !Array.isArray(field_value)) {
         fieldFormattedValue = field_value.name ?? field_value.ID ?? field_value.id ?? ""
       }
 
-      if (filterField) {
-        if (filterField.type === "select") {
-          if (filterField.multiselect) {
-            fieldFormattedValue = field_value.map((value) => value.label).join(", ")
-          } else {
-            fieldFormattedValue = filterField.options.find(
-              (option) => option.value === field_value,
-            ).label
-          }
-        }
-      }
-
-      tags.push({ label: fieldFormattedName, value: fieldFormattedValue, name: field_name })
+      tags.push({
+        text: formatFilterTagChipText(field_name, fieldFormattedValue, {
+          filterField,
+          fieldLabel: filterField ? filterField.label : (repoField.label ?? ""),
+          getRegionLabel: (id) => this.getRegionFilterTagLabel(id),
+        }),
+        name: field_name,
+      })
     }
 
     this.containers.filterTags.replaceChildren()
     for (const tag of tags) {
-      const element = textElement(
-        "div",
-        "mapsvg-filter-tag",
-        `${tag.label ? tag.label + ": " : ""}${tag.value ?? ""}`,
-      )
+      const element = textElement("div", "mapsvg-filter-tag", tag.text)
       const remove = textElement("span", "mapsvg-filter-delete", "×")
       remove.setAttribute("data-filter", tag.name)
       element.appendChild(remove)
@@ -6021,6 +6042,7 @@ export class MapSVGMap {
    * @returns {MapSVGMap}
    */
   destroy(): void {
+    this.collapseMarkerSpread()
     this.galleryController?.destroy()
     this.eventWindow.clearTimeout(this.typographyResizeTimer)
     this.eventWindow.removeEventListener("resize", this.typographyResize)
@@ -6150,7 +6172,13 @@ export class MapSVGMap {
           { lat: minlat, lng: minlng },
           { lat: maxlat, lng: maxlng },
         )
-        this.googleMaps.map.fitBounds(bbox, 0)
+        const fitTargets = dbObjects.flatMap((object) => {
+          const marker = object.get("location")?.marker
+          return marker ? [marker] : []
+        })
+        this.googleMaps.map.fitBounds(bbox, this.getGoogleMapsFitPadding([
+          ...fitTargets, ...this.markersClusters,
+        ]))
       } else {
         if (
           dbObjects[0].getData().location &&
@@ -6613,7 +6641,7 @@ export class MapSVGMap {
           new google.maps.LatLng(bounds.sw),
           new google.maps.LatLng(bounds.ne),
         )
-        this.googleMaps.map.fitBounds(latLngBounds, 10)
+        this.googleMaps.map.fitBounds(latLngBounds, this.getGoogleMapsFitPadding(zoomTo))
         if (bounds.ne.lat === bounds.sw.lat && bounds.ne.lng === bounds.sw.lng) {
           this.googleMaps.map.setZoom(zoomToLevel)
         }
@@ -6672,6 +6700,23 @@ export class MapSVGMap {
       sw: new GeoPoint(minlat, minlng),
       ne: new GeoPoint(maxlat, maxlng),
     }
+  }
+
+  /** Pixel extents around geographic anchors; independent of the current zoom. */
+  getGoogleMapsFitPadding(objects: (Region | Marker | MarkerCluster)[]): google.maps.Padding {
+    const margin = 10
+    const padding = { top: margin, right: margin, bottom: margin, left: margin }
+    for (const object of objects) {
+      if (!object.isMarker() && !object.isCluster()) continue
+      const width = Number.isFinite(object.width) ? Math.max(0, object.width) : 0
+      const height = object.isMarker() ? (object as Marker).height : width
+      const safeHeight = Number.isFinite(height) ? Math.max(0, height) : 0
+      const anchorY = object.isMarker() && !(object as Marker).centered ? safeHeight : safeHeight / 2
+      padding.top = Math.max(padding.top, Math.ceil(margin + anchorY))
+      padding.bottom = Math.max(padding.bottom, Math.ceil(margin + safeHeight - anchorY))
+      padding.left = padding.right = Math.max(padding.left, Math.ceil(margin + width / 2))
+    }
+    return padding
   }
 
   getGroupBBox(
@@ -7060,8 +7105,8 @@ export class MapSVGMap {
    * Adjust positions of all movable objects (markers, clusters, popovers, labels)
    * @ignore
    */
-  movingItemsAdjustScreenPosition() {
-    this.markersAdjustScreenPosition()
+  movingItemsAdjustScreenPosition(preserveMarkerSpread = false) {
+    this.markersAdjustScreenPosition(preserveMarkerSpread)
 
     this.popoverAdjustScreenPosition()
 
@@ -7142,7 +7187,8 @@ export class MapSVGMap {
    * Adjusts position of Markers and MarkerClusters.
    * This method is called on zoom or when map container is resized.
    */
-  markersAdjustScreenPosition(): void {
+  markersAdjustScreenPosition(preserveMarkerSpread = false): void {
+    if (!preserveMarkerSpread) this.collapseMarkerSpread()
     this.markers.forEach((marker: Marker) => {
       marker.adjustScreenPosition()
     })
@@ -7161,6 +7207,7 @@ export class MapSVGMap {
    * @param {number} deltaY
    */
   markersMoveScreenPositionBy(deltaX: number, deltaY: number): void {
+    this.collapseMarkerSpread()
     this.markers.forEach((marker) => {
       marker.moveSrceenPositionBy(deltaX, deltaY)
     })
@@ -7992,10 +8039,57 @@ export class MapSVGMap {
     return marker
   }
 
+  collapseMarkerSpread(animate = false): void {
+    const spread = this.markerSpread
+    if (!spread) return
+    if (animate) {
+      spread.close(() => {
+        if (this.markerSpread === spread) this.markerSpread = undefined
+        spread.destroy()
+      })
+    } else {
+      this.markerSpread = undefined
+      spread.destroy()
+    }
+  }
+
+  /** Expand original entities using transient pixel offsets, including clustered members. */
+  spreadMarkers(markers: Marker[], referenceX?: number, sources: HTMLElement[] = []): boolean {
+    const members = Array.from(new Set(markers)).filter(marker => marker.svgPoint)
+    if (members.length < 2 || this.editMarkers?.on) return false
+    this.clusteringModule()?.cancelTransitions?.call(this)
+    this.collapseMarkerSpread()
+    this.markerSpread = new MarkerSpread(
+      this, members,
+      referenceX ?? this.converter.convertSVGToPixel(members[0].svgPoint).x,
+      sources,
+    )
+    return true
+  }
+
+  private spreadOverlappingMarkers(marker: Marker): boolean {
+    if (this.markerSpread?.markers.includes(marker)) return this.markerSpread.closing
+    this.collapseMarkerSpread()
+    const referenceX = marker.getInteractionScreenX()
+    const point = this.converter.convertSVGToPixel(marker.svgPoint, referenceX)
+    const candidates = this.markers.filter(candidate => {
+      if (
+        !candidate.svgPoint || candidate.element.parentElement !== this.layers.markers ||
+        candidate.element.classList.contains("mapsvg-marker-hidden") ||
+        candidate.element.style.display === "none"
+      ) return false
+      const position = this.converter.convertSVGToPixel(candidate.svgPoint, referenceX)
+      // A small screen tolerance also catches coordinates rounded differently by a data source.
+      return Math.hypot(position.x - point.x, position.y - point.y) <= 6
+    })
+    return this.spreadMarkers(candidates, referenceX)
+  }
+
   markerClickHandler(e: JQuery.TriggeredEvent, marker: Marker): void {
     if (!marker) return
     this.objectClickedBeforeScroll = null
     if (this.eventsPreventList["click"]) return
+    if (e && !this.editMarkers?.on && this.spreadOverlappingMarkers(marker)) return
 
     const actions = this.options.actions
 
@@ -8157,11 +8251,16 @@ export class MapSVGMap {
   private getSvgPointAtClick(
     e: JQuery.TriggeredEvent | JQuery.MouseEventBase | MouseEvent,
   ): SVGPoint {
+    return this.converter.convertPixelToSVG(this.getScreenPointAtClick(e))
+  }
+
+  private getScreenPointAtClick(
+    e: JQuery.TriggeredEvent | JQuery.MouseEventBase | MouseEvent,
+  ): ScreenPoint {
     const mc = getMouseCoords(e)
     const x = mc.x - $(this.containers.map).offset().left
     const y = mc.y - $(this.containers.map).offset().top
-    const screenPoint = new ScreenPoint(x, y)
-    return this.converter.convertPixelToSVG(screenPoint)
+    return new ScreenPoint(x, y)
   }
 
   /**
@@ -9151,6 +9250,7 @@ export class MapSVGMap {
    * @private
    */
   setEventHandlers() {
+    this.collapseMarkerSpread()
     const _this = this
 
     $(_this.containers.map).off(".common.mapsvg")

@@ -8,6 +8,11 @@ export class WorldCopies {
 
   constructor(private original: HTMLElement, private associate?: (copy: HTMLElement) => void) {}
 
+  forEach(callback: (element: HTMLElement) => void): void {
+    callback(this.original)
+    for (const copy of this.copies.values()) callback(copy)
+  }
+
   update(x: number, y: number, worldWidth: number | undefined, viewportWidth: number, viewportHeight: number, width: number, height: number): void {
     this.x = x
     this.y = y

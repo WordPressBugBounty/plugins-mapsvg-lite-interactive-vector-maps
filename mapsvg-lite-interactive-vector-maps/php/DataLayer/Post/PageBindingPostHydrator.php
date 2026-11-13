@@ -11,7 +11,8 @@ final class PageBindingPostHydrator
     public static function hydrate(Schema $schema, array $rows, ?PostEnricher $posts = null): array
     {
         $field = $schema->getFieldByType('post');
-        if (!$field || !\MapSVG\Core\PostDataFeature::isEnabled()) return $rows;
+        if (!$field) return $rows;
+        \MapSVG\Core\PostDataFeature::assertSchema($schema);
         $name = (string) $field->name;
         $ids = [];
         foreach ($rows as $row) {

@@ -4,6 +4,8 @@
     height: 100px;
     position : relative;
     overflow: hidden;
+    /* Camera movement must not be combined with native scroll offsets. */
+    overflow: clip;
 }
 .mapsvg-wrap-all {
     box-sizing: border-box;

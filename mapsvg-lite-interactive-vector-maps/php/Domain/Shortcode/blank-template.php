@@ -1,7 +1,3 @@
-<?php if (isset($_GET['mapsvg_shortcode_inline'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
-    echo do_shortcode(sanitize_text_field(wp_unslash($_GET['mapsvg_shortcode_inline']))); // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
-    die();
-} ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 

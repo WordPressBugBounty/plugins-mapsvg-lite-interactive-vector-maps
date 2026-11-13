@@ -641,6 +641,7 @@ class Repository implements JsonSerializable
 	 */
 	public function import($data, $convertLatlngToAddress = false)
 	{
+		$data = CollectionFieldSanitizer::sanitizeObjects($data, $this->schema);
 		// Validate the complete public batch before encoding. This keeps a later
 		// invalid row from allowing earlier rows to trigger mapping/geocoding
 		// side effects before the import is rejected.

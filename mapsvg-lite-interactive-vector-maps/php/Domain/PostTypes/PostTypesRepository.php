@@ -11,7 +11,6 @@ class PostTypesRepository
    */
   public function find(): array
   {
-    if (!\MapSVG\Core\PostDataFeature::isEnabled()) return [];
     $args = array(
       '_builtin' => false
     );
@@ -40,7 +39,6 @@ class PostTypesRepository
    */
   public function get(string $post_type): array
   {
-        \MapSVG\Core\PostDataFeature::assertEnabled();
     // Get taxonomies for the post type
     $taxonomies = [];
     $tax_objs = get_object_taxonomies($post_type, 'objects');
@@ -144,7 +142,6 @@ class PostTypesRepository
    */
   public function getFieldValues($fieldName, $post_type)
   {
-        \MapSVG\Core\PostDataFeature::assertEnabled();
     $column = PublicPostColumns::canonicalName($fieldName);
     if ($column === null || !Utils::isSafeSlug($post_type)) {
       return [];
@@ -174,7 +171,6 @@ class PostTypesRepository
    */
   public function getTaxonomyValues($name, $post_type)
   {
-        \MapSVG\Core\PostDataFeature::assertEnabled();
     if (!Utils::isSafeSlug($name) || !Utils::isSafeSlug($post_type)) {
       return [];
     }
@@ -202,7 +198,6 @@ class PostTypesRepository
    */
   public function getMetaValues($name, $post_type)
   {
-        \MapSVG\Core\PostDataFeature::assertEnabled();
     if (!Utils::isSafeSlug($name) || !Utils::isSafeSlug($post_type)) {
       return [];
     }

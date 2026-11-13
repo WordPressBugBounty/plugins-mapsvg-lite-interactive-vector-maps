@@ -33,12 +33,10 @@ class Converter {
   }
 
   setYShift(): void {
-    // Don't do shift for world map (Google Map)
-    if (this.defViewBox.width === 20426) {
-      this.yShift = 0
-      return
-    }
     if (this.geoViewBox) {
+      // Recalibration must measure the raw north edge, not subtract the preceding
+      // correction. Map initialization also calls this after the constructor.
+      this.yShift = 0
       const topLeftPoint = this.convertGeoToSVG(this.geoViewBox.ne)
       this.yShift = topLeftPoint.y - this.defViewBox.y
     }
@@ -58,7 +56,9 @@ class Converter {
   }
 
   getScale() {
-    return this.mapElement.clientWidth / this.viewBox.width
+    const measured = this.map.getMapContainerSize?.().width
+    const width = measured > 0 && Number.isFinite(measured) ? measured : this.mapElement.clientWidth
+    return width / this.viewBox.width
   }
 
   /**

@@ -154,9 +154,9 @@ Handlebars.registerHelper("getMarkerImage", function (v1, v2, options) {
   }
   return new Handlebars.SafeString(
     '<img src="' +
-      location.markerImagePath +
+      Handlebars.escapeExpression(location.markerImagePath) +
       '" class="mapsvg-marker-image"/> ' +
-      (location.address && location.address.formatted ? location.address.formatted : ""),
+      Handlebars.escapeExpression(location.address && location.address.formatted ? location.address.formatted : ""),
   )
 })
 Handlebars.registerHelper("not", function (v1, v2, options) {
