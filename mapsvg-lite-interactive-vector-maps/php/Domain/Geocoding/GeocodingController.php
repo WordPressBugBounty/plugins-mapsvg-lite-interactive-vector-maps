@@ -2,7 +2,7 @@
 
 namespace MapSVG;
 
-require_once 'Geocoding.php';
+require_once __DIR__ . '/Geocoding.php';
 
 /**
  * Geocoding Controller Class.

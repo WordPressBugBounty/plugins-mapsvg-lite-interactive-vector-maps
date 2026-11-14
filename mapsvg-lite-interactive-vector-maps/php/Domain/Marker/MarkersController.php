@@ -2,7 +2,7 @@
 
 namespace MapSVG;
 
-require_once('Marker.php');
+require_once __DIR__ . '/Marker.php';
 
 class MarkersController extends Controller
 {

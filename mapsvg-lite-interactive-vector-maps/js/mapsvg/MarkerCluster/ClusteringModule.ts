@@ -54,5 +54,6 @@ export interface ClusteringModule {
   setColors: (this: MapSVGMap) => void
   dispose: (this: MapSVGMap) => void
   cancelTransitions?: (this: MapSVGMap) => void
+  ownsPosition?: (this: MapSVGMap, entity: import("../Marker/Marker").Marker | import("./MarkerCluster").MarkerCluster) => boolean
   sync: (this: MapSVGMap, services: ClusterServices) => void
 }

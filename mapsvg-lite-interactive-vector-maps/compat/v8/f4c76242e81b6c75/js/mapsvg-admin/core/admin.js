@@ -1124,10 +1124,11 @@ function loadDeps() {
 
       mediaUploader.on("select", async () => {
         const attachments = mediaUploader.state().get("selection").toJSON()
-        let image = attachments[0]
+        const attachment = attachments[0]
+        if (!attachment) return
 
         try {
-          const response = await fetch(image.sizes.full.url)
+          const response = await fetch(attachment.sizes.full.url)
           if (!response.ok) {
             throw new Error("Network response was not ok")
           }
@@ -1141,7 +1142,7 @@ function loadDeps() {
             image.onload = function () {
               let object = {}
               var timestamp = new Date().valueOf()
-              object.filename = image.filename + "_" + timestamp + ".svg"
+              object.filename = (attachment.filename || "image") + "_" + timestamp + ".svg"
               object.data =
                 '<?xml version="1.0" encoding="UTF-8" standalone="no"?>' +
                 "\n" +

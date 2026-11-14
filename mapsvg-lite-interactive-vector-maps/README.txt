@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: ai maps, interactive map, map, google maps, store locator
 Requires at least: 5.0
 Tested up to: 7.1.4
-Stable tag: 9.0.6
+Stable tag: 9.0.7
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -104,6 +104,12 @@ Use the Support button in MapSVG to open your Dashboard, then use the chat butto
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 9.0.7 =
+* **Lite**: Improved marker positioning performance and Google Maps world-copy updates.
+* **Lite**: Fixed startup errors on sites with a separate Composer autoloader, plus marker and geocoding class loading.
+* **All plans**: Fixed image uploads creating SVG files with an undefined filename in the v8 editor.
+* **Professional, Business, Pro, Elite, Envato and Demo**: Improved cluster zoom animation performance, including rapid zoom changes and offscreen markers. Update Lite and the add-on for the full improvement.
 
 = 9.0.6 =
 * **Lite**: Improved access checks for map and Collection data.

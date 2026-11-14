@@ -7188,16 +7188,17 @@ export class MapSVGMap {
    * This method is called on zoom or when map container is resized.
    */
   markersAdjustScreenPosition(preserveMarkerSpread = false): void {
-    if (!preserveMarkerSpread) this.collapseMarkerSpread()
-    this.markers.forEach((marker: Marker) => {
-      marker.adjustScreenPosition()
-    })
-    this.markersClusters.forEach((cluster: MarkerCluster) => {
-      cluster.adjustScreenPosition()
-    })
-    if (this.userLocationMarker) {
-      this.userLocationMarker.adjustScreenPosition()
+    const render = () => {
+      if (!preserveMarkerSpread) this.collapseMarkerSpread()
+      const module = this.options.clustering?.on ? this.clusteringModule() : undefined
+      // Google projection itself reads layout. Resolve every point before the first DOM write.
+      const entities = [...this.markers, ...this.markersClusters, ...(this.userLocationMarker ? [this.userLocationMarker] : [])]
+        .filter(entity => !module?.ownsPosition?.call(this, entity))
+      for (const entity of entities) this.converter?.convertSVGToPixel(entity.svgPoint)
+      for (const entity of entities) entity.adjustScreenPosition()
     }
+    if (this.converter?.withRenderFrame) this.converter.withRenderFrame(render)
+    else render()
   }
 
   /**

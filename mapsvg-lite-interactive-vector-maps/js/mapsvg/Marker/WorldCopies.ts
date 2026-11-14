@@ -53,11 +53,27 @@ export class WorldCopies {
   }
 
   private syncCopy(copy: HTMLElement, k: number, children: boolean): void {
-    for (const attr of Array.from(copy.attributes)) copy.removeAttribute(attr.name)
-    for (const attr of Array.from(this.original.attributes)) {
-      if (attr.name !== "id") copy.setAttribute(attr.name, attr.value)
+    const owned = new Set(["data-mapsvg-copy-of", "data-mapsvg-world-offset"])
+    for (const attr of Array.from(copy.attributes)) {
+      if (attr.name === "id" || (!owned.has(attr.name) && !this.original.hasAttribute(attr.name)))
+        copy.removeAttribute(attr.name)
     }
-    copy.dataset.mapsvgCopyOf = this.original.id
+    for (const attr of Array.from(this.original.attributes)) {
+      if (attr.name !== "id" && attr.name !== "style" && !owned.has(attr.name) &&
+          copy.getAttribute(attr.name) !== attr.value) copy.setAttribute(attr.name, attr.value)
+    }
+    // A copy owns its transform; mirror authored styles without resetting its world position.
+    for (const property of Array.from(copy.style)) {
+      if (property !== "transform" && !this.original.style.getPropertyValue(property)) copy.style.removeProperty(property)
+    }
+    for (const property of Array.from(this.original.style)) {
+      if (property === "transform") continue
+      const value = this.original.style.getPropertyValue(property)
+      const priority = this.original.style.getPropertyPriority(property)
+      if (copy.style.getPropertyValue(property) !== value || copy.style.getPropertyPriority(property) !== priority)
+        copy.style.setProperty(property, value, priority)
+    }
+    if (copy.dataset.mapsvgCopyOf !== this.original.id) copy.dataset.mapsvgCopyOf = this.original.id
     if (children) {
       copy.replaceChildren(...Array.from(this.original.childNodes, child => child.cloneNode(true)))
       // Labels/bubbles can have IDs. A representation must not duplicate document identities.
@@ -67,8 +83,10 @@ export class WorldCopies {
   }
 
   private position(copy: HTMLElement, k: number): void {
-    copy.dataset.mapsvgWorldOffset = String(k * this.worldWidth)
-    copy.style.transform = `translate(${this.x + k * this.worldWidth}px,${this.y}px)`
+    const offset = String(k * this.worldWidth)
+    const transform = `translate(${this.x + k * this.worldWidth}px,${this.y}px)`
+    if (copy.dataset.mapsvgWorldOffset !== offset) copy.dataset.mapsvgWorldOffset = offset
+    if (copy.style.transform !== transform) copy.style.transform = transform
   }
 
   destroy(): void {

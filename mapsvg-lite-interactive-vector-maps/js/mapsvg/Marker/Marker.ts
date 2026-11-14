@@ -330,7 +330,7 @@ export class Marker extends MapObject {
       this.adjustLabelScreenPosition()
     }
     this.worldCopies.update(displayX, displayY, this.mapsvg.converter.getWorldWidth(),
-      this.mapsvg.containers.map.clientWidth, this.mapsvg.containers.map.clientHeight, this.width, this.height)
+      this.viewportSize().width, this.viewportSize().height, this.width, this.height)
   }
 
   /** Initial popover anchor follows the actual representation hit by the pointer. */
@@ -362,10 +362,9 @@ export class Marker extends MapObject {
    * @return boolean
    */
   inViewBox(): boolean {
-    const x = this.screenPoint.x,
-      y = this.screenPoint.y,
-      mapFullWidth = this.mapsvg.containers.map.offsetWidth,
-      mapFullHeight = this.mapsvg.containers.map.offsetHeight
+    const x = this.screenPoint.x + (this.screenOffset?.x ?? 0) + (this.clusterOffset?.x ?? 0),
+      y = this.screenPoint.y + (this.screenOffset?.y ?? 0) + (this.clusterOffset?.y ?? 0),
+      { width: mapFullWidth, height: mapFullHeight } = this.viewportSize()
 
     // Marker stays visible if it's inside of the map-width/height buffer zone around the map:
     return (
@@ -381,25 +380,21 @@ export class Marker extends MapObject {
    *
    */
   updateVisibility(): boolean {
-    if (this.inViewBox() === true) {
-      this.visible = true
-
-      this.element.classList.remove("mapsvg-out-of-sight")
-
-      if (this.label) {
-        this.label.classList.remove("mapsvg-out-of-sight")
-      }
-    } else {
-      this.visible = false
-
-      this.element.classList.add("mapsvg-out-of-sight")
-
-      if (this.label) {
-        this.label.classList.add("mapsvg-out-of-sight")
-      }
+    const visible = this.inViewBox()
+    if (visible !== this.visible) {
+      this.visible = visible
+      this.element.classList.toggle("mapsvg-out-of-sight", !visible)
+      this.label?.classList.toggle("mapsvg-out-of-sight", !visible)
     }
 
     return this.visible
+  }
+
+  private viewportSize(): { width: number; height: number } {
+    return this.mapsvg.converter.getViewportSize?.() ?? {
+      width: this.mapsvg.containers.map.clientWidth,
+      height: this.mapsvg.containers.map.clientHeight,
+    }
   }
 
   isMoving(): boolean {

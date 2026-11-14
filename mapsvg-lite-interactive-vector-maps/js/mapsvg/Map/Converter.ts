@@ -14,6 +14,12 @@ class Converter {
   private worldMapWidth: number
   private googleMapsOn: boolean
   private yShift: number
+  private renderFrame?: {
+    size: { width: number; height: number }
+    projection?: google.maps.MapCanvasProjection
+    worldWidth?: number
+    points: WeakMap<SVGPoint, { x: number; y: number; pixel: ScreenPoint }>
+  }
 
   constructor(
     map: MapSVGMap,
@@ -55,8 +61,31 @@ class Converter {
     this.googleMapsOn = on
   }
 
+  /** A synchronous render pass owns its geometry. Never retain it across camera/resize events. */
+  withRenderFrame<T>(render: () => T): T {
+    if (this.renderFrame) return render()
+    const size = this.getViewportSize()
+    const projection = this.googleMapsOn && this.map.googleMaps?.overlay?.getProjection()
+    const worldWidth = this.googleMapsOn && this.geoViewBox
+      ? projection?.getWorldWidth() ?? this.worldMapWidth * size.width / this.viewBox.width
+      : undefined
+    this.renderFrame = { size, projection: projection || undefined, worldWidth, points: new WeakMap() }
+    try {
+      return render()
+    } finally {
+      this.renderFrame = undefined
+    }
+  }
+
+  getViewportSize(): { width: number; height: number } {
+    return this.renderFrame?.size ?? this.map.getMapContainerSize?.() ?? {
+      width: this.mapElement.clientWidth,
+      height: this.mapElement.clientHeight,
+    }
+  }
+
   getScale() {
-    const measured = this.map.getMapContainerSize?.().width
+    const measured = this.getViewportSize().width
     const width = measured > 0 && Number.isFinite(measured) ? measured : this.mapElement.clientWidth
     return width / this.viewBox.width
   }
@@ -64,28 +93,39 @@ class Converter {
   /**
    * Converts SVG coordinates to pixel coordinates relative to the map container
    */
-  convertSVGToPixel(svgPoint: SVGPoint, referenceX = this.mapElement.clientWidth / 2): ScreenPoint {
-    const scale = this.getScale()
-    const projection = this.googleMapsOn && this.map.googleMaps?.overlay?.getProjection()
+  convertSVGToPixel(svgPoint: SVGPoint, referenceX?: number): ScreenPoint {
+    referenceX ??= this.getViewportSize().width / 2
+    const cached = this.renderFrame?.points.get(svgPoint)
+    if (cached && cached.x === svgPoint.x && cached.y === svgPoint.y)
+      return new ScreenPoint(this.wrapPixelX(cached.pixel.x, referenceX), cached.pixel.y)
+    const projection = this.renderFrame?.projection ??
+      (this.googleMapsOn && this.map.googleMaps?.overlay?.getProjection())
     if (projection && this.geoViewBox) {
       const geo = this.convertSVGToGeo(svgPoint, false)
       const point = projection.fromLatLngToContainerPixel({ lat: geo.lat, lng: geo.lng })
-      if (point) return new ScreenPoint(this.wrapPixelX(point.x, referenceX), point.y)
+      if (point) {
+        this.renderFrame?.points.set(svgPoint, { x: svgPoint.x, y: svgPoint.y, pixel: new ScreenPoint(point.x, point.y) })
+        return new ScreenPoint(this.wrapPixelX(point.x, referenceX), point.y)
+      }
     }
+    const scale = this.getScale()
+    const pixel = new ScreenPoint((svgPoint.x - this.viewBox.x) * scale, (svgPoint.y - this.viewBox.y) * scale)
+    this.renderFrame?.points.set(svgPoint, { x: svgPoint.x, y: svgPoint.y, pixel })
     return new ScreenPoint(
-      this.wrapPixelX((svgPoint.x - this.viewBox.x) * scale, referenceX),
-      (svgPoint.y - this.viewBox.y) * scale,
+      this.wrapPixelX(pixel.x, referenceX), pixel.y,
     )
   }
 
   /** Horizontal period in screen pixels; undefined for ordinary SVG/image maps. */
   getWorldWidth(): number | undefined {
     if (!this.googleMapsOn || !this.geoViewBox) return
-    const width = this.map.googleMaps?.overlay?.getProjection()?.getWorldWidth() ?? this.worldMapWidth * this.getScale()
+    const width = this.renderFrame ? this.renderFrame.worldWidth :
+      this.map.googleMaps?.overlay?.getProjection()?.getWorldWidth() ?? this.worldMapWidth * this.getScale()
     return width > 0 && Number.isFinite(width) ? width : undefined
   }
 
-  wrapPixelX(x: number, referenceX = this.mapElement.clientWidth / 2): number {
+  wrapPixelX(x: number, referenceX?: number): number {
+    referenceX ??= this.getViewportSize().width / 2
     const width = this.getWorldWidth()
     return width ? x + Math.round((referenceX - x) / width) * width : x
   }
