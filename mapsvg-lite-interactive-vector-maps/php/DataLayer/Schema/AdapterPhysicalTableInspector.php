@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Schema;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use Plasma\Adapter\DatabaseAdapter;
 
 /** Reads complete physical table metadata through the active Plasma adapter. */
@@ -16,7 +17,7 @@ final class AdapterPhysicalTableInspector implements PhysicalTableInspector
         DatabaseAdapter $adapter,
         string $physicalPrefix
     ) {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $physicalPrefix)) {
+        if (!SqlIdentifier::isValid($physicalPrefix)) {
             throw new \InvalidArgumentException(
                 'Invalid MapSVG physical table prefix.'
             );
@@ -222,7 +223,7 @@ final class AdapterPhysicalTableInspector implements PhysicalTableInspector
 
     private static function quoteIdentifier(string $identifier): string
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid SQL identifier.'
             );
@@ -234,7 +235,7 @@ final class AdapterPhysicalTableInspector implements PhysicalTableInspector
         string $identifier,
         string $label
     ): void {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid ' . $label . ' identifier.'
             );

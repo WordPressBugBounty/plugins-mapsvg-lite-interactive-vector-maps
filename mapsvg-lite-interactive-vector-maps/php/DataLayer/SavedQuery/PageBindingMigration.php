@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\SavedQuery;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\DataLayer\Validation\ValidationJson;
 use MapSVG\RepositoryFactory;
 use MapSVG\Schema;
@@ -146,7 +147,7 @@ final class PageBindingMigration
                 continue;
             }
             $name = $options->database->schemas->{$role}->name ?? $options->database->{$role . 'TableName'} ?? $role . '_' . $mapId;
-            $schema = is_string($name) && preg_match('/\A[A-Za-z_][A-Za-z0-9_]*\z/D', $name) ? ($this->schemaByName)($name) : null;
+            $schema = is_string($name) && SqlIdentifier::isValid($name) ? ($this->schemaByName)($name) : null;
             if (!$schema || !$schema->isLocal() || !$schema->getField($schema->getPrimaryKeyFieldName()) || ($role === 'regions' && !$schema->hasSvgBinding())) {
                 ($this->report)('Map ' . $mapId . ' / ' . $role . ': unavailable or unsupported source retained.');
                 continue;

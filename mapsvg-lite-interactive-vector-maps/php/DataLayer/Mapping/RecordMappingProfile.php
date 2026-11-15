@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Mapping;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\Schema;
 
 /** Explicit table-specific JSON/null conventions layered over field-type mapping. */
@@ -26,7 +27,7 @@ final class RecordMappingProfile
         array $nullAsEmptyFields = array()
     ) {
         foreach ($jsonFields as $field => $mode) {
-            if (!is_string($field) || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $field)) {
+            if (!is_string($field) || !SqlIdentifier::isValid($field)) {
                 throw new \InvalidArgumentException('Invalid JSON mapping field.');
             }
             if (!in_array($mode, array(self::JSON_RAW, self::JSON_ASSOC, self::JSON_OBJECT), true)) {
@@ -34,7 +35,7 @@ final class RecordMappingProfile
             }
         }
         foreach ($nullAsEmptyFields as $field) {
-            if (!is_string($field) || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $field)) {
+            if (!is_string($field) || !SqlIdentifier::isValid($field)) {
                 throw new \InvalidArgumentException('Invalid null-as-empty mapping field.');
             }
         }

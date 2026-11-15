@@ -9,6 +9,7 @@ use MapSVG\DataLayer\Import\PlasmaBulkWriter;
 use MapSVG\DataLayer\Import\PlasmaBulkWriterFactory;
 use MapSVG\DataLayer\Query\SimpleQueryService;
 use MapSVG\DataLayer\Query\SimpleQueryServiceFactory;
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\DataLayer\Store\PlasmaCrudStore;
 use MapSVG\Query;
 use MapSVG\Schema;
@@ -201,7 +202,7 @@ final class PlasmaDataSource
 
         foreach ($criteria as $name => $value) {
             if (!is_string($name)
-                || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $name)) {
+                || !SqlIdentifier::isValid($name)) {
                 continue;
             }
             if (!$this->schema->getField($name)

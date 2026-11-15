@@ -6,6 +6,7 @@ namespace MapSVG\DataLayer\Workflow;
 
 use MapSVG\DataLayer\Relation\DatabaseTransactionRunner;
 use MapSVG\DataLayer\Relation\RegionRelationStore;
+use MapSVG\DataLayer\SqlIdentifier;
 use Plasma\Adapter\DatabaseAdapter;
 
 /**
@@ -190,7 +191,7 @@ final class MapTableCopyService
         string $identifier,
         string $label
     ): void {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid ' . $label . ' identifier.'
             );

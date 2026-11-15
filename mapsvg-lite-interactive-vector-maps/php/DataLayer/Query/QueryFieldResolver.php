@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MapSVG\DataLayer\Query;
 
 use MapSVG\DataLayer\Mapping\RecordMapper;
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\DataLayer\StorageSchemaResolution;
 use MapSVG\Schema;
 
@@ -128,7 +129,7 @@ final class QueryFieldResolver
         string $storageName,
         object $field
     ): ResolvedQueryField {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $storageName)) {
+        if (!SqlIdentifier::isValid($storageName)) {
             throw new \InvalidArgumentException('Invalid query storage field.');
         }
 

@@ -98,7 +98,7 @@ final class StorageSchemaResolver
      */
     public static function modelKeyFor(string $logicalTable): string
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $logicalTable)) {
+        if (!SqlIdentifier::isValid($logicalTable)) {
             throw new \InvalidArgumentException('Invalid schema table identifier.');
         }
 
@@ -266,7 +266,7 @@ final class StorageSchemaResolver
 
     private function assertIdentifier(string $identifier, string $label): void
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException('Invalid ' . $label . ' identifier.');
         }
     }

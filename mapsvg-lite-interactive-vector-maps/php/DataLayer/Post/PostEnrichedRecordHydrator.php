@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MapSVG\DataLayer\Post;
 
 use MapSVG\DataLayer\Mapping\SchemaRecordMapper;
+use MapSVG\DataLayer\SqlIdentifier;
 
 /** Adds WordPress post enrichment after pure physical-row mapping. */
 final class PostEnrichedRecordHydrator implements RecordHydrator
@@ -23,7 +24,7 @@ final class PostEnrichedRecordHydrator implements RecordHydrator
         ?string $postFieldName = null
     ) {
         if ($postFieldName !== null
-            && !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $postFieldName)) {
+            && !SqlIdentifier::isValid($postFieldName)) {
             throw new \InvalidArgumentException(
                 'Post field name must be a safe identifier.'
             );

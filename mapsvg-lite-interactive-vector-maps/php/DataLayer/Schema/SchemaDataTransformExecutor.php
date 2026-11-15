@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Schema;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use Plasma\Adapter\DatabaseAdapter;
 
 /** Executes idempotent row transforms after physical DDL succeeds. */
@@ -118,7 +119,7 @@ final class SchemaDataTransformExecutor
 
     private static function quoteIdentifier(string $identifier): string
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid transform SQL identifier.'
             );

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Location;
 
+use MapSVG\DataLayer\SqlIdentifier;
+
 /** Explicit schema-bound preparation seam; nothing enables it automatically. */
 final class SynchronousLocationPreparationCanary
 {
@@ -18,7 +20,7 @@ final class SynchronousLocationPreparationCanary
         string $language = 'en',
         string $country = ''
     ) {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $fieldName)) {
+        if (!SqlIdentifier::isValid($fieldName)) {
             throw new \InvalidArgumentException(
                 'Location field name must be a safe identifier.'
             );

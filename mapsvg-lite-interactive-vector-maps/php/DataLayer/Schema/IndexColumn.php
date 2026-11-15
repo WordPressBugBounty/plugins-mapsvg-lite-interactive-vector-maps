@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Schema;
 
+use MapSVG\DataLayer\SqlIdentifier;
+
 final class IndexColumn
 {
     private string $name;
@@ -11,7 +13,7 @@ final class IndexColumn
 
     public function __construct(string $name, ?int $prefixLength = null)
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $name)) {
+        if (!SqlIdentifier::isValid($name)) {
             throw new \InvalidArgumentException(
                 'Invalid index-column identifier.'
             );

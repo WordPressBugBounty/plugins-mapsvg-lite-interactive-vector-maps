@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Import;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use Plasma\Adapter\DatabaseAdapter;
 use Plasma\Adapter\DialectAwareAdapter;
 
@@ -408,7 +409,7 @@ final class TableSwapService
 
     private function logicalName(string $name): string
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $name)) {
+        if (!SqlIdentifier::isValid($name)) {
             throw new \InvalidArgumentException(
                 'MapSVG table name must be a safe logical identifier.'
             );

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Relation;
 
+use MapSVG\DataLayer\SqlIdentifier;
+
 /** One normalized object-to-region target stored in the shared r2o table. */
 final class RegionRelationLink
 {
@@ -62,9 +64,6 @@ final class RegionRelationLink
 
     private static function isIdentifier(string $value): bool
     {
-        return (bool) preg_match(
-            '/^[A-Za-z_][A-Za-z0-9_]*$/D',
-            $value
-        );
+        return SqlIdentifier::isValid($value);
     }
 }

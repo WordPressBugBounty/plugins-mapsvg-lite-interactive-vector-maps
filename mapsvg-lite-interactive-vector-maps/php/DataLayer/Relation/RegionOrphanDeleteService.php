@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Relation;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use Plasma\Adapter\DatabaseAdapter;
 
 /** Atomically deletes still-orphaned region rows and their shared-r2o links. */
@@ -202,7 +203,7 @@ final class RegionOrphanDeleteService
         string $identifier,
         string $label
     ): void {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid ' . $label . ' identifier.'
             );

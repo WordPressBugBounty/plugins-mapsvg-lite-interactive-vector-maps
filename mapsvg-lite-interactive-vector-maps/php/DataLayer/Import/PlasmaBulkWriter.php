@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Import;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use Plasma\Model;
 use Plasma\Plasma;
 
@@ -37,7 +38,7 @@ final class PlasmaBulkWriter implements BulkWriter
 
         foreach ($conflictFields as $field) {
             if (!is_string($field)
-                || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $field)) {
+                || !SqlIdentifier::isValid($field)) {
                 throw new \InvalidArgumentException(
                     'Bulk conflict fields must be safe identifiers.'
                 );
@@ -145,7 +146,7 @@ final class PlasmaBulkWriter implements BulkWriter
         $knownFields = $this->model->getFieldTypes();
         foreach ($columns as $column) {
             if (!is_string($column)
-                || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $column)) {
+                || !SqlIdentifier::isValid($column)) {
                 throw new \InvalidArgumentException(
                     'Bulk columns must be safe identifiers.'
                 );

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Query;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\DataLayer\StorageSchemaResolution;
 use Plasma\Adapter\DatabaseAdapter;
 
@@ -24,7 +25,7 @@ final class DistinctValueService
     /** @return array<int,mixed> */
     public function values(string $fieldName): array
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $fieldName)) {
+        if (!SqlIdentifier::isValid($fieldName)) {
             return array();
         }
         if (!array_key_exists($fieldName, $this->resolution->actualColumns())) {

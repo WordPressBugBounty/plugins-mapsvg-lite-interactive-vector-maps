@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Relation;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use Plasma\Adapter\DatabaseAdapter;
 
 /** Prepared/idempotent access to the shared global r2o table. */
@@ -355,7 +356,7 @@ final class WpdbRegionRelationStore implements RegionRelationStore
         string $identifier,
         string $label
     ): void {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid ' . $label . ' identifier.'
             );

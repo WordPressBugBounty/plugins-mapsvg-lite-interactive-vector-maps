@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Schema;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\Schema;
 
 /** Maps MapSVG UI fields to their current physical MySQL representation. */
@@ -16,7 +17,7 @@ final class SchemaTableDefinitionFactory
         string $physicalPrefix,
         string $engine = 'InnoDB'
     ) {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $physicalPrefix)) {
+        if (!SqlIdentifier::isValid($physicalPrefix)) {
             throw new \InvalidArgumentException(
                 'Invalid MapSVG physical table prefix.'
             );
@@ -288,7 +289,7 @@ final class SchemaTableDefinitionFactory
         string $identifier,
         string $label
     ): void {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid ' . $label . ' identifier.'
             );

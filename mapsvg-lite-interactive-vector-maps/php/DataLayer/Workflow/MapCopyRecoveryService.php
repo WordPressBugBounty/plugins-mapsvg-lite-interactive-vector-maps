@@ -7,6 +7,7 @@ namespace MapSVG\DataLayer\Workflow;
 use MapSVG\DataLayer\Relation\RegionRelationStore;
 use MapSVG\DataLayer\Repository\SchemaCatalogV2Repository;
 use MapSVG\DataLayer\Schema\SchemaMutationService;
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\Schema;
 
 /**
@@ -85,7 +86,7 @@ final class MapCopyRecoveryService
         string $identifier,
         string $label
     ): void {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid ' . $label . ' identifier.'
             );

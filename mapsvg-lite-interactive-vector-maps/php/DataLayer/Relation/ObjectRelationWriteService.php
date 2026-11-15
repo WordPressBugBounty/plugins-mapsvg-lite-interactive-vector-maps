@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Relation;
 
+use MapSVG\DataLayer\SqlIdentifier;
+
 /** Coordinates object-row DML with its shared-r2o projection. */
 final class ObjectRelationWriteService
 {
@@ -109,7 +111,7 @@ final class ObjectRelationWriteService
         string $identifier,
         string $label
     ): void {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid ' . $label . ' identifier.'
             );

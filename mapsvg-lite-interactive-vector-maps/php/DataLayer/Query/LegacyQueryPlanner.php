@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MapSVG\DataLayer\Query;
 
 use MapSVG\DataLayer\Mapping\RecordMapper;
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\DataLayer\StorageSchemaResolution;
 use MapSVG\Query;
 use MapSVG\Schema;
@@ -120,7 +121,7 @@ final class LegacyQueryPlanner
             }
         }
         if (isset($context['publicPostTable']) && (!is_string($context['publicPostTable'])
-            || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $context['publicPostTable']))) {
+            || !SqlIdentifier::isValid($context['publicPostTable']))) {
             throw new \InvalidArgumentException('Public post table must be a safe server identifier.');
         }
         if (array_key_exists('allowedRegionTables', $context)) {
@@ -131,7 +132,7 @@ final class LegacyQueryPlanner
             );
             foreach ($tables as $table) {
                 if (!is_string($table)
-                    || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $table)) {
+                    || !SqlIdentifier::isValid($table)) {
                     throw new \InvalidArgumentException(
                         'Allowed region table names must be safe identifiers.'
                     );
@@ -374,7 +375,7 @@ final class LegacyQueryPlanner
                 );
             }
             $table = $value['table_name'];
-            if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $table)) {
+            if (!SqlIdentifier::isValid($table)) {
                 throw new \InvalidArgumentException('Region table name is invalid.');
             }
             if ($allowedTables !== array() && !in_array($table, $allowedTables, true)) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MapSVG\DataLayer\Schema;
 
 use MapSVG\DataLayer\DataLayerV2;
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\Schema;
 use Plasma\Adapter\DatabaseAdapter;
 
@@ -63,7 +64,7 @@ final class SchemaCatalogUsageService
 
     private static function quoteIdentifier(string $identifier): string
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid schema catalog SQL identifier.'
             );

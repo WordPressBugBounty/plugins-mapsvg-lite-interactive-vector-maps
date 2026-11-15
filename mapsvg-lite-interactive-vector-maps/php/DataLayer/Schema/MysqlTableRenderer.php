@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Schema;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use Plasma\Adapter\DatabaseAdapter;
 
 /** Renders validated physical definitions into exact MySQL DDL. */
@@ -164,7 +165,7 @@ final class MysqlTableRenderer
     private static function quoteIdentifier(string $identifier): string
     {
         SchemaSqlDefinition::identifier($identifier);
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid SQL identifier.'
             );

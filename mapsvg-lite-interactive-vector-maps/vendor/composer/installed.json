@@ -395,12 +395,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/nlproduction/plasma.git",
-                "reference": "bd0bbf04f7f4120badc56afae3665c263f87b5f9"
+                "reference": "d5511f6443199c52b03a3c0b76e7fea5c12ccb44"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nlproduction/plasma/zipball/bd0bbf04f7f4120badc56afae3665c263f87b5f9",
-                "reference": "bd0bbf04f7f4120badc56afae3665c263f87b5f9",
+                "url": "https://api.github.com/repos/nlproduction/plasma/zipball/d5511f6443199c52b03a3c0b76e7fea5c12ccb44",
+                "reference": "d5511f6443199c52b03a3c0b76e7fea5c12ccb44",
                 "shasum": ""
             },
             "require": {
@@ -417,7 +417,7 @@
                 "ext-pdo_sqlite": "Use SQLite with PDO",
                 "itsgoingd/clockwork": "Optional database-query inspection"
             },
-            "time": "2026-09-25T23:32:20+00:00",
+            "time": "2026-11-15T01:28:34+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Schema;
 
+use MapSVG\DataLayer\SqlIdentifier;
+
 final class IndexDefinition
 {
     public const PRIMARY = 'primary';
@@ -20,7 +22,7 @@ final class IndexDefinition
     public function __construct(string $name, string $type, array $columns)
     {
         if ($name !== 'PRIMARY'
-            && !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $name)) {
+            && !SqlIdentifier::isValid($name)) {
             throw new \InvalidArgumentException('Invalid index identifier.');
         }
         if (!in_array($type, array(

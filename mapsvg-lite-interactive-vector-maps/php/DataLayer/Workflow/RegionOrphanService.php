@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MapSVG\DataLayer\Workflow;
 
 use MapSVG\DataLayer\Relation\RegionOrphanDeleteService;
+use MapSVG\DataLayer\SqlIdentifier;
 use Plasma\Adapter\DatabaseAdapter;
 
 /** Prefix-aware orphan mark/count/delete facade over validated physical storage. */
@@ -155,7 +156,7 @@ final class RegionOrphanService
         string $identifier,
         string $label
     ): void {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid ' . $label . ' identifier.'
             );

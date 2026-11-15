@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Import;
 
+use MapSVG\DataLayer\SqlIdentifier;
+
 /** Durable state for one in-flight or cleanup-pending snapshot swap. */
 final class TableSwapJournalEntry
 {
@@ -26,7 +28,7 @@ final class TableSwapJournalEntry
             throw new \InvalidArgumentException('Unknown table-swap journal phase.');
         }
         foreach (array($liveTable, $stageTable, $backupTable) as $name) {
-            if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $name)) {
+            if (!SqlIdentifier::isValid($name)) {
                 throw new \InvalidArgumentException(
                     'Table-swap journal contains an unsafe table name.'
                 );

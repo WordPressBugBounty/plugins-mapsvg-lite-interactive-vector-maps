@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MapSVG\DataLayer\Location;
 
 use MapSVG\DataLayer\DataLayerV2;
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\Schema;
 use Plasma\Adapter\DatabaseAdapter;
 
@@ -167,7 +168,7 @@ final class QueuedLocationStore
 
     private static function quoteIdentifier(string $identifier): string
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid queued geocoding SQL identifier.'
             );

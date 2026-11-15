@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Schema;
 
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\Schema;
 
 /** Derives explicit, idempotent row transforms from old/new UI fields. */
@@ -77,7 +78,7 @@ final class SchemaDataTransformPlanner
                 ? get_object_vars($rawField)
                 : (array) $rawField;
             $name = trim((string) ($field['name'] ?? ''));
-            if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $name)) {
+            if (!SqlIdentifier::isValid($name)) {
                 throw new \InvalidArgumentException(
                     'Invalid schema-transform field identifier.'
                 );

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MapSVG\DataLayer\Schema;
 
+use MapSVG\DataLayer\SqlIdentifier;
+
 /** One idempotent data rewrite required by an explicit schema edit. */
 final class SchemaDataTransform
 {
@@ -90,7 +92,7 @@ final class SchemaDataTransform
 
     private static function assertIdentifier(string $identifier): void
     {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier)) {
+        if (!SqlIdentifier::isValid($identifier)) {
             throw new \InvalidArgumentException(
                 'Invalid transform column identifier.'
             );

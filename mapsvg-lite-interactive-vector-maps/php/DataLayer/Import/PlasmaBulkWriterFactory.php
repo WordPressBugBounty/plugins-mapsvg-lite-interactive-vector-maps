@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MapSVG\DataLayer\Import;
 
 use MapSVG\DataLayer\DataLayerV2;
+use MapSVG\DataLayer\SqlIdentifier;
 use MapSVG\Schema;
 
 /** Explicit composition root for one schema's live-table bulk writer. */
@@ -31,7 +32,7 @@ final class PlasmaBulkWriterFactory
                 'Remote schemas cannot use local Plasma bulk writes.'
             );
         }
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $logicalTable)) {
+        if (!SqlIdentifier::isValid($logicalTable)) {
             throw new \InvalidArgumentException(
                 'Bulk target table must be a safe logical identifier.'
             );

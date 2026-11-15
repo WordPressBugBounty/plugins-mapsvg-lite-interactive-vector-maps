@@ -3,7 +3,7 @@
         'name' => '__root__',
         'pretty_version' => 'dev-master',
         'version' => 'dev-master',
-        'reference' => '612851e9a2eb1906631ae0ec3821ddaa017272b2',
+        'reference' => '815820d431dc91a4f01944830b0342d5a1a91241',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -13,7 +13,7 @@
         '__root__' => array(
             'pretty_version' => 'dev-master',
             'version' => 'dev-master',
-            'reference' => '612851e9a2eb1906631ae0ec3821ddaa017272b2',
+            'reference' => '815820d431dc91a4f01944830b0342d5a1a91241',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
@@ -58,7 +58,7 @@
         'nlproduction/plasma' => array(
             'pretty_version' => 'dev-feature/mapsvg-integration-prerequisites',
             'version' => 'dev-feature/mapsvg-integration-prerequisites',
-            'reference' => 'bd0bbf04f7f4120badc56afae3665c263f87b5f9',
+            'reference' => 'd5511f6443199c52b03a3c0b76e7fea5c12ccb44',
             'type' => 'library',
             'install_path' => __DIR__ . '/../nlproduction/plasma',
             'aliases' => array(),
