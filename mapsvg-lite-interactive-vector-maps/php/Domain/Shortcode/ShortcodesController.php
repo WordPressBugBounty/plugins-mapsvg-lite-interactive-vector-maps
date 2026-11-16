@@ -6,7 +6,7 @@ class ShortcodesController extends Controller
 {
     public static function get($request)
     {
-
+        header('X-Content-Type-Options: nosniff');
         $shortcode = stripslashes(urldecode($request['shortcode']));
 
         if (empty($shortcode)) {

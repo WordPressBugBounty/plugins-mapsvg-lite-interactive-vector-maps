@@ -138,7 +138,7 @@ class ShortcodeHandler
 	 */
 	public static function renderShortcode(string $shortcode): void
 	{
-
+		header('X-Content-Type-Options: nosniff');
 		self::loadBlankTemplate();
 
 		// Validate shortcode

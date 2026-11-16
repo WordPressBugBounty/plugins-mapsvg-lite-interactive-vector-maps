@@ -224,22 +224,13 @@ class Router
 	private function handleShortcodeRequest($wp, $parts)
 	{
 		if (count($parts) > 1) {
-			// Get the full shortcode from the URL parts and decode it
-			// Check for shortcode in query parameter
+			// Decode transport only; the shared policy must see and reject the whole input.
 			if (isset($_GET['s'])) {
-				$shortcode = sanitize_text_field(wp_unslash($_GET['s']));
+				$shortcode = is_string($_GET['s']) ? wp_unslash($_GET['s']) : '';
 			} else {
 				// Fallback to URL parts for backward compatibility
 				$shortcode = implode('/', array_slice($parts, 2));
 				$shortcode = urldecode($shortcode);
-			}
-
-			// Ensure the shortcode has proper brackets
-			if (!str_starts_with($shortcode, '[')) {
-				$shortcode = '[' . $shortcode;
-			}
-			if (!str_ends_with($shortcode, ']')) {
-				$shortcode = $shortcode . ']';
 			}
 
 			// Include the necessary files

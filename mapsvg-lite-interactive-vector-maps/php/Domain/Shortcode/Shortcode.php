@@ -5,17 +5,22 @@ namespace MapSVG;
 class Shortcode
 {
 
-  /** Shared policy for REST fragments and standalone shortcode pages. */
+  /** Shared policy for one complete shortcode in REST fragments and standalone pages. */
   public static function isAllowed(string $shortcode): bool
   {
     $name = self::getName($shortcode);
+    // do_shortcode() preserves HTML outside matches and in enclosing content.
+    // Never accept visitor-authored markup, even inside shortcode attributes.
+    if ($name === null || strpos($shortcode, '<') !== false
+      || preg_match('/\A\s*' . get_shortcode_regex([$name]) . '\s*\z/s', $shortcode, $match) !== 1
+      || $match[1] !== '' || $match[6] !== '') return false;
+
     $allowed = (array) Options::get('allowed_shortcodes');
     if (in_array($name, $allowed, true)) return self::containsOnlyAllowedShortcodes($shortcode, $allowed);
     if ($name !== 'mapsvg' || !is_user_logged_in() || !current_user_can('edit_posts')) return false;
 
     // The exception grants one MapSVG embed, never adjacent or nested third-party shortcodes.
-    return preg_match('/\A\s*' . get_shortcode_regex(['mapsvg']) . '\s*\z/s', $shortcode, $match) === 1
-      && $match[1] === '' && $match[5] === '' && $match[6] === '';
+    return $match[5] === '';
   }
 
   /** An allowed first tag cannot authorize adjacent or enclosed third-party tags. */
