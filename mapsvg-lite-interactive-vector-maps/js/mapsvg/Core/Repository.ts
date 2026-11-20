@@ -419,8 +419,8 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
     // Detached domain/facet reads can request their own bounded page without
     // changing the live binding's pagination or current results.
     if (request.sourceRead && this.map.inBackend) params.editorBinding = {
-      ...binding, perPage: Math.min(5000, Math.max(1, Number(query.perpage) || 5000)),
-      pagination: { ...binding.pagination, on: true, perpage: Math.min(5000, Math.max(1, Number(query.perpage) || 5000)) },
+      ...binding, perPage: Math.max(1, Number(query.perpage) || 5000),
+      pagination: { ...binding.pagination, on: true, perpage: Math.max(1, Number(query.perpage) || 5000) },
     }
     const rpcUrl = this.server.getUrl("rpc").replace(/\/v1\//, "/v9/").replace(/([?&]rest_route=[^&]*)/, match => match.replace(/%2[Ff]v1%2[Ff]|\/v1\//, "/v9/"))
     const url = !this.map.inBackend ? withDraftPreview(rpcUrl, window.location.search, Number(this.map.id)) : rpcUrl
@@ -440,8 +440,8 @@ export class Repository<T extends Model = Model> implements RepositoryInterface<
           const result = outcome.result
           if (optionsField) { deferred.resolve(result.options); return }
           if (!request.sourceRead && result.page.paginated === false) {
-            // Unpaged Regions still use bounded RPC chunks. Publish one complete
-            // repository result; never briefly apply a truncated region dataset.
+            // Publish one complete unpaged binding. Retain chunk assembly for
+            // compatible servers without exposing partially loaded rows.
             if (!first && result.page.skip !== 0) { read(1); return }
             first ??= result
             if (result.bindingRevision !== first.bindingRevision || result.schemaRevision !== first.schemaRevision

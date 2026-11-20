@@ -7,8 +7,6 @@ use MapSVG\DataLayer\Schema\SchemaSqlDefinition;
 class SchemaRepository extends Repository
 {
 
-	private const CATALOG_QUERY_MAX_PAGE_SIZE = 10000;
-
 	/** @var \MapSVG\DataLayer\Schema\SchemaMutationService|null */
 	private $schemaMutations;
 
@@ -120,10 +118,7 @@ class SchemaRepository extends Repository
 			\MapSVG\DataLayer\Query\SimpleQueryServiceFactory::forSchema(
 				$this->schemaDataLayer,
 				$this->schema,
-				new \MapSVG\DataLayer\Query\QueryLimits(
-					self::CATALOG_QUERY_MAX_PAGE_SIZE,
-					self::CATALOG_QUERY_MAX_PAGE_SIZE
-				),
+				new \MapSVG\DataLayer\Query\QueryLimits(),
 				null,
 				$mapper
 			);

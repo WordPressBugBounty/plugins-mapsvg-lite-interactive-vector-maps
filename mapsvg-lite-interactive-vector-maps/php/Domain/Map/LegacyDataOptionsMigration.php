@@ -50,7 +50,6 @@ final class LegacyDataOptionsMigration
                     // v8 used zero/negative perpage as "no LIMIT"; native take=0
                     // means zero rows. Use the native unpaged compatibility path.
                     if ($pagination->perpage === 0) $pagination->on = false;
-                    if (!empty($pagination->on) && $pagination->perpage > 5000) throw new \UnexpectedValueException('The legacy page size exceeds the v9 limit of 5000; review pagination before migration.');
                 }
             }
             foreach (['autoRefetch', 'regionsAutoRefetch'] as $name) {

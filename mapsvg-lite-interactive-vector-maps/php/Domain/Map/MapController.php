@@ -124,7 +124,7 @@ class MapController extends Controller
 				$runtime = array('filterout' => $regionsQuery['filterout'] ?? array());
 				if (!empty($request['includeOrphans'])) $runtime['filters'] = array('includeOrphans' => 1);
 				$response['regions'] = $boundId
-					? self::prefetchBoundQuery($map, 'regions', $boundId, 5000, $runtime)
+					? self::prefetchBoundQuery($map, 'regions', $boundId, null, $runtime)
 					: $regionsRepo->find(new Query($regionsQuery));
 				$response['regions']["schema"] = $regionsRepo->getSchema();
 			} else {
@@ -169,7 +169,7 @@ class MapController extends Controller
 						? \MapSVG\DataLayer\SavedQuery\SavedQueryExecutionService::boundQueryId($map, 'objects') : null;
 					$perpage = (int) ($objectsQuery['perpage'] ?? 0);
 					$response['objects'] = $boundId
-						? self::prefetchBoundQuery($map, 'objects', $boundId, $perpage > 0 ? min($perpage, 5000) : 5000, array('filterout' => $objectsQuery['filterout'] ?? array()))
+						? self::prefetchBoundQuery($map, 'objects', $boundId, $perpage > 0 ? $perpage : null, array('filterout' => $objectsQuery['filterout'] ?? array()))
 						: $objectsRepo->find(new Query($objectsQuery));
 				} else {
 					$response['objects'] = [];
@@ -196,7 +196,7 @@ class MapController extends Controller
 		}
 	}
 
-	private static function prefetchBoundQuery($map, string $role, string $queryId, int $take, array $runtime = array()): array
+	private static function prefetchBoundQuery($map, string $role, string $queryId, ?int $take, array $runtime = array()): array
 	{
 		$result = (new \MapSVG\DataLayer\SavedQuery\SavedQueryExecutionService())->executeBound(
 			$map,
@@ -209,7 +209,7 @@ class MapController extends Controller
 			'items' => $result['rows'],
 			'hasMore' => $result['count'] > count($result['rows']),
 			'page' => 1,
-			'perpage' => $take,
+			'perpage' => $take ?? 0,
 		);
 	}
 

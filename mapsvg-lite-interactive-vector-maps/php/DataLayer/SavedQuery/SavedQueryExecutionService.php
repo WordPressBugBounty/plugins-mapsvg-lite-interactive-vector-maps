@@ -60,12 +60,14 @@ final class SavedQueryExecutionService
         }
         foreach (array('skip', 'take') as $key) {
             if (!array_key_exists($key, $pagination)) continue;
+            // Internal Map prefetch uses a null take to request the entire binding.
+            if ($key === 'take' && $pagination[$key] === null) { unset($input['take']); continue; }
             if (!is_int($pagination[$key]) || $pagination[$key] < 0) {
                 throw new \InvalidArgumentException($key . ' must be a non-negative integer.');
             }
             $input[$key] = $pagination[$key];
         }
-        if (!isset($input['take'])) $input['take'] = 50;
+        if (!array_key_exists('take', $pagination) && !isset($input['take'])) $input['take'] = 50;
         // Plain Store DTOs can contain detached empty stdClass values. Compare
         // structure and scalar types instead of object identities or loose ==.
         if (serialize($this->store->query($saved['id'])) !== serialize($saved)) {

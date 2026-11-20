@@ -89,8 +89,8 @@ final class QueryRpcOptions
         }
         $take = $input['take'] ?? 50;
         $skip = $input['skip'] ?? 0;
-        if (!is_int($take) || $take < 1 || $take > 5000 || !is_int($skip) || $skip < 0 || $skip > 1000000) {
-            throw new \InvalidArgumentException('RPC Queries require bounded pagination.');
+        if (!is_int($take) || $take < 1 || !is_int($skip) || $skip < 0) {
+            throw new \InvalidArgumentException('RPC Query pagination must use non-negative integer offsets and positive page sizes.');
         }
     }
 

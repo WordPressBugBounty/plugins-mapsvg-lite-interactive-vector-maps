@@ -30,7 +30,7 @@ final class MapDataQueryExecutor
             $service = SimpleQueryServiceFactory::forSchema(
                 $dataLayer,
                 $schema,
-                new QueryLimits(250, 5000, 500, 24, 500)
+                new QueryLimits(500, 24, 500)
             );
             return $service->findPrisma($query);
         };

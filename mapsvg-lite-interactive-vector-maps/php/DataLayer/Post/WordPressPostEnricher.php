@@ -7,20 +7,8 @@ namespace MapSVG\DataLayer\Post;
 /** Core linked-post enrichment with request-scoped caching; callers gate native WP/CPT sources. */
 final class WordPressPostEnricher implements PostEnricher
 {
-    private int $maxUniquePosts;
-
     /** @var array<int,mixed> */
     private array $cache = array();
-
-    public function __construct(int $maxUniquePosts = 200)
-    {
-        if ($maxUniquePosts < 1 || $maxUniquePosts > 1000) {
-            throw new \InvalidArgumentException(
-                'Post enrichment limit must be between 1 and 1000.'
-            );
-        }
-        $this->maxUniquePosts = $maxUniquePosts;
-    }
 
     /** @param mixed $postId @return mixed */
     public function enrich($postId)
@@ -32,11 +20,6 @@ final class WordPressPostEnricher implements PostEnricher
 
         if (array_key_exists($id, $this->cache)) {
             return self::copyValue($this->cache[$id]);
-        }
-        if (count($this->cache) >= $this->maxUniquePosts) {
-            throw new \LengthException(
-                'Post enrichment request exceeds the unique-post limit.'
-            );
         }
 
         $enriched = $this->loadAndEnrich($id);
@@ -58,11 +41,6 @@ final class WordPressPostEnricher implements PostEnricher
             if (!array_key_exists($id, $this->cache)) {
                 $uncached[] = $id;
             }
-        }
-        if (count($this->cache) + count($uncached) > $this->maxUniquePosts) {
-            throw new \LengthException(
-                'Post enrichment request exceeds the unique-post limit.'
-            );
         }
 
         if ($uncached !== array() && function_exists('_prime_post_caches')) {

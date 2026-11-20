@@ -55,7 +55,7 @@ final class SchemaQuery implements BatchAwareQueryResolver
             'revision' => $schema->revision(),
             'siteId' => $context->siteId(),
             'userId' => $context->userId(),
-        )), 0);
+        )));
     }
 
     public function execute(\stdClass $params, object $context)

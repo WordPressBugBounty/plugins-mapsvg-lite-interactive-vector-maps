@@ -35,6 +35,13 @@ final class PostQueryExtension implements AdvancedQueryExtension
         $postFilter = $options['postFilter'] ?? null;
         $resolvedFilterIds = $options['resolvedPostIds'] ?? null;
 
+        if (is_array($resolvedFilterIds) && count($resolvedFilterIds) > $context->limits()->maxListValues()) {
+            $field = $context->schema()->getFieldByType('post');
+            if (!$field) throw new \InvalidArgumentException('Resolved IDs require a post field.');
+            $resolved = $context->fields()->resolve((string) $field->name);
+            $builder->addWhere($builder->inCondition($resolved->storageName(), $this->ids($resolvedFilterIds)));
+        }
+
         if ($postFilter !== null) {
             if (!is_array($postFilter)
                 || !isset($postFilter['field'], $postFilter['value'])
@@ -57,7 +64,7 @@ final class PostQueryExtension implements AdvancedQueryExtension
                     $context->schema(),
                     $postFilter['value']
                 );
-                $resolvedFilterIds = $this->ids($resolvedFilterIds, $context);
+                $resolvedFilterIds = $this->ids($resolvedFilterIds);
                 $builder->addWhere($builder->inCondition(
                     $field->storageName(),
                     $resolvedFilterIds
@@ -82,7 +89,7 @@ final class PostQueryExtension implements AdvancedQueryExtension
                     (string) $search['term']
                 );
             }
-            $options['postSearchIds'] = $this->ids($searchIds, $context);
+            $options['postSearchIds'] = $this->ids($searchIds);
         } else {
             $options['postSearchIds'] = array();
         }
@@ -103,13 +110,10 @@ final class PostQueryExtension implements AdvancedQueryExtension
     }
 
     /** @param mixed $ids @return array<int, int|string> */
-    private function ids($ids, AdvancedQueryContext $context): array
+    private function ids($ids): array
     {
         if (!is_array($ids)) {
             throw new \InvalidArgumentException('Resolved post IDs must be a list.');
-        }
-        if (count($ids) > $context->limits()->maxListValues()) {
-            throw new \LengthException('Resolved post IDs exceed the server limit.');
         }
         $normalized = array();
         foreach ($ids as $id) {

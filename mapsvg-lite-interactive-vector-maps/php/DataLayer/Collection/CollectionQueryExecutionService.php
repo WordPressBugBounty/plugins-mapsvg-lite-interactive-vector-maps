@@ -28,7 +28,7 @@ final class CollectionQueryExecutionService
             return SimpleQueryServiceFactory::forSchema(
                 $dataLayer,
                 $schema,
-                new QueryLimits(5000, 5000, 500, 24, 500)
+                new QueryLimits(500, 24, 500)
             )->findPrisma($input);
         };
     }
@@ -70,7 +70,7 @@ final class CollectionQueryExecutionService
         }
         $service = SimpleQueryServiceFactory::forSchema(
             DataLayerFactory::createV2(null, array('force' => true)), $schema,
-            new QueryLimits(5000, 5000, 500, 24, 500)
+            new QueryLimits(500, 24, 500)
         );
         return $service->findPageBinding($input, new \MapSVG\Query(array_merge(
             $runtime, array('perpage' => 1, 'page' => 1, 'withCount' => true)

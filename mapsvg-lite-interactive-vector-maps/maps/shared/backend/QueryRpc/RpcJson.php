@@ -8,8 +8,6 @@ final class RpcJson
 {
     public const REQUEST_BYTES = 262144;
     public const PARAMS_BYTES = 65536;
-    public const RESPONSE_BYTES = 8388608;
-    public const RESULT_BYTES = 2097152;
     public const BATCH_CALLS = 25;
 
     public static function encode($value): string
@@ -37,16 +35,20 @@ final class RpcJson
     }
 
     /** PHP resolver results may use associative arrays for JSON objects. */
-    public static function copyResult($value, int $maxBytes, int &$nodes = 0)
+    public static function copyResult($value, ?int $maxBytes = null, int &$nodes = 0)
     {
-        $copy = self::visit($value, 2, $nodes, true);
-        if (strlen(self::encode($copy)) > $maxBytes) throw new \LengthException('RPC result exceeds byte limit.');
+        $copy = self::visit($value, 0, $nodes, true, $maxBytes !== null);
+        $json = self::encode($copy);
+        if ($maxBytes !== null && strlen($json) > $maxBytes) throw new \LengthException('RPC result exceeds byte limit.');
         return $copy;
     }
 
-    private static function visit($value, int $depth, int &$nodes, bool $resultArrays = false)
+    private static function visit($value, int $depth, int &$nodes, bool $resultArrays = false, bool $bounded = true)
     {
-        if (++$nodes > 100000 || $depth > 24) throw new \LengthException('RPC JSON is too complex.');
+        ++$nodes;
+        if ($bounded && ($nodes > 100000 || $depth > 24)) throw new \LengthException('RPC JSON is too complex.');
+        // Match the JSON encoder's nesting boundary and reject recursive values.
+        if ($depth >= 512) throw new \InvalidArgumentException('RPC values must be acyclic JSON.');
         if ($value === null || is_bool($value) || is_string($value) || is_int($value)) return $value;
         if (is_float($value) && is_finite($value)) return $value;
         if (is_array($value) && $resultArrays && $value !== array() && array_keys($value) !== range(0, count($value) - 1)) {
@@ -57,7 +59,7 @@ final class RpcJson
                 throw new \InvalidArgumentException('RPC arrays must be lists. Decode JSON objects as stdClass.');
             }
             $copy = array();
-            foreach ($value as $item) $copy[] = self::visit($item, $depth + 1, $nodes, $resultArrays);
+            foreach ($value as $item) $copy[] = self::visit($item, $depth + 1, $nodes, $resultArrays, $bounded);
             return $copy;
         }
         if (!is_object($value) || get_class($value) !== \stdClass::class) {
@@ -65,16 +67,16 @@ final class RpcJson
         }
         $copy = new \stdClass();
         foreach (get_object_vars($value) as $key => $item) {
-            self::visit((string) $key, $depth + 1, $nodes);
-            $copy->{(string) $key} = self::visit($item, $depth + 1, $nodes, $resultArrays);
+            self::visit((string) $key, $depth + 1, $nodes, $resultArrays, $bounded);
+            $copy->{(string) $key} = self::visit($item, $depth + 1, $nodes, $resultArrays, $bounded);
         }
         return $copy;
     }
 
     /** Canonical object ordering for internal identity; arrays retain order and typed values. */
-    public static function canonicalHash($value): string
+    public static function canonicalHash($value, bool $request = true): string
     {
-        return hash('sha256', self::encode(self::canonical(self::copy($value, self::REQUEST_BYTES))));
+        return hash('sha256', self::encode(self::canonical($request ? self::copy($value, self::REQUEST_BYTES) : self::copyResult($value))));
     }
 
     private static function canonical($value)

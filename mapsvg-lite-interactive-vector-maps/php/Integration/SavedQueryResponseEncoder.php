@@ -21,6 +21,6 @@ final class SavedQueryResponseEncoder
         }
         // The existing catalog has no aggregate HTTP limit. Individual saved
         // definitions retain their Store limits; do not import the RPC ceiling.
-        return RestResponseJsonEncoder::serve($response, $request, $server, null);
+        return RestResponseJsonEncoder::serve($response, $request, $server);
     }
 }

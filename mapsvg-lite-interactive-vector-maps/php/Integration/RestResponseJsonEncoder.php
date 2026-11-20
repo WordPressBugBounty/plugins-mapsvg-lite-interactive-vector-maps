@@ -2,12 +2,10 @@
 declare(strict_types=1);
 namespace MapSVG\Integration;
 
-use MapSVG\Shared\QueryRpc\RpcJson;
-
 /** Shared HTTP tail, invoked only by explicit WordPress resource route owners. */
 final class RestResponseJsonEncoder
 {
-    public static function serve($response,$request,$server,?int $maxBytes=RpcJson::RESPONSE_BYTES): bool
+    public static function serve($response,$request,$server): bool
     {
         // WordPress has already authenticated/dispatched and sent status and headers.
         if($request->get_method()==='HEAD')return true;
@@ -21,8 +19,7 @@ final class RestResponseJsonEncoder
             $options=$request->has_param('_pretty')?JSON_PRETTY_PRINT:0;
             $options=apply_filters('rest_json_encode_options',$options,$request);
             $json=self::encode($data,$options);
-            $output=self::output($json,$maxBytes);
-            if($maxBytes!==null && strlen($output)>$maxBytes)throw new \LengthException('REST HTTP response exceeds its bound.');
+            $output=self::output($json);
         } catch(\Throwable $error) {
             // Core's native error shape; do not disclose plugin/filter exception details.
             status_header(500);
@@ -31,12 +28,8 @@ final class RestResponseJsonEncoder
             // This error contains no floats. Keep core's selected formatting/options when valid.
             try {$json=wp_json_encode($failure,$options);}
             catch(\Throwable $ignored) {$json=false;}
-            if(!is_string($json) || ($maxBytes!==null && strlen($json)>$maxBytes))$json='{"code":"rest_encode_error","message":"JSON response encoding failed.","data":{"status":500}}';
-            try {$output=self::output($json,$maxBytes);}
-            catch(\LengthException $ignored) {
-                $server->send_header('Content-Type','application/json; charset='.get_option('blog_charset'));
-                $output=$json;
-            }
+            if(!is_string($json))$json='{"code":"rest_encode_error","message":"JSON response encoding failed.","data":{"status":500}}';
+            $output=self::output($json);
         }
         // The host setting has been restored before any output or subsequent serve hooks.
         echo $output;
@@ -62,11 +55,10 @@ final class RestResponseJsonEncoder
         }
     }
 
-    private static function output(string $json,?int $maxBytes): string
+    private static function output(string $json): string
     {
         // Core validates/enables this callback before dispatch and before this hook.
         $callback=$_GET['_jsonp']??false;
-        if($callback && $maxBytes!==null && strlen($callback)+strlen($json)+6>$maxBytes)throw new \LengthException('REST HTTP response exceeds its bound.');
         return $callback?'/**/'.$callback.'('.$json.')':$json;
     }
 }

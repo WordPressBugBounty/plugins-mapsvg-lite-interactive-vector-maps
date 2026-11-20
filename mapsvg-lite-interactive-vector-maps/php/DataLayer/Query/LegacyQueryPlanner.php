@@ -29,14 +29,14 @@ final class LegacyQueryPlanner
     }
 
     /**
-     * Supported context: resolvedPostIds => bounded scalar ID list.
+     * Supported context: resolvedPostIds => server-resolved scalar ID list.
      *
      * @param array<string, mixed> $context
      */
     public function plan(Query $query, array $context = array()): QueryPlan
     {
         $this->assertContext($context);
-        list($page, $perpage, $skip, $take, $hardLimit, $extraRow) =
+        list($page, $perpage, $skip, $take, $extraRow) =
             $this->pagination($query);
         $this->validateFilterInputs($query, $context);
 
@@ -67,7 +67,6 @@ final class LegacyQueryPlanner
                     'publicPostTable' => $context['publicPostTable'] ?? null,
                 ),
                 $extraRow,
-                $hardLimit,
                 (bool) $query->withCount
             );
         }
@@ -75,8 +74,8 @@ final class LegacyQueryPlanner
         $orderBy = $this->orderBy($query);
         $options = array(
             'orderBy' => $orderBy,
-            'take' => $take,
         );
+        if ($take !== null) $options['take'] = $take;
         if ($where !== array()) {
             $options['where'] = $where;
         }
@@ -95,7 +94,6 @@ final class LegacyQueryPlanner
             $page,
             $perpage,
             $extraRow,
-            $hardLimit,
             (bool) $query->withCount
         );
     }
@@ -117,7 +115,7 @@ final class LegacyQueryPlanner
         }
         foreach (array('resolvedPostIds', 'resolvedPostSearchIds') as $name) {
             if (array_key_exists($name, $context)) {
-                $this->boundedList($context[$name], $name, true);
+                $this->boundedList($context[$name], $name, true, false);
             }
         }
         if (isset($context['publicPostTable']) && (!is_string($context['publicPostTable'])
@@ -141,7 +139,7 @@ final class LegacyQueryPlanner
         }
     }
 
-    /** @return array{0:int,1:int,2:int,3:int,4:?int,5:bool} */
+    /** @return array{0:int,1:int,2:int,3:?int,4:bool} */
     private function pagination(Query $query): array
     {
         $page = (int) $query->page;
@@ -152,27 +150,23 @@ final class LegacyQueryPlanner
         if ($perpage < 0) {
             throw new \InvalidArgumentException('Legacy query perpage must not be negative.');
         }
-        if ($perpage > $this->limits->maxPageSize()) {
-            throw new \LengthException('Legacy query perpage exceeds the server limit.');
-        }
 
         if ($perpage === 0) {
             return array(
                 $page,
                 0,
                 0,
-                $this->limits->maxUnboundedRows() + 1,
-                $this->limits->maxUnboundedRows(),
+                null,
                 false,
             );
         }
 
         $pageIndex = $page - 1;
-        if ($pageIndex > intdiv(PHP_INT_MAX, $perpage)) {
+        if ($perpage === PHP_INT_MAX || $pageIndex > intdiv(PHP_INT_MAX, $perpage)) {
             throw new \OverflowException('Legacy query pagination offset is too large.');
         }
         $skip = $pageIndex * $perpage;
-        return array($page, $perpage, $skip, $perpage + 1, null, true);
+        return array($page, $perpage, $skip, $perpage + 1, true);
     }
 
     /** @param array<string, mixed> $context */
@@ -239,6 +233,10 @@ final class LegacyQueryPlanner
     private function advancedReasons(Query $query, array $context): array
     {
         $reasons = array();
+        if (isset($context['resolvedPostIds']) && count($context['resolvedPostIds']) > $this->limits->maxListValues()) {
+            // Server-resolved IDs bypass the input-list compiler through prepared SQL.
+            $reasons[] = 'resolved_post_ids';
+        }
         if (isset($context['publicPostTable']) && $this->schema->type === 'post') {
             $reasons[] = 'public_post_visibility';
         }
@@ -344,7 +342,8 @@ final class LegacyQueryPlanner
         }
 
         if (array_key_exists('resolvedPostIds', $context)) {
-            $predicates[] = $this->resolvedPostPredicate($context['resolvedPostIds']);
+            $predicate = $this->resolvedPostPredicate($context['resolvedPostIds']);
+            if (count($context['resolvedPostIds']) <= $this->limits->maxListValues()) $predicates[] = $predicate;
         }
 
         return $this->andPredicates($predicates);
@@ -656,7 +655,7 @@ final class LegacyQueryPlanner
         }
 
         $resolved = $this->fields->resolve((string) $field->name);
-        $values = $this->boundedList($ids, 'resolvedPostIds', true);
+        $values = $this->boundedList($ids, 'resolvedPostIds', true, false);
         $normalized = array();
         foreach ($values as $value) {
             if (!is_scalar($value) || is_bool($value)) {
@@ -776,7 +775,7 @@ final class LegacyQueryPlanner
     }
 
     /** @return array<int, mixed> */
-    private function boundedList($value, string $label, bool $allowEmpty): array
+    private function boundedList($value, string $label, bool $allowEmpty, bool $bounded = true): array
     {
         if (!is_array($value) || !self::isList($value)) {
             throw new \InvalidArgumentException($label . ' must be a list.');
@@ -784,7 +783,7 @@ final class LegacyQueryPlanner
         if (!$allowEmpty && $value === array()) {
             throw new \InvalidArgumentException($label . ' must not be empty.');
         }
-        if (count($value) > $this->limits->maxListValues()) {
+        if ($bounded && count($value) > $this->limits->maxListValues()) {
             throw new \LengthException($label . ' exceeds the server list limit.');
         }
         return array_values($value);

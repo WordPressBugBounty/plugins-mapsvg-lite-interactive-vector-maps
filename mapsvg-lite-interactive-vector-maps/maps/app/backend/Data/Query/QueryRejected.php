@@ -9,7 +9,7 @@ final class QueryRejected extends \RuntimeException
     private string $reason;
     public function __construct(string $reason)
     {
-        if (!in_array($reason, array('app_changed', 'app_not_found', 'forbidden', 'invalid_params', 'query_not_found', 'query_changed', 'query_budget_exceeded', 'resource_not_found'), true)) {
+        if (!in_array($reason, array('app_changed', 'app_not_found', 'forbidden', 'invalid_params', 'query_not_found', 'query_changed', 'resource_not_found'), true)) {
             throw new \InvalidArgumentException('Invalid query rejection reason.');
         }
         $this->reason = $reason;

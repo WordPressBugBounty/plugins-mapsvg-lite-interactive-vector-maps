@@ -301,7 +301,7 @@ final class SavedQueryStore
                 throw new \InvalidArgumentException($key . ' JSON is invalid or too large.');
             }
         }
-        $limits = new QueryLimits(250, 5000, 500, 24, 500);
+        $limits = new QueryLimits(500, 24, 500);
         $effectiveInput = array_merge(
             $inputMembers,
             array('take' => $inputMembers['take'] ?? 50)

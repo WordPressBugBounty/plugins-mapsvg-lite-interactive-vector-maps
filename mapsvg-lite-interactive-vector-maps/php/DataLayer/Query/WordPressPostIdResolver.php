@@ -84,7 +84,7 @@ final class WordPressPostIdResolver implements PostIdResolver
             : 'post';
         return array(
             'post_type' => $postType,
-            'posts_per_page' => $this->limits->maxListValues() + 1,
+            'posts_per_page' => -1,
             'fields' => 'ids',
             'no_found_rows' => true,
             'suppress_filters' => false,
@@ -218,11 +218,6 @@ final class WordPressPostIdResolver implements PostIdResolver
         }
         $query = new \WP_Query($args);
         $ids = is_array($query->posts) ? array_values($query->posts) : array();
-        if (count($ids) > $this->limits->maxListValues()) {
-            throw new \LengthException(
-                'Resolved post IDs exceed the server list limit.'
-            );
-        }
         return $ids;
     }
 

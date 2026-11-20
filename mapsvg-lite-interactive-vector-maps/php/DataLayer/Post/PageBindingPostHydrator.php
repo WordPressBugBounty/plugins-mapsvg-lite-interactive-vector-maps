@@ -20,7 +20,7 @@ final class PageBindingPostHydrator
             if (array_key_exists($name, $row) && is_scalar($row[$name]) && (int) $row[$name] > 0) $ids[(int) $row[$name]] = (int) $row[$name];
         }
         $values = [];
-        // Enrichment has a bounded request cache; wide unpaged reads use bounded batches.
+        // Prime WordPress caches in batches without limiting the complete result.
         foreach (array_chunk(array_values($ids), 200) as $batch) {
             $enriched = ($posts ?? new WordPressPostEnricher())->enrichMany($batch);
             // WP_Post / WP_Term are domain objects; named RPC admits plain JSON only.

@@ -25,7 +25,6 @@ final class QueryPlan
     private int $page;
     private int $perpage;
     private bool $fetchesExtraRow;
-    private ?int $hardRowLimit;
     private bool $needsCount;
     /** @var string[]|null */
     private ?array $publicSelect;
@@ -46,7 +45,6 @@ final class QueryPlan
         int $page,
         int $perpage,
         bool $fetchesExtraRow,
-        ?int $hardRowLimit,
         bool $needsCount,
         ?array $publicSelect
     ) {
@@ -69,7 +67,6 @@ final class QueryPlan
         $this->page = $page;
         $this->perpage = $perpage;
         $this->fetchesExtraRow = $fetchesExtraRow;
-        $this->hardRowLimit = $hardRowLimit;
         $this->needsCount = $needsCount;
         $this->publicSelect = $publicSelect === null
             ? null
@@ -84,7 +81,6 @@ final class QueryPlan
         int $page,
         int $perpage,
         bool $fetchesExtraRow,
-        ?int $hardRowLimit,
         bool $needsCount,
         ?array $publicSelect = null
     ): self {
@@ -98,7 +94,6 @@ final class QueryPlan
             $page,
             $perpage,
             $fetchesExtraRow,
-            $hardRowLimit,
             $needsCount,
             $publicSelect
         );
@@ -116,7 +111,6 @@ final class QueryPlan
         int $perpage = 0,
         array $advancedOptions = array(),
         bool $fetchesExtraRow = false,
-        ?int $hardRowLimit = null,
         bool $needsCount = false,
         ?array $publicSelect = null
     ): self {
@@ -130,7 +124,6 @@ final class QueryPlan
             $page,
             $perpage,
             $fetchesExtraRow,
-            $hardRowLimit,
             $needsCount,
             $publicSelect
         );
@@ -193,11 +186,6 @@ final class QueryPlan
     public function fetchesExtraRow(): bool
     {
         return $this->fetchesExtraRow;
-    }
-
-    public function hardRowLimit(): ?int
-    {
-        return $this->hardRowLimit;
     }
 
     public function needsCount(): bool

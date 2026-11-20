@@ -25,12 +25,6 @@ final class SimpleQueryExecutor
         }
 
         $storageRows = $this->store->findMany($plan->options());
-        $hardLimit = $plan->hardRowLimit();
-        if ($hardLimit !== null && count($storageRows) > $hardLimit) {
-            throw new \LengthException(
-                'Query exceeds the guarded All rows limit of ' . $hardLimit . '.'
-            );
-        }
 
         $hasMore = $plan->fetchesExtraRow()
             && count($storageRows) > $plan->perpage();

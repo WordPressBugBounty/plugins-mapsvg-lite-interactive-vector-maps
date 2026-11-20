@@ -24,7 +24,7 @@ final class AdvancedSqlBuilder
     private array $having = array();
     /** @var string[] */
     private array $orderBy = array();
-    private int $take = 0;
+    private ?int $take = null;
     private int $skip = 0;
     private bool $paginationSet = false;
 
@@ -136,9 +136,9 @@ final class AdvancedSqlBuilder
             . ' ' . $this->direction($direction);
     }
 
-    public function setPagination(int $take, int $skip): void
+    public function setPagination(?int $take, int $skip): void
     {
-        if ($take < 0 || $skip < 0) {
+        if (($take !== null && $take < 0) || $skip < 0) {
             throw new \InvalidArgumentException(
                 'Advanced pagination values must be non-negative.'
             );
@@ -174,11 +174,6 @@ final class AdvancedSqlBuilder
         if ($values === array()) {
             return '0 = 1';
         }
-        if (count($values) > $this->context->limits()->maxListValues()) {
-            throw new \LengthException(
-                'Advanced IN list exceeds the server limit.'
-            );
-        }
         $params = array();
         foreach ($values as $value) {
             if (!is_scalar($value)
@@ -208,8 +203,8 @@ final class AdvancedSqlBuilder
         if ($this->orderBy !== array()) {
             $sql .= ' ORDER BY ' . implode(', ', $this->orderBy);
         }
-        if ($this->paginationSet) {
-            $sql .= ' LIMIT ' . $this->take;
+        if ($this->paginationSet && ($this->take !== null || $this->skip > 0)) {
+            $sql .= ' LIMIT ' . ($this->take ?? PHP_INT_MAX);
             if ($this->skip > 0) {
                 $sql .= ' OFFSET ' . $this->skip;
             }

@@ -3,7 +3,7 @@ Contributors: oyatek
 Tags: ai maps, interactive map, map, google maps, store locator
 Requires at least: 5.0
 Tested up to: 7.1.4
-Stable tag: 9.0.9
+Stable tag: 9.0.11
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -104,6 +104,18 @@ Use the Support button in MapSVG to open your Dashboard, then use the chat butto
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 9.0.11 =
+* Lite: Fixed large maps failing to load because of internal data response limits. Configured pagination still applies.
+* Lite and all add-ons: Fixed region Details staying empty when opened before the data finishes loading, including maps using the v8 renderer.
+* Lite: Fixed dragging the scrollbar thumb in the Details panel.
+* Paid add-ons and Demo: Fixed WordPress notices caused by early script registration.
+* Update Lite and your add-on to receive all applicable fixes.
+
+= 9.0.10 =
+* Lite: A free license includes 10 non-expiring AI credits, granted once.
+* Lite: Usage and chat show reset information only for licenses with a recurring AI allowance.
+* Update the Lite plugin to 9.0.10, including on paid installations.
 
 = 9.0.9 =
 * **Lite**: Security improvements for embedded shortcode content. Update Lite on both free and paid installations; no paid add-on update is required.

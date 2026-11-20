@@ -21,6 +21,6 @@ final class SavedQueryExecutionResponseEncoder
             return $served;
         }
         // Preserve the existing v1 HTTP size policy, independently of v9 RPC.
-        return RestResponseJsonEncoder::serve($response, $request, $server, null);
+        return RestResponseJsonEncoder::serve($response, $request, $server);
     }
 }

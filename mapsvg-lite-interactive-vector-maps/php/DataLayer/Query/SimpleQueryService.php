@@ -70,18 +70,18 @@ final class SimpleQueryService
             $extra['where'] = $where;
             $extra['select'] = $options['select'] ?? array();
             $extra['skip'] = $options['skip'] ?? 0;
-            $extra['take'] = $options['take'];
+            $extra['take'] = $options['take'] ?? null;
             $extra['orderBy'] = array();
             foreach ($options['orderBy'] ?? array() as $group) foreach ($group as $field => $direction) {
                 $extra['orderBy'][] = array('kind' => 'field', 'field' => $field, 'direction' => $direction);
             }
             $plan = QueryPlan::advanced(QueryPlan::PRISMA_RESPONSE, $filter->advancedReasons(), 1,
-                $options['take'], $extra, false, null, true, $base->publicSelect());
+                ($options['take'] ?? 0), $extra, false, true, $base->publicSelect());
         } else {
             $options['where'] = $where;
             $plan = QueryPlan::plasma(QueryPlan::PRISMA_RESPONSE, $options,
                 $where === array() ? array() : array('where' => $where), 1,
-                $options['take'], false, null, true, $base->publicSelect());
+                ($options['take'] ?? 0), false, true, $base->publicSelect());
         }
         return (new PrismaQueryResponseAdapter())->adapt($this->executePlan($plan));
     }

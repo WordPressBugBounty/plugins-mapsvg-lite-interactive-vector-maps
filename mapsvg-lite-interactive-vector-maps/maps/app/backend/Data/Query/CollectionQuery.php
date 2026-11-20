@@ -46,10 +46,10 @@ final class CollectionQuery implements BatchAwareQueryResolver, QuerySchemaMetad
             $result = new \stdClass();
             $result->name = CollectionName::validate($params->name ?? null);
             $result->skip = property_exists($params, 'skip')
-                ? self::integer($params->skip, 0, 1000000)
+                ? self::integer($params->skip, 0)
                 : 0;
             $result->take = property_exists($params, 'take')
-                ? self::integer($params->take, 1, 500)
+                ? self::integer($params->take, 1)
                 : 50;
 
             foreach (array('where', 'select', 'orderBy') as $key) {
@@ -79,7 +79,7 @@ final class CollectionQuery implements BatchAwareQueryResolver, QuerySchemaMetad
             'siteId' => $context->siteId(),
             'userId' => $context->userId(),
         ));
-        return new QueryBatchPolicy($key, $params->take);
+        return new QueryBatchPolicy($key);
     }
 
     public function execute(\stdClass $params, object $context)
@@ -188,14 +188,15 @@ final class CollectionQuery implements BatchAwareQueryResolver, QuerySchemaMetad
         return $schema;
     }
 
-    private static function integer($value, int $minimum, int $maximum): int
+    private static function integer($value, int $minimum): int
     {
-        if ((!is_int($value) && !is_float($value))
+        if (is_int($value) && $value >= $minimum) return $value;
+        if (!is_float($value)
             || !is_finite((float) $value)
             || floor((float) $value) !== (float) $value
             || $value < $minimum
-            || $value > $maximum) {
-            throw new \InvalidArgumentException('Expected a bounded integer.');
+            || $value >= (float) PHP_INT_MAX) {
+            throw new \InvalidArgumentException('Expected a non-negative representable integer.');
         }
         return (int) $value;
     }

@@ -44,7 +44,7 @@ final class PrismaQueryPlanner
         $translation = $this->whereTranslator->translate($whereInput);
         list($select, $publicSelect) = $this->select($query['select'] ?? array());
         list($orderBy, $orderReasons) = $this->orderBy($query['orderBy'] ?? array());
-        list($take, $skip, $hardLimit, $perpage) = $this->pagination($query);
+        list($take, $skip, $perpage) = $this->pagination($query);
 
         $advanced = array_values(array_unique(array_merge(
             $translation->advancedReasons(),
@@ -66,15 +66,14 @@ final class PrismaQueryPlanner
                     'take' => $take,
                 ),
                 false,
-                $hardLimit,
                 true,
                 $publicSelect
             );
         }
         $options = array(
             'orderBy' => $orderBy,
-            'take' => $take,
         );
+        if ($take !== null) $options['take'] = $take;
         if ($translation->where() !== array()) {
             $options['where'] = $translation->where();
         }
@@ -96,7 +95,6 @@ final class PrismaQueryPlanner
             1,
             $perpage,
             false,
-            $hardLimit,
             true,
             $publicSelect
         );
@@ -276,7 +274,7 @@ final class PrismaQueryPlanner
         return array($translated, array_values(array_unique($advanced)));
     }
 
-    /** @param array<string, mixed> $query @return array{0:int,1:int,2:?int,3:int} */
+    /** @param array<string, mixed> $query @return array{0:?int,1:int,2:int} */
     private function pagination(array $query): array
     {
         $skip = $query['skip'] ?? 0;
@@ -288,9 +286,8 @@ final class PrismaQueryPlanner
 
         if (!array_key_exists('take', $query)) {
             return array(
-                $this->limits->maxUnboundedRows() + 1,
+                null,
                 $skip,
-                $this->limits->maxUnboundedRows(),
                 0,
             );
         }
@@ -301,10 +298,7 @@ final class PrismaQueryPlanner
                 'Prisma take must be a non-negative integer.'
             );
         }
-        if ($take > $this->limits->maxPageSize()) {
-            throw new \LengthException('Prisma take exceeds the server page-size limit.');
-        }
-        return array($take, $skip, null, $take);
+        return array($take, $skip, $take);
     }
 
     private static function isList(array $value): bool

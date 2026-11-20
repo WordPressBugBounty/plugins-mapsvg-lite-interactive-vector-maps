@@ -11,8 +11,6 @@ use MapSVG\Shared\QueryRpc\RpcJson;
 /** Editor-authorized logical schema catalog; field definitions stay behind getSchema. */
 final class SchemaCatalogQuery implements BatchAwareQueryResolver
 {
-    private const MAX_SCHEMAS = 5000;
-
     private CollectionSchemaCatalog $catalog;
     private int $siteId;
 
@@ -54,7 +52,7 @@ final class SchemaCatalogQuery implements BatchAwareQueryResolver
             'revision' => self::revision($schemas),
             'siteId' => $context->siteId(),
             'userId' => $context->userId(),
-        )), count($schemas));
+        )));
     }
 
     public function execute(\stdClass $params, object $context)
@@ -83,9 +81,6 @@ final class SchemaCatalogQuery implements BatchAwareQueryResolver
     private function schemas(): array
     {
         $schemas = $this->catalog->listSchemas();
-        if (count($schemas) > self::MAX_SCHEMAS) {
-            throw new QueryRejected('query_budget_exceeded');
-        }
         foreach ($schemas as $schema) {
             if (!$schema instanceof CollectionReadSchema) {
                 throw new \UnexpectedValueException('Invalid schema catalog result.');
@@ -100,6 +95,6 @@ final class SchemaCatalogQuery implements BatchAwareQueryResolver
         $items = array_map(static function (CollectionReadSchema $schema): \stdClass {
             return (object) array('schemaId' => $schema->id(), 'revision' => $schema->revision());
         }, $schemas);
-        return RpcJson::canonicalHash($items);
+        return RpcJson::canonicalHash($items, false);
     }
 }

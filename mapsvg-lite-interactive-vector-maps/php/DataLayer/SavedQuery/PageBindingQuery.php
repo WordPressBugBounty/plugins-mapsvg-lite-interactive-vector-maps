@@ -41,7 +41,7 @@ final class PageBindingQuery implements BatchAwareQueryResolver
             || !is_int($params->mapId ?? null) || $params->mapId < 1
             || !is_string($params->pageId ?? null) || strlen($params->pageId) > 120
             || !in_array($params->role ?? null, array('objects', 'regions'), true)
-            || (isset($params->page) && (!is_int($params->page) || $params->page < 1 || $params->page > 1000000))
+            || (isset($params->page) && (!is_int($params->page) || $params->page < 1))
             || (isset($params->versionId) && (!is_int($params->versionId) || $params->versionId < 1))
             || (isset($params->editorBinding) && !$params->editorBinding instanceof \stdClass)
             || (isset($params->runtime) && !$params->runtime instanceof \stdClass)
@@ -55,7 +55,7 @@ final class PageBindingQuery implements BatchAwareQueryResolver
     public function batchPolicy(\stdClass $params, object $context): QueryBatchPolicy
     {
         $this->authorize($context, $params);
-        return new QueryBatchPolicy(null, 5000);
+        return new QueryBatchPolicy(null);
     }
 
     /** Compatible defaults are read-only; explicit Page settings always win. */
@@ -113,19 +113,20 @@ final class PageBindingQuery implements BatchAwareQueryResolver
             if (array_key_exists('orderBy', $binding) && $binding['orderBy'] !== null && $binding['orderBy'] !== array()) $input['orderBy'] = $binding['orderBy'];
             $pagination = $binding['pagination'] ?? array();
             $overrideSize = array_key_exists('perPage', $binding);
-            if ($overrideSize && $binding['perPage'] !== null && (!is_int($binding['perPage']) || $binding['perPage'] < 1 || $binding['perPage'] > 5000)) throw new QueryRejected('invalid_params');
-            // Missing take on a Regions Query means all regions, not the Objects
-            // default page size. Keep each RPC bounded; the runtime joins chunks.
-            $unpaged = $schema->hasSvgBinding() && !array_key_exists('take', $input)
+            if ($overrideSize && $binding['perPage'] !== null && (!is_int($binding['perPage']) || $binding['perPage'] < 1)) throw new QueryRejected('invalid_params');
+            // No explicit page size means all rows, for Objects and Regions alike.
+            $unpaged = !array_key_exists('take', $input)
                 && (!isset($binding['perPage'])) && ($overrideSize || empty($pagination['on']));
-            $take = $unpaged ? 5000 : ($overrideSize ? ($binding['perPage'] ?? $input['take'] ?? 50)
-                : (!empty($pagination['on']) ? ($pagination['perpage'] ?? 30) : ($input['take'] ?? 5000)));
-            if (!is_int($take) || $take < 0 || $take > 5000) throw new QueryRejected('invalid_params');
-            if ($saved && isset($saved['rpc'])) $take = min($take, $input['take'] ?? 50);
+            $take = $unpaged ? null : ($overrideSize ? ($binding['perPage'] ?? $input['take'] ?? 50)
+                : (!empty($pagination['on']) ? ($pagination['perpage'] ?? 30) : ($input['take'] ?? null)));
+            if ($take !== null && (!is_int($take) || $take < 0)) throw new QueryRejected('invalid_params');
+            if ($saved && isset($saved['rpc'])) $take = $take === null ? ($input['take'] ?? 50) : min($take, $input['take'] ?? 50);
             $page = $unpaged || $overrideSize || array_key_exists('take', $input) || !empty($pagination['on']) ? ($params->page ?? 1) : 1;
-            $input['take'] = $take;
-            $input['skip'] = ($page - 1) * $take;
-            if ($input['skip'] > 1000000) throw new QueryRejected('invalid_params');
+            if ($take !== null) $input['take'] = $take;
+            else unset($input['take']);
+            $pageIndex = $page - 1;
+            if ($take !== null && $take > 0 && $pageIndex > intdiv(PHP_INT_MAX, $take)) throw new QueryRejected('invalid_params');
+            $input['skip'] = $pageIndex * ($take ?? 0);
             $runtime = isset($params->runtime) ? json_decode(json_encode($params->runtime), true) : array();
             if (array_diff(array_keys($runtime), array('filters', 'search', 'searchField', 'searchFallback'))) throw new QueryRejected('invalid_params');
             if (isset($runtime['filters']) && !is_array($runtime['filters'])) throw new QueryRejected('invalid_params');
@@ -137,7 +138,7 @@ final class PageBindingQuery implements BatchAwareQueryResolver
             if (isset($params->field)) {
                 if (!preg_match('/\A[A-Za-z_][A-Za-z0-9_.-]{0,240}\z/D', $params->field) || !in_array(explode('.', $params->field)[0], $schema->getFieldNames(), true)) throw new QueryRejected('invalid_params');
                 $input['select'] = array(explode('.', $params->field)[0]);
-                $input['skip'] = 0; $input['take'] = 5000;
+                $input['skip'] = 0; unset($input['take']);
             }
             if ($saved && serialize($saved) !== serialize($this->store->query($saved['id']))) throw new QueryRejected('query_changed');
             $regionNames = array();
@@ -161,7 +162,6 @@ final class PageBindingQuery implements BatchAwareQueryResolver
             $rows = CollectionQueryProjection::apply($result['rows'], $input);
             $rows = \MapSVG\DataLayer\Post\PageBindingPostHydrator::hydrate($schema, $rows);
             if (isset($params->field)) {
-                if ($result['count'] > 5000) throw new QueryRejected('result_too_large');
                 $values = array();
                 $labels = array();
                 foreach ($schema->getField(explode('.', $params->field)[0])->options ?? array() as $option) {
@@ -183,7 +183,7 @@ final class PageBindingQuery implements BatchAwareQueryResolver
             }
             $description = PageBindingSource::resultSchema($schema, $input);
             $revision = hash('sha256', json_encode(array($saved['id'] ?? $queryId, $description), JSON_THROW_ON_ERROR));
-            $response = array('rows' => $rows, 'count' => $result['count'], 'page' => array('skip' => $input['skip'], 'take' => $take, 'hasMore' => $take > 0 && $input['skip'] + count($rows) < $result['count'], 'paginated' => !$unpaged), 'queryName' => $saved['name'] ?? $queryId, 'schemaRevision' => $revision,
+            $response = array('rows' => $rows, 'count' => $result['count'], 'page' => array('skip' => $input['skip'], 'take' => $take ?? 0, 'hasMore' => $take !== null && $take > 0 && $input['skip'] + count($rows) < $result['count'], 'paginated' => !$unpaged), 'queryName' => $saved['name'] ?? $queryId, 'schemaRevision' => $revision,
                 'bindingRevision' => hash('sha256', serialize(array($saved, $binding, $sourceRevision))));
             if (!empty($params->withSchema) || ($params->schemaRevision ?? null) !== $revision) $response['schema'] = $description;
             return $response;

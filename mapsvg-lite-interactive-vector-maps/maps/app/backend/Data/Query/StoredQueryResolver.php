@@ -37,13 +37,12 @@ final class StoredQueryResolver implements BatchAwareQueryResolver, QuerySchemaM
     public function batchPolicy(\stdClass $params, object $context): QueryBatchPolicy
     {
         $this->authorize($context, $params);
-        $input = $this->definition->options()->bind($this->definition->input(), $params, $context->userId());
         $key = \MapSVG\Shared\QueryRpc\RpcJson::canonicalHash((object) array(
             'query' => $this->definition->name(), 'revision' => $this->definition->revision(),
             'site' => $context->siteId(), 'user' => $context->userId(),
             'editor' => $context->canEditQueries(), 'params' => $params,
         ));
-        return new QueryBatchPolicy($key, $input['take']);
+        return new QueryBatchPolicy($key);
     }
     public function describeResult(\stdClass $params, object $context, $result): \stdClass
     {

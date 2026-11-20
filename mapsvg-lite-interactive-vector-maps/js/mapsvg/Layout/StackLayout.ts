@@ -85,6 +85,7 @@ export function applyStackContentLayout(element: HTMLElement, settings: Containe
 export function setStackComponentOpen(element: HTMLElement, opened: boolean): void {
   element.dataset.mapsvgComponentOpen = String(opened)
   element.style.display = opened ? "flex" : "none"
+  element.style.pointerEvents = opened ? "auto" : "none"
 }
 
 /** Returns whether this child provides a height constraint for its own children. */
@@ -116,8 +117,9 @@ export function applyStackChildLayout(element: HTMLElement, settings: ContainerL
   if (settings.height?.mode !== "fixed" && settings.heightPercent === undefined) element.style.height = absolute && (!anchored || settings.height?.mode === "fill") ? "100%" : fill ? "0px" : "auto"
   if (settings.width?.mode === "auto" && settings.maxWidth === undefined && settings.maxWidthPercent === undefined) element.style.maxWidth = "100%"
   element.style.overflow = bounded ? "auto" : "visible"
-  // An empty Details overlay must not intercept the Map before a record is opened.
-  element.style.pointerEvents = absolute ? "none" : "auto"
+  // An open Details host owns its native scrollbar, so it must accept pointer
+  // input itself; enabling only the child controller leaves the thumb inert.
+  element.style.pointerEvents = absolute && element.dataset.mapsvgComponentOpen !== "true" ? "none" : "auto"
   if (element.dataset.mapsvgComponentOpen === "false") element.style.display = "none"
   return bounded
 }

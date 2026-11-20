@@ -298,7 +298,6 @@ final class OperationSchemaCompiler
                 'take' => array(
                     'type' => 'integer',
                     'minimum' => 0,
-                    'maximum' => $this->limits->maxPageSize(),
                 ),
                 'skip' => array(
                     'type' => 'integer',

@@ -5763,7 +5763,7 @@ export class MapSVGMap {
 
   private detailsRegionId?: string
 
-  /** Refresh an open Region card after live Objects change, retaining its controller/placement. */
+  /** Refresh the current Region card after either repository is hydrated. */
   private refreshRegionDetails(): void {
     const controller = this.controllers.detailsView
     if (!this.detailsRegionId || !controller?.opened || controller.destroyed) return
@@ -7981,9 +7981,7 @@ export class MapSVGMap {
         if (this.controllers.popover) {
           this.controllers.popover.setState(region.getData())
         }
-        if (this.controllers.detailsView) {
-          this.controllers.detailsView.setState(region.getData())
-        }
+        this.refreshRegionDetails()
       })
       this.updateFiltersState()
     }
@@ -9105,7 +9103,6 @@ export class MapSVGMap {
           this.startClusterizer()
         }
         this.reloadRegionsFull()
-        this.refreshRegionDetails()
         this.objectsLoadedToMapHandler()
       },
     )
@@ -9756,6 +9753,7 @@ export class MapSVGMap {
     }
     this.updateFiltersState()
     if (this.options.regionDataRules) this.reloadAllRegionStyles()
+    this.refreshRegionDetails()
   }
 
   /**
