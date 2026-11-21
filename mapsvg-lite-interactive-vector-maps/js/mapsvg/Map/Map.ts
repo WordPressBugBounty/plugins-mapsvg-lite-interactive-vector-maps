@@ -603,6 +603,7 @@ export class MapSVGMap {
    */
   markers: ArrayIndexed<Marker> = new ArrayIndexed("id", [], { unique: true })
   private markerSpread?: MarkerSpread
+  private overlappingMarkerSpreadDisabled = false
   /**
    * Array of Marker clusters
    */
@@ -8038,6 +8039,23 @@ export class MapSVGMap {
     return marker
   }
 
+  /**
+   * Control automatic expansion when clicking overlapping individual markers.
+   * Enabled by default for each map instance. Disabling closes an open spread
+   * and lets subsequent clicks run the usual actions and `click.marker` handler.
+   * Cluster clicks follow their own behavior.
+   *
+   * @example
+   * // In the map's afterInit handler:
+   * event.map.setSpreadOverlappingMarkers(false)
+   */
+  setSpreadOverlappingMarkers(enabled: boolean): void {
+    const disabled = !enabled
+    if (this.overlappingMarkerSpreadDisabled === disabled) return
+    this.overlappingMarkerSpreadDisabled = disabled
+    if (disabled) this.collapseMarkerSpread()
+  }
+
   collapseMarkerSpread(animate = false): void {
     const spread = this.markerSpread
     if (!spread) return
@@ -8069,6 +8087,7 @@ export class MapSVGMap {
   private spreadOverlappingMarkers(marker: Marker): boolean {
     if (this.markerSpread?.markers.includes(marker)) return this.markerSpread.closing
     this.collapseMarkerSpread()
+    if (this.overlappingMarkerSpreadDisabled) return false
     const referenceX = marker.getInteractionScreenX()
     const point = this.converter.convertSVGToPixel(marker.svgPoint, referenceX)
     const candidates = this.markers.filter(candidate => {

@@ -2,8 +2,8 @@
 Contributors: oyatek
 Tags: ai maps, interactive map, map, google maps, store locator
 Requires at least: 5.0
-Tested up to: 7.1.4
-Stable tag: 9.0.11
+Tested up to: 7.1.5
+Stable tag: 9.0.12
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -104,6 +104,13 @@ Use the Support button in MapSVG to open your Dashboard, then use the chat butto
 You can report security bugs through the Patchstack Vulnerability Disclosure Program. The Patchstack team helps validate, triage and handle any security vulnerabilities. [Report a security vulnerability.](https://patchstack.com/database/vdp/4b4b7989-18ec-4cef-82a4-c2225e5fceef)
 
 == Changelog ==
+
+= 9.0.12 =
+* Lite: Fixed the “Isolate map styles from WP Theme” setting turning back on after publishing.
+* Lite: Added a JavaScript method to turn off automatic expansion of overlapping markers on individual maps.
+* Update Lite to receive both changes, including on installations with a paid add-on.
+* Paid add-ons and Demo: Fixed Directory backgrounds moving out of view when scrolling long lists, including when Filters share the sidebar.
+* Update your add-on to 9.0.12 to receive the Directory fix.
 
 = 9.0.11 =
 * Lite: Fixed large maps failing to load because of internal data response limits. Configured pagination still applies.

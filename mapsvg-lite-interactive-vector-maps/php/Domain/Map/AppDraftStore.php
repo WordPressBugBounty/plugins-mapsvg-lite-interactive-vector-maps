@@ -82,7 +82,6 @@ final class AppDraftStore
             throw new \InvalidArgumentException('A complete App snapshot is required.', 400);
         }
         $record['id'] = $mapId;
-        if ((int) ($record['options'][AppEngine::KEY] ?? 9) !== 8) unset($record['options']['useShadowRoot']);
         // Runtime record metadata is retained; title/source columns follow the authoring document.
         $record['title'] = (string) ($record['options']['title'] ?? $record['title'] ?? '');
         $record['svgFilePath'] = (string) ($record['options']['source'] ?? '');
